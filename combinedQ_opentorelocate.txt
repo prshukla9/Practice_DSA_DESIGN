@@ -1,0 +1,114 @@
+CATEGORY            | SUB-CATEGORY            | QUESTION
+------------------------------------------------------------------------------------------
+
+JAVA                | Basics                  | Functional Interface kya hota hai
+JAVA                | Basics                  | Lambda Expressions kaise kaam karti hai
+JAVA                | Internals               | System.out.println internal working
+JAVA                | Advanced                | Virtual Threads kya hai
+JAVA                | Streams                 | Frequency of characters using Streams
+JAVA                | Streams                 | Sort frequency map descending
+JAVA                | Streams                 | Complex stream (salary > 50k employees)
+JAVA                | Streams                 | Grouping + sorting employees
+JAVA                | Streams                 | Filter names starting with A
+JAVA                | Streams                 | Product grouping by category
+JAVA                | Streams                 | flatMap use-case (phone numbers)
+JAVA                | OOP                     | ArrayList vs Set
+JAVA                | OOP                     | int vs Integer
+
+SPRING BOOT         | Core                    | @SpringBootApplication internal working
+SPRING BOOT         | Core                    | @Configuration vs AutoConfiguration
+SPRING BOOT         | Core                    | IoC Container kya hai
+SPRING BOOT         | Core                    | Bean scopes
+SPRING BOOT         | Core                    | Bean lifecycle issues
+SPRING BOOT         | REST                    | @RestController vs @Controller
+SPRING BOOT         | REST                    | @PathVariable vs @RequestParam
+SPRING BOOT         | REST                    | HTTP methods & idempotency
+SPRING BOOT         | DB                      | @Transactional explain karo
+SPRING BOOT         | DB                      | Multiple DB config kaise kare
+SPRING BOOT         | DB                      | Dynamic DB routing
+SPRING BOOT         | Exception               | Global Exception Handling
+SPRING BOOT         | Exception               | Custom Exception kaise banate hai
+SPRING BOOT         | File Handling           | File upload & Excel parsing
+
+SECURITY            | Basics                  | Authentication vs Authorization
+SECURITY            | OAuth2                  | OAuth2 flow
+SECURITY            | JWT                     | JWT flow
+SECURITY            | Tokens                  | Token expiry & refresh tokens
+SECURITY            | RBAC                    | Role based access control
+
+KUBERNETES          | Basics                  | Kubernetes use case
+KUBERNETES          | Config                  | ConfigMaps/Secrets update
+
+MICROSERVICES       | Migration               | Monolith to Microservices strategy
+MICROSERVICES       | Migration               | Challenges faced
+MICROSERVICES       | Infra                   | API Gateway, Service Registry, Circuit Breaker
+MICROSERVICES       | Communication           | Sync vs Async communication
+MICROSERVICES       | Communication           | Service communication (dynamic vs static URLs)
+MICROSERVICES       | Security                | Token handling in microservices
+
+DISTRIBUTED SYS     | Concepts                | CAP Theorem
+DISTRIBUTED SYS     | Concepts                | Sync vs Async systems
+
+DESIGN              | Principles              | SOLID principles
+DESIGN              | Principles              | SRP example
+DESIGN              | Patterns                | Circuit Breaker, Saga
+
+DATABASE            | Concepts                | DynamoDB vs RDBMS
+DATABASE            | Queries                 | Median salary SQL
+DATABASE            | Migration               | Liquibase usage
+DATABASE            | Config                  | Change DB (MySQL → PostgreSQL)
+
+CODING              | Strings                 | First non-repeating character
+CODING              | LinkedList              | Palindrome Linked List
+CODING              | LinkedList              | Custom Linked List + middle element
+CODING              | Arrays                  | Next Greater Element
+CODING              | Graph                   | Number of Islands
+CODING              | Tree                    | Left view of binary tree
+CODING              | Sorting                 | Custom Comparator
+
+SYSTEM DESIGN       | API                     | Weather API aggregation design
+SYSTEM DESIGN       | API                     | Generic aggregation API
+SYSTEM DESIGN       | API                     | Library Management System
+SYSTEM DESIGN       | API                     | High volume API design
+SYSTEM DESIGN       | API                     | Rate limiting (Token Bucket / Redis)
+
+SYSTEM DESIGN       | Async                   | Long running process design
+SYSTEM DESIGN       | Async                   | External API integration
+SYSTEM DESIGN       | Async                   | Kafka request-reply pattern
+SYSTEM DESIGN       | Async                   | Kafka scaling (consumer groups)
+
+SYSTEM DESIGN       | Excel System            | Excel upload + email notification system
+SYSTEM DESIGN       | Excel System            | Validations & scalability
+SYSTEM DESIGN       | Excel System            | AWS vs Non-AWS design
+
+SYSTEM DESIGN       | Data                    | 1M records processing
+SYSTEM DESIGN       | Data                    | Pagination & GC impact
+
+PROJECT             | Experience              | Project architecture explain karo
+PROJECT             | Experience              | Challenges faced
+PROJECT             | Experience              | Optimization kiya kya
+
+CONCURRENCY         | Basics                  | Virtual threads vs OS threads
+
+FUNCTIONAL          | Streams                 | map vs flatMap
+
+ADVANCED CODING     | Frequency               | Second highest frequency
+ADVANCED CODING     | Frequency               | Sort by frequency
+ADVANCED CODING     | Heap                    | Kth smallest element
+ADVANCED CODING     | DFS                     | Graph DFS implementation
+
+INTERVIEW DESIGN    | System                  | LRU Cache design
+INTERVIEW DESIGN    | System                  | Custom HashSet design
+
+API DESIGN          | System                  | Library API endpoints design
+
+DEVOPS              | Container               | Docker vs Kubernetes
+DEVOPS              | Deployment              | Kubernetes deployment flow
+
+REACTIVE            | Spring WebFlux          | Event loop model
+REACTIVE            | Comparison              | WebFlux vs Spring MVC
+REACTIVE            | Operators               | map vs flatMap vs doOnSuccess
+
+SCENARIOS           | Debugging               | Slow API debugging
+SCENARIOS           | Validation              | API validation using @Valid
+SCENARIOS           | Versioning              | DB versioning (optimistic locking)

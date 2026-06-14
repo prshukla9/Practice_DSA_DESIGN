@@ -1,0 +1,281 @@
+================= BASIC STREAM OPERATIONS =================
+
+[ ] Convert list to stream
+[ ] Filter even numbers
+[ ] Filter strings starting with 'A'
+[ ] Convert list of strings to uppercase
+[ ] Convert list of integers to squares
+[ ] Count elements > 10
+[ ] Find first element
+[ ] Find any element
+[ ] Check all match condition
+[ ] Check any match condition
+
+
+================= MAP / FILTER =================
+
+[ ] Extract names from list of objects
+[ ] Filter employees with salary > 50k
+[ ] Convert list of objects to list of IDs
+[ ] Remove null values from list
+[ ] Filter distinct elements
+[ ] Convert string list to length list
+[ ] Get emails of all users
+[ ] Filter based on multiple conditions
+[ ] Map values and collect
+[ ] Filter and sort together
+
+
+================= SORTING =================
+
+[ ] Sort integers ascending
+[ ] Sort integers descending
+[ ] Sort strings by length
+[ ] Sort objects by field
+[ ] Sort employees by salary
+[ ] Sort by multiple fields
+[ ] Reverse sort list
+[ ] Sort map by keys
+[ ] Sort map by values
+[ ] Custom comparator sorting
+
+
+================= COLLECTORS =================
+
+[ ] Convert to list
+[ ] Convert to set
+[ ] Convert to map
+[ ] Group by field
+[ ] Count occurrences using grouping
+[ ] Join strings
+[ ] Partition by condition
+[ ] Collect into custom object
+[ ] Summarizing statistics
+[ ] Mapping with collectors
+
+
+================= GROUPING =================
+
+[ ] Group employees by department
+[ ] Count employees per department
+[ ] Find highest salary per department
+[ ] Group strings by length
+[ ] Group numbers by even/odd
+[ ] Nested grouping
+[ ] Group and sort
+[ ] Group and filter
+[ ] Group into custom DTO
+[ ] Group with counting
+
+
+================= ADVANCED =================
+
+[ ] Find duplicate elements
+[ ] Find first non-repeating element
+[ ] Find second highest number
+[ ] Flatten nested lists (flatMap)
+[ ] Merge two lists using streams
+[ ] Convert list to map with duplicate keys
+[ ] Handle duplicate keys in map
+[ ] Top K elements using streams
+[ ] Remove duplicates using streams
+[ ] Find max/min using streams
+
+
+================= OPTIONAL =================
+
+[ ] Handle null safely using Optional
+[ ] Find max using Optional
+[ ] Find min using Optional
+[ ] Optional map example
+[ ] Optional orElse vs orElseGet
+[ ] Optional filter usage
+[ ] Optional chaining
+[ ] Optional with streams
+[ ] Avoid NullPointerException
+[ ] Return default values
+
+
+================= REAL-WORLD USE CASES =================
+
+[ ] Process API response list
+[ ] Filter active users
+[ ] Transform DB result to DTO
+[ ] Aggregate data
+[ ] Remove invalid entries
+[ ] Sort API data
+[ ] Paginate using streams
+[ ] Convert entity to response
+[ ] Combine multiple lists
+[ ] Log processing pipeline
+
+
+================= STREAM PATTERN HINTS =================
+
+filter() → condition apply
+map() → transform data
+flatMap() → flatten nested structure
+collect() → convert result
+groupingBy() → grouping
+sorted() → sorting
+distinct() → remove duplicates
+limit() → top K
+skip() → pagination
+reduce() → aggregation
+
+================= BASIC =================
+
+---- Filter ----
+List<Integer> res = list.stream()
+    .filter(x -> x % 2 == 0)
+    .collect(Collectors.toList());
+
+---- Map ----
+List<Integer> squares = list.stream()
+    .map(x -> x * x)
+    .collect(Collectors.toList());
+
+---- Count ----
+long count = list.stream()
+    .filter(x -> x > 10)
+    .count();
+
+---- Find First ----
+Optional<Integer> first = list.stream().findFirst();
+
+
+================= SORTING =================
+
+---- Sort Asc ----
+list.stream()
+    .sorted()
+    .collect(Collectors.toList());
+
+---- Sort Desc ----
+list.stream()
+    .sorted((a, b) -> b - a)
+    .collect(Collectors.toList());
+
+---- Sort Objects ----
+list.stream()
+    .sorted(Comparator.comparing(Employee::getSalary))
+    .collect(Collectors.toList());
+
+
+================= COLLECTORS =================
+
+---- To List ----
+list.stream().collect(Collectors.toList());
+
+---- To Set ----
+list.stream().collect(Collectors.toSet());
+
+---- To Map ----
+Map<Integer, String> map = list.stream()
+    .collect(Collectors.toMap(
+        x -> x.getId(),
+        x -> x.getName()
+    ));
+
+---- Handle Duplicate Keys ----
+Map<Integer, String> map = list.stream()
+    .collect(Collectors.toMap(
+        x -> x.getId(),
+        x -> x.getName(),
+        (oldVal, newVal) -> oldVal
+    ));
+
+
+================= GROUPING =================
+
+---- Group By ----
+Map<String, List<Employee>> grouped =
+    list.stream().collect(Collectors.groupingBy(Employee::getDept));
+
+---- Count By Group ----
+Map<String, Long> count =
+    list.stream().collect(Collectors.groupingBy(
+        Employee::getDept,
+        Collectors.counting()
+    ));
+
+---- Max By Group ----
+Map<String, Optional<Employee>> max =
+    list.stream().collect(Collectors.groupingBy(
+        Employee::getDept,
+        Collectors.maxBy(Comparator.comparing(Employee::getSalary))
+    ));
+
+
+================= ADVANCED =================
+
+---- Find Duplicates ----
+Set<Integer> seen = new HashSet<>();
+List<Integer> dup = list.stream()
+    .filter(x -> !seen.add(x))
+    .collect(Collectors.toList());
+
+---- First Non-Repeating ----
+int res = list.stream()
+    .filter(x -> Collections.frequency(list, x) == 1)
+    .findFirst()
+    .orElse(-1);
+
+---- Second Highest ----
+int second = list.stream()
+    .sorted(Collections.reverseOrder())
+    .skip(1)
+    .findFirst()
+    .orElse(-1);
+
+---- Flatten List ----
+List<Integer> flat = listOfLists.stream()
+    .flatMap(List::stream)
+    .collect(Collectors.toList());
+
+---- Top K ----
+list.stream()
+    .sorted(Collections.reverseOrder())
+    .limit(k)
+    .collect(Collectors.toList());
+
+
+================= OPTIONAL =================
+
+---- Optional Basic ----
+Optional<Integer> opt = list.stream().findFirst();
+
+---- orElse ----
+int val = opt.orElse(0);
+
+---- orElseGet ----
+int val = opt.orElseGet(() -> 10);
+
+---- Optional Map ----
+Optional<Integer> res = opt.map(x -> x * 2);
+
+---- Optional Filter ----
+Optional<Integer> res = opt.filter(x -> x > 10);
+
+
+================= REAL WORLD =================
+
+---- Entity to DTO ----
+List<UserDTO> dtos = users.stream()
+    .map(u -> new UserDTO(u.getId(), u.getName()))
+    .collect(Collectors.toList());
+
+---- Filter Active Users ----
+users.stream()
+    .filter(User::isActive)
+    .collect(Collectors.toList());
+
+---- Pagination ----
+users.stream()
+    .skip(page * size)
+    .limit(size)
+    .collect(Collectors.toList());
+
+---- Combine Lists ----
+Stream.concat(list1.stream(), list2.stream())
+    .collect(Collectors.toList());

@@ -1,0 +1,132 @@
+CATEGORY            | SUB-CATEGORY            | QUESTION
+------------------------------------------------------------------------------------------
+
+SYSTEM DESIGN       | Core                    | Social media feed design (LinkedIn/Twitter)
+SYSTEM DESIGN       | Core                    | Infrequent users handling
+SYSTEM DESIGN       | Core                    | Notification system + failure handling
+SYSTEM DESIGN       | LLD                     | StackOverflow system design
+SYSTEM DESIGN       | LLD                     | Library Management System (schema + APIs)
+SYSTEM DESIGN       | LLD                     | Ecommerce system (Order, Auth, Cart, Product)
+SYSTEM DESIGN       | Architecture            | Project architecture design (REST + diagrams)
+SYSTEM DESIGN       | Concepts                | SQL vs NoSQL (when to choose)
+SYSTEM DESIGN       | Concepts                | Event Driven Architecture (use cases)
+
+KAFKA               | Basics                  | Kafka architecture components
+KAFKA               | Basics                  | Topic & Partition
+KAFKA               | Basics                  | Consumer group
+KAFKA               | Reliability             | Message delivery guarantee
+KAFKA               | Reliability             | Retry & DLQ
+KAFKA               | Advanced                | Producer-consumer handling & idempotency
+KAFKA               | Data Format             | Avro vs JSON
+KAFKA               | Experience              | Real-world Kafka usage
+
+JAVA CORE           | Collections             | HashMap vs Hashtable
+JAVA CORE           | Collections             | HashMap internal working
+JAVA CORE           | Collections             | HashSet architecture
+JAVA CORE           | OOP                     | Shallow vs Deep Copy
+JAVA CORE           | OOP                     | Immutable class design
+JAVA CORE           | OOP                     | Abstract class vs Interface
+JAVA CORE           | OOP                     | Default methods in interfaces
+JAVA CORE           | Java 8                  | Functional interfaces & lambdas
+JAVA CORE           | Java 8                  | map vs flatMap
+JAVA CORE           | Java 8                  | Streams internal working
+JAVA CORE           | Concurrency             | ExecutorService vs ForkJoinPool
+JAVA CORE           | Concurrency             | submit vs execute
+JAVA CORE           | Concurrency             | Object vs Class level locks
+JAVA CORE           | Concurrency             | Volatile keyword
+JAVA CORE           | Concurrency             | Synchronization
+JAVA CORE           | Threads                 | Thread.join & run()
+JAVA CORE           | Misc                    | Swap 2 numbers in one statement
+
+MULTITHREADING      | Basics                  | Multithreading kya hai
+MULTITHREADING      | Problem                 | Producer Consumer
+MULTITHREADING      | Problem                 | Thread-safe queue
+MULTITHREADING      | Problem                 | Odd-even printing using threads
+MULTITHREADING      | Internals               | ExecutorService working
+MULTITHREADING      | Concepts                | Data consistency handling
+
+SPRING BOOT         | Core                    | @Transactional (Propagation, Isolation)
+SPRING BOOT         | Core                    | Class vs Method level @Transactional
+SPRING BOOT         | Core                    | Custom annotations
+SPRING BOOT         | Core                    | Annotation working internally
+SPRING BOOT         | Core                    | CRUD (Controller-Service-Repo)
+SPRING BOOT         | Config                  | Profiles (env configs)
+SPRING BOOT         | JPA                     | Repository components
+SPRING BOOT         | JPA                     | Entity mapping (Lazy/Eager, Cascade)
+SPRING BOOT         | Core                    | Spring vs Spring Boot
+SPRING BOOT         | Config                  | Change embedded server
+SPRING BOOT         | Config                  | Enable CORS
+SPRING BOOT         | Core                    | Bean scopes
+SPRING BOOT         | REST                    | REST principles
+SPRING BOOT         | Exception               | Exception handling
+
+REST API            | Design                  | Secure REST APIs
+REST API            | Methods                 | PUT vs PATCH
+REST API            | Params                  | RequestParam vs PathVariable
+REST API            | Versioning              | API versioning
+REST API            | Design                  | Library Management APIs
+REST API            | Security                | Basic Auth & JWT
+REST API            | Concepts                | Idempotency
+REST API            | Testing                 | Integration testing
+
+DATABASE            | SQL                     | Second highest salary
+DATABASE            | MongoDB                 | Compound indexing
+DATABASE            | MongoDB                 | Index usage with AND
+DATABASE            | Optimization            | Query optimization
+DATABASE            | Scaling                 | MongoDB scalability
+DATABASE            | Concepts                | SQL vs NoSQL
+
+DEVOPS              | CI/CD                   | CI/CD pipeline stages
+DEVOPS              | Monitoring              | Monitoring tools (Splunk)
+DEVOPS              | Performance             | Load testing tools
+DEVOPS              | Scaling                 | Handle traffic spikes
+DEVOPS              | Caching                 | Caching strategies
+DEVOPS              | Metrics                 | API performance measurement
+DEVOPS              | Scaling                 | Horizontal vs Vertical scaling
+
+DESIGN PATTERNS     | Patterns                | Singleton (Eager, Lazy, Thread-safe)
+DESIGN PATTERNS     | Patterns                | Factory pattern
+DESIGN PATTERNS     | Patterns                | Strategy pattern
+DESIGN PATTERNS     | Principles              | SOLID (LSP focus)
+
+CODING              | SQL                     | 2nd highest salary
+CODING              | String                  | Reverse string (special chars)
+CODING              | String                  | First repeating character
+CODING              | Arrays                  | Integer to array reverse
+CODING              | Java 8                  | Multiply elements using streams
+CODING              | Arrays                  | Shuffle array
+
+MISC                | Concepts                | CDN kya hai
+MISC                | Debugging               | Forbidden API error debugging
+MISC                | Testing                 | Integration & load testing tools
+MISC                | Agile                   | Agile methodology & sprint planning
+MISC                | Production              | Production issue handling
+MISC                | Process                 | Definition of Done
+MISC                | Experience              | Daily challenges
+MISC                | Resume                  | Resume deep dive questions
+MISC                | Cloud                   | GCP Pub-Sub
+MISC                | REST                    | API creation from scratch
+
+ARRAYS              | Problem                 | Replace with next greatest
+ARRAYS              | Problem                 | Move zeroes
+ARRAYS              | Problem                 | Merge sorted arrays
+ARRAYS              | Problem                 | Merge without extra space
+ARRAYS              | Problem                 | Next greater element distance
+
+STRINGS             | Problem                 | Longest unique substring
+STRINGS             | Problem                 | Longest uniform substring
+STRINGS             | Problem                 | First non-repeating char
+STRINGS             | Problem                 | Longest repeating subsequence
+STRINGS             | Problem                 | String to integer
+STRINGS             | Problem                 | Partition labels
+
+TREES               | Problem                 | Root to leaf paths
+TREES               | Problem                 | Equal tree partition
+
+GREEDY              | Problem                 | Activity selection
+
+STOCK               | Problem                 | Best time to buy & sell stock
+
+HASHMAP             | Problem                 | Insert/Delete/Get O(1)
+
+GRID                | Problem                 | Max path sum in matrix

@@ -1,0 +1,99 @@
+CATEGORY            | SUB-CATEGORY            | QUESTION
+------------------------------------------------------------------------------------------
+
+BINARY SEARCH       | Basics                  | Find missing number (1 to N sorted array)
+BINARY SEARCH       | Basics                  | Median of two sorted arrays
+BINARY SEARCH       | Basics                  | Find first occurrence of element
+BINARY SEARCH       | Basics                  | Find last occurrence of element
+BINARY SEARCH       | Basics                  | Find insert position of element
+BINARY SEARCH       | Advanced                | Search in rotated sorted array
+BINARY SEARCH       | Advanced                | Find peak element
+BINARY SEARCH       | Advanced                | Koko Eating Bananas
+BINARY SEARCH       | Advanced                | Capacity to ship packages within D days
+BINARY SEARCH       | Advanced                | Min days to make bouquets
+BINARY SEARCH       | Advanced                | Smallest divisor given threshold
+
+GREEDY              | Problem                 | Book Exchange problem (maximize books)
+GREEDY              | Problem                 | Activity Selection
+GREEDY              | Problem                 | Jump Game
+GREEDY              | Problem                 | Jump Game II
+GREEDY              | Problem                 | Gas Station
+GREEDY              | Problem                 | Non-overlapping intervals
+GREEDY              | Problem                 | Boats to save people
+GREEDY              | Problem                 | Candy distribution
+GREEDY              | Problem                 | Partition labels
+GREEDY              | Problem                 | Max non-overlapping meetings
+
+TWO POINTER         | Problem                 | Reverse string (special char same position)
+TWO POINTER         | Problem                 | Two Sum II (sorted array)
+TWO POINTER         | Problem                 | Valid Palindrome
+TWO POINTER         | Problem                 | 3Sum
+TWO POINTER         | Problem                 | Container with most water
+TWO POINTER         | Problem                 | Trapping rain water
+TWO POINTER         | Problem                 | Remove duplicates (sorted array)
+TWO POINTER         | Problem                 | Move zeroes
+TWO POINTER         | Problem                 | Sort colors
+TWO POINTER         | Problem                 | Merge two sorted arrays
+
+SLIDING WINDOW      | Problem                 | Longest uniform substring (index + length)
+SLIDING WINDOW      | Problem                 | Sum of min + max in subarrays of size K
+SLIDING WINDOW      | Problem                 | Longest repeating substring
+SLIDING WINDOW      | Problem                 | Longest substring without repeating
+SLIDING WINDOW      | Problem                 | Minimum size subarray sum
+SLIDING WINDOW      | Problem                 | Minimum moves to group all 1s
+SLIDING WINDOW      | Problem                 | Longest consecutive repeating substring
+
+ARRAYS              | Problem                 | Shuffle array (without built-in)
+ARRAYS              | Problem                 | Replace elements with greatest on right
+
+STACK               | Problem                 | Valid Parentheses
+STACK               | Problem                 | Remove adjacent duplicates
+STACK               | Problem                 | Next Greater Element
+STACK               | Problem                 | Daily Temperatures
+
+MONOTONIC STACK     | Problem                 | Next Greater Element (optimized)
+MONOTONIC STACK     | Problem                 | Daily Temperatures
+
+MAP / SET           | Problem                 | First non-repeating character
+MAP / SET           | Problem                 | Group Anagrams
+MAP / SET           | Problem                 | Frequency map (last removed element)
+
+LINKED LIST         | Problem                 | Add two numbers
+LINKED LIST         | Problem                 | Remove Nth node from end
+LINKED LIST         | Problem                 | Merge two sorted lists
+LINKED LIST         | Problem                 | Rotate list
+LINKED LIST         | Problem                 | Detect cycle II
+LINKED LIST         | Problem                 | Merge K sorted lists
+LINKED LIST         | Problem                 | Odd Even Linked List
+LINKED LIST         | Problem                 | Middle of linked list
+LINKED LIST         | Problem                 | Palindrome linked list
+
+HEAP                | Problem                 | Kth smallest element
+HEAP                | Problem                 | Median from data stream
+HEAP                | Problem                 | Last stone weight
+HEAP                | Problem                 | Top K frequent elements
+HEAP                | Problem                 | Kth largest in stream
+HEAP                | Problem                 | Kth largest in array
+HEAP                | Problem                 | Reorganize string
+
+DP                  | Problem                 | Cherry Pickup
+DP                  | Problem                 | Unique Paths
+DP                  | Problem                 | Unique Paths with obstacles
+DP                  | Problem                 | House Robber
+DP                  | Problem                 | Climbing Stairs
+
+PREFIX SUM          | Problem                 | Subarray sum equals K
+PREFIX SUM          | Problem                 | Pivot index
+
+MISC                | Problem                 | Leaderboard design
+MISC                | Problem                 | Task Scheduler
+MISC                | Problem                 | Asteroid collision
+MISC                | Problem                 | Merge intervals
+MISC                | Problem                 | Pangram missing alphabets
+MISC                | Problem                 | Min swaps (max end, min start)
+MISC                | Problem                 | Second smallest element
+MISC                | Problem                 | Remove consecutive duplicates string
+MISC                | Problem                 | Car pooling (capacity check)
+
+INTERVIEW DESIGN    | System                  | LRU Cache implementation
+INTERVIEW DESIGN    | System                  | Custom HashSet implementation

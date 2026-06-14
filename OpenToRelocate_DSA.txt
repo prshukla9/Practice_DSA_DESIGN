@@ -1,0 +1,390 @@
+================= CORE PATTERNS FIRST (VERY IMPORTANT) =================
+
+[ ] Sliding Window
+[ ] Two Pointer
+[ ] Prefix Sum
+[ ] Binary Search Patterns
+[ ] Hashing
+[ ] Recursion
+[ ] Backtracking
+[ ] Heap / Priority Queue
+
+
+================= STRINGS =================
+
+[ ] First non-repeating character
+[ ] Longest substring without repeating
+[ ] Longest substring with K distinct
+[ ] Minimum window substring
+[ ] Valid palindrome
+[ ] Group anagrams
+[ ] String compression
+[ ] Longest repeating replacement
+[ ] Smallest window substring
+[ ] Count substrings with K distinct
+[ ] String permutations
+[ ] Word break
+[ ] KMP Algorithm
+[ ] Rabin-Karp
+
+🔥 EXTRA ADD:
+[ ] Remove adjacent duplicates
+[ ] Compare version numbers
+[ ] Decode string
+[ ] Reorganize string
+[ ] Partition labels
+
+----------------- PATTERN HINT -----------------
+Sliding Window → substring problems
+HashMap → frequency / anagram
+Two Pointer → palindrome / reverse
+KMP / Rabin → pattern search
+Backtracking → permutations
+
+================= ARRAYS =================
+
+[ ] Two Sum
+[ ] 3Sum
+[ ] 4Sum
+[ ] Kadane’s Algorithm
+[ ] Maximum product subarray
+[ ] Container with most water
+[ ] Trapping rain water
+[ ] Merge intervals
+[ ] Insert interval
+[ ] Sliding window maximum
+[ ] Subarray sum = K
+[ ] Subarray XOR
+[ ] Product except self
+[ ] Prefix sum queries
+[ ] Rotate array
+[ ] Move zeros
+[ ] Majority element
+[ ] Kth largest element
+
+🔥 EXTRA ADD:
+[ ] Missing number
+[ ] Find duplicates
+[ ] Sort 0-1-2 (Dutch flag)
+[ ] Next permutation
+[ ] Peak element (array)
+
+----------------- PATTERN HINT -----------------
+Two Pointer → sorted array / pair problems
+Sliding Window → subarray problems
+Prefix Sum → sum queries / subarray sum
+Greedy → intervals / jumps
+Heap → kth / top k
+Binary Search → sorted / monotonic
+
+================= BINARY SEARCH =================
+
+[ ] Classic binary search
+[ ] First & last occurrence
+[ ] Search in rotated sorted array
+[ ] Peak element
+[ ] Allocate minimum pages
+[ ] Median of two sorted arrays
+
+
+================= STACK / QUEUE =================
+
+[ ] Valid parentheses
+[ ] Next greater element
+[ ] Next greater circular
+[ ] Largest rectangle in histogram
+[ ] Stock span problem
+[ ] Sliding window maximum
+[ ] Min stack
+[ ] Evaluate postfix expression
+
+
+================= LINKED LIST =================
+
+[ ] Reverse linked list
+[ ] Detect cycle
+[ ] Find start of cycle
+[ ] Merge two sorted lists
+[ ] Remove nth node from end
+[ ] Palindrome linked list
+[ ] Intersection of linked list
+[ ] LRU Cache
+
+
+================= HEAP / PRIORITY QUEUE =================
+
+[ ] Kth largest element
+[ ] Top K frequent elements
+[ ] Merge K sorted lists
+[ ] Median from data stream
+[ ] Task scheduler
+
+
+================= RECURSION + BACKTRACKING =================
+
+[ ] Subsets
+[ ] Permutations
+[ ] Combination sum
+[ ] Generate parentheses
+[ ] Word break
+[ ] Restore IP
+[ ] Palindrome partitioning
+
+
+================= GRAPH =================
+
+[ ] BFS
+[ ] DFS
+[ ] Number of islands
+[ ] Rotten oranges
+[ ] Topological sort
+[ ] Detect cycle (graph)
+[ ] Shortest path (basic BFS)
+
+
+================= EXTRA PRACTICE (ADVANCED BOOST 🔥) =================
+
+[ ] Longest increasing subsequence
+[ ] DP - House Robber
+[ ] DP - Coin Change
+[ ] DP - Knapsack (basic)
+[ ] DP - Longest common subsequence
+
+[ ] Trie basics
+[ ] Search autocomplete (Trie use case)
+
+[ ] Bit manipulation basics
+[ ] Single number problems
+
+[ ] Greedy - Activity selection
+[ ] Greedy - Minimum platforms
+
+[ ] Two heaps problems
+[ ] Sliding window advanced
+
+
+
+
+
+================= EXTRA =================
+
+================= STRINGS (50) =================
+
+1. First non-repeating character
+2. First repeating character
+3. Reverse words in a string
+4. Valid palindrome (ignore special chars)
+5. Longest common prefix
+6. Anagram check (without sorting)
+7. String rotations
+8. Character frequency count
+9. Remove duplicates
+10. String compression
+
+11. Longest substring without repeating characters
+12. Longest substring with K distinct chars
+13. Minimum window substring
+14. Find all anagrams
+15. Count substrings with K distinct chars
+16. Longest repeating replacement
+17. Smallest substring with all unique chars
+18. Count substrings at most K distinct
+19. Max vowels in substring
+20. Substrings without duplicates
+
+21. Valid palindrome with one deletion
+22. Merge strings alternately
+23. Compare version numbers
+24. Subsequence check
+25. Backspace compare
+26. Min swaps for palindrome
+27. Remove adjacent duplicates
+28. Remove K digits
+29. Lexicographically smallest string
+30. Partition labels
+
+31. Group anagrams
+32. Top K frequent words
+33. Common chars in all strings
+34. Isomorphic strings
+35. Word pattern
+36. Duplicate substrings
+37. Count distinct substrings
+38. Equal vowels & consonants substring
+39. Smallest window substring
+40. Reorganize string
+
+41. String permutations
+42. String subsets
+43. Phone combinations
+44. Word break
+45. Restore IP
+46. Palindrome partitioning
+47. Generate parentheses
+48. Expression add operators
+49. KMP algorithm
+50. Rabin-Karp algorithm
+
+
+================= ARRAYS (50) =================
+
+1. Second largest element
+2. Find duplicates O(n)
+3. Missing number
+4. All missing numbers
+5. Majority element
+6. Elements > n/3
+7. Sorted rotated check
+8. Remove duplicates
+9. Rotate array
+10. Move zeros
+
+11. Max sum subarray size k
+12. Longest subarray sum k
+13. Count subarrays sum k
+14. Smallest subarray >= target
+15. Max consecutive 1s with flips
+16. Longest 1s after deletion
+17. Subarrays at most k distinct
+18. Subarrays exactly k distinct
+19. Max average subarray
+20. Sliding window max
+
+21. Sort 0,1,2
+22. Container with most water
+23. Trapping rain water
+24. Remove duplicates twice
+25. 3Sum
+26. 4Sum
+27. Pair difference k
+28. Merge sorted arrays
+29. Intersection arrays
+30. Squares of sorted array
+
+31. Kadane's algorithm
+32. Max product subarray
+33. Product except self
+34. Subarray sum divisible k
+35. Equal 0s and 1s
+36. Subarray XOR
+37. Prefix sum query
+38. Nice subarrays
+39. Pivot index
+40. Min size subarray sum
+
+41. Merge intervals
+42. Insert interval
+43. Non-overlapping intervals
+44. Minimum platforms required
+45. Kth largest element
+46. Top K frequent elements
+47. Median of two sorted arrays
+48. Peak element
+49. Search in rotated sorted array
+50. Allocate minimum pages
+
+
+================= STACK / QUEUE / LINKED LIST (50) =================
+
+1. Stack using array
+2. Stack using linked list
+3. Stack using queues
+4. Two stacks in one array
+5. Min stack
+6. Max stack
+7. Next greater element
+8. Next greater circular
+9. Previous smaller element
+10. Daily temperatures
+
+11. Stock span problem
+12. Largest rectangle in histogram
+13. Evaluate postfix expression
+14. Evaluate prefix expression
+15. Infix to postfix conversion
+16. Valid parentheses
+17. Decode string
+
+18. Queue using array
+19. Circular queue
+20. Queue using stacks
+21. Deque design
+
+22. Sliding window maximum
+23. First negative in window
+24. Maximum of all subarrays
+25. Longest subarray with diff <= limit
+
+26. Rotten oranges (BFS)
+27. Number of islands (BFS)
+28. Task scheduler
+29. Hit counter
+30. Moving average from stream
+
+31. Reverse linked list
+32. Middle of linked list
+33. Detect cycle
+34. Find start of cycle
+35. Remove nth node from end
+36. Merge two sorted lists
+37. Palindrome linked list
+38. Intersection of linked lists
+
+39. Reverse nodes in k-group
+40. Flatten linked list
+41. Rotate linked list
+42. Partition linked list
+43. Odd-even linked list
+44. Remove duplicates (sorted)
+45. Remove duplicates (unsorted)
+
+46. Copy list with random pointer
+47. LRU Cache
+48. LFU Cache
+49. Add two numbers (LL)
+50. Merge k sorted lists
+
+================= MASTER PATTERN GUIDE =================
+
+Sliding Window →
+Use when:
+- substring / subarray
+- longest / smallest window
+- K constraint
+
+Two Pointer →
+Use when:
+- sorted array
+- pair sum / palindrome
+
+Prefix Sum →
+Use when:
+- range sum
+- subarray sum = K
+
+Binary Search →
+Use when:
+- sorted array
+- monotonic condition
+- answer space search
+
+Heap →
+Use when:
+- kth smallest/largest
+- top K frequent
+
+Backtracking →
+Use when:
+- permutations / combinations
+- recursion tree
+
+Graph (BFS/DFS) →
+Use when:
+- grid / matrix
+- connected components
+
+DP →
+Use when:
+- overlapping subproblems
+- optimize recursion
+...

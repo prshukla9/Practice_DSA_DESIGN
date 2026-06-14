@@ -1,0 +1,73 @@
+================= JAVA CORE + CONCURRENCY =================
+
+[ ] Multithreading basics
+[ ] Thread lifecycle
+[ ] ExecutorService
+[ ] ThreadPool (Fixed / Cached)
+[ ] CompletableFuture
+[ ] synchronized keyword
+[ ] ReentrantLock
+[ ] volatile keyword
+[ ] Deadlock
+[ ] Race condition
+[ ] ConcurrentHashMap
+[ ] BlockingQueue
+
+[ ] Producer-Consumer Problem
+[ ] Thread Pool Tuning
+[ ] Lock vs synchronized
+
+
+================= BACKEND (SPRING BOOT + MICROSERVICES) =================
+
+[ ] Spring Boot internals
+[ ] REST API design
+[ ] Exception handling
+[ ] Logging (logback / slf4j)
+
+[ ] Microservices architecture
+[ ] Kafka (producer / consumer)
+[ ] API Gateway
+[ ] Service communication (Feign / REST)
+[ ] Redis caching
+
+[ ] JWT Authentication
+[ ] Spring Security
+[ ] Rate Limiting (implementation)
+[ ] Retry mechanism
+[ ] Circuit Breaker (Resilience4j)
+[ ] Idempotency
+[ ] API versioning
+[ ] Pagination
+
+
+================= SQL + DATABASE =================
+
+[ ] Joins
+[ ] Indexing
+[ ] Query optimization
+[ ] Normalization
+[ ] Transactions (ACID)
+[ ] Aggregations
+[ ] Window functions
+
+[ ] Index Internals (B-Tree)
+[ ] Isolation Levels
+[ ] Deadlocks
+[ ] SQL vs NoSQL
+
+
+================= DEVOPS / INFRA =================
+
+[ ] Docker basics
+[ ] CI/CD
+[ ] AWS basics (EC2, S3)
+[ ] Deployment flow
+
+
+================= REAL WORLD PREP =================
+
+[ ] Production issue examples
+[ ] Scaling systems
+[ ] Debugging slow APIs
+[ ] Trade-offs explanation

@@ -1,0 +1,280 @@
+================ SYSTEM DESIGN =================
+
+[HLD - High Level Design]
+
+1. Social Media Feed Design
+- Requirements: post creation, feed generation, likes/comments
+- Approach:
+  - Fanout-on-write (push to followers)
+  - Fanout-on-read (generate at request time)
+- DB: NoSQL (posts), cache (Redis)
+- Scaling: partition by userId
+- Optimization: pagination, caching
+
+--------------------------------------------------
+
+2. Notification System
+- Async system using Kafka
+- Retry mechanism + DLQ
+- Idempotency to avoid duplicate notifications
+- Channels: email, push, SMS
+
+--------------------------------------------------
+
+3. URL Shortener
+- Generate unique short key (Base62 / hashing)
+- Store mapping (short → long)
+- DB: key-value store
+- Handle collisions
+- Add analytics (click count)
+
+--------------------------------------------------
+
+4. Rate Limiter
+- Token Bucket / Leaky Bucket
+- Store counters in Redis
+- Per user/IP limit
+- Use case: API protection
+
+--------------------------------------------------
+
+5. Microservices Architecture
+- API Gateway (routing, auth)
+- Service discovery
+- DB per service
+- Communication: REST / Kafka
+
+--------------------------------------------------
+
+6. Caching
+- Redis
+- Strategies:
+  - Cache Aside
+  - Write Through
+- Problems:
+  - Cache invalidation
+  - Thundering herd
+
+--------------------------------------------------
+
+7. Distributed Transactions (SAGA)
+- Multiple services coordination
+- Compensating transactions
+
+--------------------------------------------------
+
+8. Advanced Concepts
+- Distributed Locking (Redis lock)
+- Leader Election (single active node)
+- Hot partition problem
+- Backpressure handling
+- Multi-region deployment
+
+--------------------------------------------------
+
+
+[LLD - Low Level Design]
+
+1. Ecommerce System
+- Entities: User, Product, Cart, Order, Payment
+- APIs:
+  - addToCart()
+  - placeOrder()
+- Flow:
+  - Validate → Lock inventory → Payment → Order confirm
+
+--------------------------------------------------
+
+2. Parking Lot
+- Classes: Vehicle, Slot, Ticket
+- Strategy pattern for slot allocation
+
+--------------------------------------------------
+
+3. Rate Limiter (LLD)
+- Class design:
+  - RateLimiter
+  - TokenBucket
+- Thread-safe implementation
+
+--------------------------------------------------
+
+4. Design Focus
+- Class diagram
+- DB schema
+- Thread safety
+- Error handling
+- Validation
+
+--------------------------------------------------
+
+
+================ DEVOPS =================
+
+1. CI/CD Pipeline
+- Code → Build → Test → Deploy
+- Tools: Jenkins / GitHub Actions
+
+--------------------------------------------------
+
+2. Deployment Strategies
+- Blue-Green
+- Canary
+- Rolling deployment
+
+--------------------------------------------------
+
+3. Scaling
+- Horizontal scaling (add instances)
+- Vertical scaling (increase resources)
+- Auto scaling using metrics
+
+--------------------------------------------------
+
+4. Caching
+- Redis
+- TTL, eviction policies
+
+--------------------------------------------------
+
+5. Monitoring
+- Logs: ELK / Splunk
+- Metrics: Prometheus + Grafana
+
+--------------------------------------------------
+
+6. Performance
+- Load testing using JMeter
+- Identify bottlenecks
+
+--------------------------------------------------
+
+7. Advanced DevOps
+- Zero downtime deployment
+- Secrets management
+- Connection pooling
+- Thread pool tuning
+- Reverse proxy (NGINX)
+
+--------------------------------------------------
+
+
+================ KAFKA =================
+
+- Broker, Topic, Partition
+- Consumer group
+- Offset management
+- Delivery guarantees:
+  - At least once
+  - Exactly once
+
+- Retry + DLQ
+- Idempotent consumer
+
+Use cases:
+- Order processing
+- Notification system
+
+--------------------------------------------------
+
+
+================ JAVA =================
+
+Core
+- HashMap internal (bucket, hashing)
+- ConcurrentHashMap (thread-safe)
+
+Java 8
+- Streams
+- map vs flatMap
+
+Concurrency
+- ExecutorService
+- Thread pools
+- volatile vs synchronized
+- Locks (ReentrantLock)
+
+--------------------------------------------------
+
+
+================ SPRING BOOT =================
+
+- @Transactional (propagation, isolation)
+- Bean lifecycle
+- Dependency Injection
+
+JPA
+- Lazy vs Eager
+- N+1 problem
+
+REST
+- REST principles
+- Idempotency
+
+Security
+- JWT authentication
+
+--------------------------------------------------
+
+
+================ DATABASE =================
+
+SQL
+- Indexing
+- Joins
+- Query optimization
+
+Scaling
+- Sharding
+- Replication
+
+Advanced
+- Deadlocks
+- Isolation levels
+- Cursor pagination
+
+--------------------------------------------------
+
+
+================ NETWORKING =================
+
+- HTTP vs HTTPS
+- TCP vs UDP
+- DNS working
+- CDN
+
+Advanced
+- Timeout (connection vs read)
+- Retry + exponential backoff
+- Keep-alive
+
+--------------------------------------------------
+
+
+================ SECURITY =================
+
+- Authentication vs Authorization
+- JWT flow
+- OAuth basics
+- HTTPS/SSL
+
+--------------------------------------------------
+
+
+================ DESIGN PATTERNS =================
+
+- Singleton
+- Factory
+- Strategy
+- SOLID principles
+
+--------------------------------------------------
+
+
+================ MISC =================
+
+- CDN concept
+- Production issue handling
+- Agile methodology
+- Integration testing
+- Resume deep dive
