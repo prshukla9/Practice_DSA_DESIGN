@@ -1,0 +1,609 @@
+MASTER PROMPT 1 — DOCKER (LEARN + BUILD)
+You are a senior DevOps mentor.
+
+Explain Docker from scratch in Hinglish for a Java developer.
+
+Cover:
+- What is Docker (simple analogy)
+- Difference between VM vs Docker
+- What are images, containers, layers
+
+Then:
+
+Create a production-ready Dockerfile for my Spring Boot application (jar in target folder).
+
+For EACH line:
+- Explain what it does
+- Why we use it
+- What alternative we could use
+
+Then show:
+- How to build Docker image
+- How to run container
+- How to check logs
+
+Also explain:
+- How this differs in DEV vs PROD
+
+IMPORTANT:
+- Do NOT just explain
+- Also give exact working commands step-by-step
+- Give copy-paste ready commands
+- Assume I will execute everything
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+MASTER PROMPT 2 — AWS EC2 (FULL UNDERSTANDING)
+You are a DevOps mentor.
+
+Explain AWS EC2 in Hinglish from scratch.
+
+Cover:
+- What is EC2
+- Instance, Public IP, Security Group
+
+Then guide step-by-step:
+- Create EC2 instance
+- What settings to choose and WHY
+- How to connect via SSH
+
+Explain:
+- Why each step is needed
+- What could go wrong
+- Alternatives
+
+IMPORTANT:
+- Do NOT just explain
+- Give exact AWS steps and commands
+- Assume I will follow and execute
+
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+MASTER PROMPT 3 — DEPLOY DOCKER ON EC2
+You are a DevOps engineer.
+
+I have a Dockerized Spring Boot application.
+
+Guide me step-by-step in Hinglish to deploy it on AWS EC2.
+
+Include:
+- Install Docker
+- Build image
+- Run container
+
+Also show:
+- How to check logs
+- Restart container
+- Debug issues
+
+IMPORTANT:
+- Give exact commands I can run
+- Do NOT just explain
+- Make it executable step-by-step
+
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+MASTER PROMPT 4 — NGINX (CORE CONCEPT)
+
+You are a DevOps mentor.
+
+Explain Nginx in Hinglish using simple real-world analogy.
+
+Cover:
+- What is reverse proxy
+- Why we don't expose port 8080 directly
+- How Nginx works between client and backend
+
+Then:
+
+Create Nginx config for:
+- Domain: api.dignidad.in
+- Backend: localhost:8080
+
+Explain:
+- Each config line
+- Why it's needed
+- Alternatives (like load balancer)
+
+Also explain:
+- How this changes in production
+
+IMPORTANT:
+- Provide full config file
+- Provide commands to enable Nginx
+- Provide restart commands
+- Do NOT just explain
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+MASTER PROMPT 5 — DOMAIN + DNS
+You are a networking expert.
+
+Explain DNS in Hinglish from scratch.
+
+Cover:
+- What is domain
+- What is A record
+- What is CNAME
+- How browser reaches server
+
+Then guide:
+- How to connect api.dignidad.in to EC2
+
+Explain:
+- Why we use A record
+- When to use CNAME
+- Common mistakes
+
+IMPORTANT:
+- Give exact DNS entries
+- Explain A vs CNAME
+- Provide real example
+
+Also explain DEV vs PROD differences.
+
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+FINAL MASTER PROMPT 6 — SSL
+You are a DevOps mentor.
+
+Explain HTTPS and SSL.
+
+Then guide:
+- Install certbot
+- Generate SSL
+- Enable auto-renew
+
+IMPORTANT:
+- Give exact commands
+- Do NOT just explain
+- Make it executable
+
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+MASTER PROMPT 7 — ENV (DEV vs PROD)
+
+You are a backend architect.
+
+Explain environment configuration in Hinglish.
+
+Cover:
+- Why dev and prod environments are needed
+- What problems happen if we don't separate them
+
+Then show:
+- application-dev.properties
+- application-prod.properties
+
+Explain:
+- Each config
+- How to switch profiles
+
+Also explain:
+- DB separation
+- API configs
+- ABDM sandbox vs production
+
+IMPORTANT:
+- Give real config examples
+- Explain switching profiles
+
+Make it practical + interview ready.
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+MASTER PROMPT 8 — CI/CD (INTERVIEW BOOST)
+You are a DevOps mentor.
+
+Explain CI/CD in Hinglish.
+
+Cover:
+- What is CI/CD
+- Why it's used in real companies
+
+Then show:
+- Simple GitHub Actions pipeline for Spring Boot app
+
+Explain:
+- Each step
+- Why it's needed
+
+Also compare:
+- Jenkins vs GitHub Actions
+
+IMPORTANT:
+- Give full YAML file
+- Explain each step
+- Make it usable directly
+
+Keep it practical and interview-focused.
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+
+NOT COVERINFG THIS MOMENT
+
+Kubernetes ❌
+Load balancer ❌
+Auto scaling ❌
+Terraform ❌
+
+RDS (DB stable) S3 (file storage) CloudWatch (monitoring)
+
+
+
+
+PRODUCTION PROMPTS
+
+---------------------------------------------------------------------------------------------------------------------------------------
+PROMPT 1 — PRODUCTION DOCKER (OPTIMIZED)
+You are a senior DevOps mentor.
+
+I have a Spring Boot application (JAR).
+
+Create a PRODUCTION-READY Dockerfile with:
+- OpenJDK 17 slim image
+- Multi-stage build (if needed)
+- Small image size optimization
+- Proper naming
+- Expose port 8080
+
+Explain:
+- Each line in Hinglish
+- Why this approach is used
+- What alternatives exist
+
+Then give commands:
+- Build image
+- Run container
+- Check logs
+
+Also explain:
+- DEV vs PROD Docker differences
+- How to make container restart automatically
+
+IMPORTANT:
+- Do NOT just explain
+- Give exact working commands
+
+Also
+Use non-root user inside container (security best practice)
+Add healthcheck
+
+---------------------------------------------------------------------------------------------------------------------------------------
+
+PROMPT 2 — EC2 PRODUCTION SETUP (SECURE)
+You are a DevOps engineer.
+
+Guide me to create a PRODUCTION-READY AWS EC2 setup.
+
+Include:
+- Instance type selection (t2.micro vs others)
+- Security group (only required ports)
+- SSH setup
+
+Then:
+
+Explain:
+- Why port 22, 80, 443 are needed
+- Why not open 8080 publicly
+
+Also include:
+- Basic server hardening steps
+- Firewall basics
+
+IMPORTANT:
+- Give exact AWS steps
+- Explain each decision
+
+Also
+Disable password login (only SSH key)
+Install fail2ban (basic security)
+Setup CloudWatch agent (basic monitoring)
+---------------------------------------------------------------------------------------------------------------------------------------
+
+PROMPT 3 — DOCKER DEPLOY (PRODUCTION SAFE)
+You are a DevOps engineer.
+
+Deploy my Dockerized Spring Boot app on EC2 in PRODUCTION mode.
+
+Include:
+- Docker install
+- Build image
+- Run container with restart policy
+
+Commands must include:
+- docker logs
+- docker restart
+- docker stop
+
+Explain:
+- Why restart=always is used
+- What happens if server restarts
+
+IMPORTANT:
+- Give exact commands
+- Explain why each command is used
+
+Also
+Use --restart=always
+Add resource limits
+docker run -d -p 8080:8080 \
+--memory="512m" \
+--cpus="1.0" \
+--restart=always \
+my-app
+
+---------------------------------------------------------------------------------------------------------------------------------------
+PROMPT 4 — NGINX PRODUCTION CONFIG
+You are a DevOps expert.
+
+Create a PRODUCTION-READY Nginx config for:
+
+Domain: api.dignidad.in  
+Backend: localhost:8080  
+
+Include:
+- Reverse proxy
+- Security headers
+- Timeout config
+
+Explain:
+- Each line in Hinglish
+- Why it's required
+
+Also include commands:
+- Enable site
+- Restart Nginx
+
+IMPORTANT:
+- Provide full config file
+- Do NOT just explain
+
+Also
+Rate limiting (basic DDoS protection)
+Gzip compression
+---------------------------------------------------------------------------------------------------------------------------------------
+PROMPT 5 — SSL (HTTPS PRODUCTION)
+You are a DevOps engineer.
+
+Enable HTTPS for api.dignidad.in using Let's Encrypt.
+
+Steps:
+- Install certbot
+- Generate certificate
+- Configure Nginx
+
+Explain:
+- What happens during SSL handshake
+- Why HTTPS is critical in production
+
+Also include:
+- Auto-renew setup
+
+IMPORTANT:
+- Give exact commands
+- Make it production safe
+
+Also
+Force HTTP → HTTPS redirect
+---------------------------------------------------------------------------------------------------------------------------------------
+
+PROMPT 6 — PRODUCTION DATABASE (RDS READY)
+You are a backend architect.
+
+Explain how to move from local DB to PRODUCTION DB.
+
+Cover:
+- EC2 DB vs AWS RDS
+- Why RDS is better
+
+Then:
+- Show Spring Boot config for DB connection
+- Show environment variable usage
+
+Explain:
+- Connection pooling
+- Security (username/password handling)
+
+IMPORTANT:
+- Provide real config examples
+
+Also
+Use connection pool (HikariCP tuning)
+DB should NOT be public (private subnet concept mention)
+---------------------------------------------------------------------------------------------------------------------------------------
+PROMPT 7 — FILE STORAGE (S3 READY)
+You are a cloud architect.
+
+Explain how to store files (like prescriptions) in production.
+
+Cover:
+- Local storage vs AWS S3
+- Why S3 is better
+
+Then:
+- Show how to upload file to S3
+- Show how to store file URL in DB
+
+Explain:
+- Security
+- Access control
+
+IMPORTANT:
+- Provide working example
+
+Also
+Use pre-signed URLs (secure upload)
+
+---------------------------------------------------------------------------------------------------------------------------------------
+PROMPT 8 — ENV + SECRETS (CRITICAL)
+You are a DevOps expert.
+
+Explain how to manage secrets in production.
+
+Cover:
+- Environment variables
+- Why not hardcode passwords
+
+Then:
+- Show Spring Boot env config
+- Show how to pass env variables in Docker
+
+Explain:
+- DEV vs PROD differences
+
+IMPORTANT:
+- Provide real examples
+
+Also
+Mention AWS Secrets Manager (advanced)
+Rotate secrets concept
+
+---------------------------------------------------------------------------------------------------------------------------------------
+PROMPT 9 — CI/CD (AUTO DEPLOY)
+You are a DevOps engineer.
+
+Create a production-ready CI/CD pipeline using GitHub Actions.
+
+Steps:
+- Build project
+- Build Docker image
+- Push to server
+
+Explain:
+- Each step
+- Why CI/CD is needed
+
+IMPORTANT:
+- Provide full YAML file
+
+Also
+Push Docker image to registry (Docker Hub / ECR)
+SSH into server and deploy OR trigger Kubernetes deploy
+
+
+---------------------------------------------------------------------------------------------------------------------------------------
+
+PROMPT 10 — LOAD BALANCER (PRODUCTION ENTRY POINT)
+
+You are a DevOps expert.
+
+Explain Load Balancer in Hinglish.
+
+Then:
+
+Setup AWS Application Load Balancer:
+
+Route traffic to EC2
+
+Explain:
+
+Health checks
+Failover
+
+IMPORTANT:
+
+Why LB is required in production
+Why direct EC2 access is bad
+
+---------------------------------------------------------------------------------------------------------------------------------------
+
+🔥 PROMPT 11 — KUBERNETES (SCALABLE PRODUCTION)
+
+You are a DevOps mentor.
+
+Deploy Spring Boot app on Kubernetes.
+
+Include:
+
+Deployment (multiple replicas)
+Service
+
+Explain:
+
+Why Kubernetes is needed over Docker
+
+---------------------------------------------------------------------------------------------------------------------------------------
+
+🔥 PROMPT 12 — AUTO SCALING (TRAFFIC HANDLING)
+
+You are a DevOps engineer.
+
+Setup:
+
+Horizontal scaling (Kubernetes HPA OR EC2 ASG)
+
+Explain:
+
+Traffic spike handling
+Cost optimization
+
+---------------------------------------------------------------------------------------------------------------------------------------
+
+🔥 PROMPT 13 — ZERO DOWNTIME DEPLOYMENT
+
+You are a DevOps mentor.
+
+Explain:
+
+Rolling deployment
+
+Then:
+
+Implement in Kubernetes
+
+Explain:
+
+No downtime during deploy
+
+---------------------------------------------------------------------------------------------------------------------------------------
+
+🔥 PROMPT 14 — MONITORING (REAL PRODUCTION)
+
+You are a DevOps expert.
+
+Setup:
+
+CloudWatch (logs + metrics)
+
+Explain:
+
+Alerts
+CPU / memory tracking
+
+---------------------------------------------------------------------------------------------------------------------------------------
+
+🔥 PROMPT 15 — LOGGING SYSTEM
+
+You are a DevOps engineer.
+
+Explain:
+
+Centralized logging
+
+Options:
+
+CloudWatch logs
+ELK stack
+
+---------------------------------------------------------------------------------------------------------------------------------------
+
+🔥 PROMPT 16 — INFRA AS CODE (TERRAFORM)
+
+You are a DevOps mentor.
+
+Create Terraform scripts:
+
+EC2
+Security group
+
+Explain:
+
+Why automation is needed
