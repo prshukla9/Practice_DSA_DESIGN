@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ================= FOUNDATIONS (MUST FIRST) =================
 
 [ ] Load Balancer (L4 vs L7)
@@ -237,4 +238,76 @@ Kafka duplicate
 [ ] Write-around
 [ ] Cache Stampede
 [ ] Redis Basics
+=======
+================= FOUNDATIONS (MUST FIRST) =================
+
+[ ] Load Balancer (L4 vs L7)
+[ ] CDN
+[ ] Horizontal vs Vertical Scaling
+[ ] CAP Theorem
+[ ] Consistency Models
+[ ] Sharding vs Partitioning
+[ ] Replication
+[ ] Consistent Hashing
+
+
+================= HLD (TOP 15) =================
+
+[ ] URL Shortener
+[ ] Rate Limiter
+[ ] Chat System
+[ ] Notification System
+[ ] News Feed / Timeline
+
+[ ] Video Streaming System
+[ ] E-commerce System
+[ ] Ride Sharing System
+[ ] File Storage System
+[ ] Distributed Cache
+
+[ ] Search Autocomplete
+[ ] Log Aggregation
+[ ] Payment System
+[ ] Online Code Editor
+[ ] Recommendation System
+
+
+================= LLD (TOP 20) =================
+
+[ ] LRU Cache
+[ ] LFU Cache
+[ ] Parking Lot System
+[ ] Rate Limiter (LLD)
+[ ] Logging System
+
+[ ] Splitwise
+[ ] Elevator System
+[ ] Library Management System
+[ ] ATM System
+[ ] Vending Machine
+
+[ ] Tic Tac Toe
+[ ] Snake Game
+[ ] File System Design
+[ ] Notification Service
+[ ] Task Scheduler
+
+[ ] Consistent Hashing (LLD)
+[ ] Distributed Lock
+[ ] Message Queue Design
+[ ] Token Bucket Rate Limiter
+[ ] Cache Design System
+
+
+================= CACHE (IMPORTANT 🔥) =================
+
+[ ] Cache Eviction (LRU, LFU, FIFO, TTL)
+[ ] Cache Invalidation
+[ ] Cache Consistency
+[ ] Write-through
+[ ] Write-back
+[ ] Write-around
+[ ] Cache Stampede
+[ ] Redis Basics
+>>>>>>> 2aab2fec016dcc7a0387841e37b77da7aed2bbbd
 [ ] Redis Pub/Sub

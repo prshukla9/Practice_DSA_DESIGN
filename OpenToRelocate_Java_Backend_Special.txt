@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 
 ================= 3. JAVA CORE + CONCURRENCY =================
 
@@ -55,3 +56,62 @@
 [ ] Structure answers (step by step)
 [ ] Explain trade-offs
 [ ] Give real-world examples
+=======
+
+================= 3. JAVA CORE + CONCURRENCY =================
+
+[ ] Multithreading basics
+[ ] Thread lifecycle
+[ ] ExecutorService
+[ ] ThreadPool (Fixed / Cached)
+[ ] CompletableFuture
+[ ] synchronized keyword
+[ ] ReentrantLock
+[ ] volatile keyword
+[ ] Deadlock
+[ ] Race condition
+[ ] ConcurrentHashMap
+[ ] BlockingQueue
+
+
+================= 4. BACKEND (SPRING BOOT + MICROSERVICES) =================
+
+[ ] Spring Boot internals
+[ ] REST API design (best practices)
+[ ] Exception handling
+[ ] Logging (logback / slf4j)
+[ ] Microservices architecture
+[ ] Kafka (producer / consumer / async flow)
+[ ] API Gateway concept
+[ ] Service communication (Feign / REST)
+[ ] Caching (Redis basic)
+[ ] Production issue handling examples
+
+
+================= 5. SQL + DATABASE =================
+
+[ ] Joins (Inner / Left / Right)
+[ ] Indexing
+[ ] Query optimization
+[ ] Normalization
+[ ] Transactions (ACID)
+[ ] Aggregations (Group By, Having)
+[ ] Window functions (basic idea)
+
+
+================= 6. DEVOPS / INFRA (BASIC) =================
+
+[ ] Docker basics
+[ ] CI/CD concept
+[ ] AWS basics (EC2, S3)
+[ ] Deployment flow understanding
+
+
+================= 7. COMMUNICATION =================
+
+[ ] Explain solution clearly
+[ ] Think aloud while coding
+[ ] Structure answers (step by step)
+[ ] Explain trade-offs
+[ ] Give real-world examples
+>>>>>>> 2aab2fec016dcc7a0387841e37b77da7aed2bbbd

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ================ SYSTEM DESIGN =================
  
 [HLD - High Level Design (MOST ASKED)]
@@ -256,4 +257,264 @@ Principles
 - Production issue handling
 - Integration & load testing
 - Agile methodology
+=======
+================ SYSTEM DESIGN =================
+ 
+[HLD - High Level Design (MOST ASKED)]
+ 
+Core
+- Social Media Feed Design (fanout push/pull, cache, pagination)
+- Notification System (retry, DLQ, async)
+- Infrequent Users Handling
+- URL Shortener (hashing, DB, scaling)
+- Rate Limiter (token bucket, leaky bucket)
+ 
+Architecture
+- Microservices Architecture (API Gateway, Service Discovery)
+- Load Balancer (L4 vs L7)
+- Caching Layer (Redis)
+- Message Queue (Kafka)
+- Circuit Breaker
+- Multi-region deployment (active-active / active-passive)
+ 
+Concepts (VERY IMPORTANT)
+- SQL vs NoSQL (when to choose)
+- Event Driven Architecture
+- CAP Theorem
+- Consistency (Strong vs Eventual)
+- Idempotency
+- Backpressure handling
+- Distributed Transactions (SAGA)
+- Pagination (cursor vs offset)
+ 
+🔥 ADVANCED (DIFFERENTIATOR)
+- Distributed Locking (Redis/DB)
+- Leader Election
+- Thundering Herd Problem
+- Hot Partition Problem
+- Data Partitioning (hash/range/geo)
+- Read-heavy vs Write-heavy systems
+ 
+--------------------------------------------------
+ 
+[LLD - Low Level Design (INTERVIEW FAVORITE)]
+ 
+Core Designs
+- Ecommerce System (Order, Cart, Payment, Inventory)
+- Library Management System (Schema + APIs)
+- StackOverflow System Design
+- Parking Lot System
+- Rate Limiter (LLD + code)
+ 
+Focus Areas
+- Class Design
+- DB Schema
+- API Design
+- Edge Cases
+ 
+🔥 ADVANCED (IMPORTANT EDGE)
+- Concurrency handling (thread-safe design)
+- Validation layer (input/API)
+- Error handling (retry, fallback)
+- Extensibility (Open/Closed principle)
+ 
+ 
+================ DEVOPS =================
+ 
+CI/CD
+- Pipeline (Build → Test → Deploy)
+- Blue-Green Deployment
+- Canary Deployment
+ 
+Scaling
+- Horizontal vs Vertical Scaling
+- Auto Scaling
+- Handle Traffic Spikes
+ 
+Caching
+- Redis (TTL, LRU/LFU)
+- Cache Aside, Write Through
+ 
+Monitoring
+- Splunk, ELK
+- Prometheus, Grafana
+ 
+Performance
+- Load Testing (JMeter)
+- Bottleneck analysis
+ 
+Metrics
+- Latency, Throughput, Error rate
+ 
+🔥 ADVANCED
+- Zero downtime deployment
+- Secrets management (Vault/env)
+- Connection pooling (DB)
+- Thread pool tuning
+ 
+ 
+================ KAFKA =================
+ 
+Basics
+- Kafka Architecture
+- Topic & Partition
+- Consumer Group
+ 
+Reliability
+- Message Delivery Guarantee
+- Retry & DLQ
+ 
+Advanced
+- Idempotency
+- Ordering guarantees
+- Event-driven microservices
+ 
+Experience
+- Real-world usage
+ 
+ 
+================ JAVA CORE =================
+ 
+Collections
+- HashMap vs Hashtable
+- HashMap internal working
+- ConcurrentHashMap
+ 
+OOP
+- Shallow vs Deep Copy
+- Immutable class design
+- Abstract vs Interface
+ 
+Java 8
+- Functional interfaces
+- map vs flatMap
+- Streams
+ 
+Concurrency (VERY IMPORTANT)
+- ExecutorService
+- submit vs execute
+- Locks vs synchronized
+- volatile keyword
+ 
+Threads
+- Thread.join & run()
+ 
+ 
+================ MULTITHREADING =================
+ 
+Basics
+- Multithreading concept
+ 
+Problems
+- Producer Consumer
+- Thread-safe queue
+- Odd-even printing
+ 
+Concepts
+- Data consistency
+ 
+ 
+================ SPRING BOOT =================
+ 
+Core
+- @Transactional (Propagation, Isolation)
+- Class vs Method level
+- Bean scopes
+ 
+JPA
+- Lazy/Eager
+- N+1 problem
+ 
+REST
+- REST principles
+ 
+Exception
+- Global exception handling
+ 
+Security
+- JWT
+ 
+ 
+================ REST API =================
+ 
+Design
+- Secure APIs
+- Idempotency
+ 
+Methods
+- PUT vs PATCH
+ 
+Params
+- RequestParam vs PathVariable
+ 
+Versioning
+- API versioning
+ 
+Security
+- JWT / Basic Auth
+ 
+ 
+================ DATABASE =================
+ 
+SQL
+- Indexing
+- Joins
+- Query optimization
+ 
+NoSQL
+- MongoDB basics
+ 
+Scaling
+- Sharding
+- Replication
+ 
+Concepts
+- SQL vs NoSQL
+ 
+🔥 ADVANCED
+- Deadlocks
+- Isolation levels
+- Cursor pagination
+ 
+ 
+================ NETWORKING =================
+ 
+- HTTP vs HTTPS
+- TCP vs UDP
+- DNS working
+- CDN
+- Latency vs Throughput
+ 
+🔥 ADVANCED
+- Timeout (connection vs read)
+- Keep-alive
+- Retry + exponential backoff
+ 
+ 
+================ SECURITY =================
+ 
+- Authentication vs Authorization
+- JWT flow
+- OAuth basics
+- HTTPS/SSL
+ 
+ 
+================ DESIGN PATTERNS =================
+ 
+Patterns
+- Singleton
+- Factory
+- Strategy
+ 
+Principles
+- SOLID
+ 
+ 
+================ MISC =================
+ 
+- CDN kya hai
+- Production issue handling
+- Integration & load testing
+- Agile methodology
+>>>>>>> 2aab2fec016dcc7a0387841e37b77da7aed2bbbd
 - Resume deep dive

@@ -1,3 +1,4 @@
+<<<<<<< HEAD:InterviewReady/OpenToRelocate_DSA.txt
 ================= CORE PATTERNS FIRST (VERY IMPORTANT) =================
 
 [ ] Sliding Window
@@ -206,4 +207,214 @@ DP →
 Use when:
 - overlapping subproblems
 - optimize recursion
+=======
+================= CORE PATTERNS FIRST (VERY IMPORTANT) =================
+
+[ ] Sliding Window
+[ ] Two Pointer
+[ ] Prefix Sum
+[ ] Binary Search Patterns
+[ ] Hashing
+[ ] Recursion
+[ ] Backtracking
+[ ] Heap / Priority Queue
+
+
+================= STRINGS =================
+
+[ ] First non-repeating character
+[ ] Longest substring without repeating
+[ ] Longest substring with K distinct
+[ ] Minimum window substring
+[ ] Valid palindrome
+[ ] Group anagrams
+[ ] String compression
+[ ] Longest repeating replacement
+[ ] Smallest window substring
+[ ] Count substrings with K distinct
+[ ] String permutations
+[ ] Word break
+[ ] KMP Algorithm
+[ ] Rabin-Karp
+
+🔥 EXTRA ADD:
+[ ] Remove adjacent duplicates
+[ ] Compare version numbers
+[ ] Decode string
+[ ] Reorganize string
+[ ] Partition labels
+
+----------------- PATTERN HINT -----------------
+Sliding Window → substring problems
+HashMap → frequency / anagram
+Two Pointer → palindrome / reverse
+KMP / Rabin → pattern search
+Backtracking → permutations
+
+================= ARRAYS =================
+
+[ ] Two Sum
+[ ] 3Sum
+[ ] 4Sum
+[ ] Kadane’s Algorithm
+[ ] Maximum product subarray
+[ ] Container with most water
+[ ] Trapping rain water
+[ ] Merge intervals
+[ ] Insert interval
+[ ] Sliding window maximum
+[ ] Subarray sum = K
+[ ] Subarray XOR
+[ ] Product except self
+[ ] Prefix sum queries
+[ ] Rotate array
+[ ] Move zeros
+[ ] Majority element
+[ ] Kth largest element
+
+🔥 EXTRA ADD:
+[ ] Missing number
+[ ] Find duplicates
+[ ] Sort 0-1-2 (Dutch flag)
+[ ] Next permutation
+[ ] Peak element (array)
+
+----------------- PATTERN HINT -----------------
+Two Pointer → sorted array / pair problems
+Sliding Window → subarray problems
+Prefix Sum → sum queries / subarray sum
+Greedy → intervals / jumps
+Heap → kth / top k
+Binary Search → sorted / monotonic
+
+================= BINARY SEARCH =================
+
+[ ] Classic binary search
+[ ] First & last occurrence
+[ ] Search in rotated sorted array
+[ ] Peak element
+[ ] Allocate minimum pages
+[ ] Median of two sorted arrays
+
+
+================= STACK / QUEUE =================
+
+[ ] Valid parentheses
+[ ] Next greater element
+[ ] Next greater circular
+[ ] Largest rectangle in histogram
+[ ] Stock span problem
+[ ] Sliding window maximum
+[ ] Min stack
+[ ] Evaluate postfix expression
+
+
+================= LINKED LIST =================
+
+[ ] Reverse linked list
+[ ] Detect cycle
+[ ] Find start of cycle
+[ ] Merge two sorted lists
+[ ] Remove nth node from end
+[ ] Palindrome linked list
+[ ] Intersection of linked list
+[ ] LRU Cache
+
+
+================= HEAP / PRIORITY QUEUE =================
+
+[ ] Kth largest element
+[ ] Top K frequent elements
+[ ] Merge K sorted lists
+[ ] Median from data stream
+[ ] Task scheduler
+
+
+================= RECURSION + BACKTRACKING =================
+
+[ ] Subsets
+[ ] Permutations
+[ ] Combination sum
+[ ] Generate parentheses
+[ ] Word break
+[ ] Restore IP
+[ ] Palindrome partitioning
+
+
+================= GRAPH =================
+
+[ ] BFS
+[ ] DFS
+[ ] Number of islands
+[ ] Rotten oranges
+[ ] Topological sort
+[ ] Detect cycle (graph)
+[ ] Shortest path (basic BFS)
+
+
+================= EXTRA PRACTICE (ADVANCED BOOST 🔥) =================
+
+[ ] Longest increasing subsequence
+[ ] DP - House Robber
+[ ] DP - Coin Change
+[ ] DP - Knapsack (basic)
+[ ] DP - Longest common subsequence
+
+[ ] Trie basics
+[ ] Search autocomplete (Trie use case)
+
+[ ] Bit manipulation basics
+[ ] Single number problems
+
+[ ] Greedy - Activity selection
+[ ] Greedy - Minimum platforms
+
+[ ] Two heaps problems
+[ ] Sliding window advanced
+
+
+================= MASTER PATTERN GUIDE =================
+
+Sliding Window →
+Use when:
+- substring / subarray
+- longest / smallest window
+- K constraint
+
+Two Pointer →
+Use when:
+- sorted array
+- pair sum / palindrome
+
+Prefix Sum →
+Use when:
+- range sum
+- subarray sum = K
+
+Binary Search →
+Use when:
+- sorted array
+- monotonic condition
+- answer space search
+
+Heap →
+Use when:
+- kth smallest/largest
+- top K frequent
+
+Backtracking →
+Use when:
+- permutations / combinations
+- recursion tree
+
+Graph (BFS/DFS) →
+Use when:
+- grid / matrix
+- connected components
+
+DP →
+Use when:
+- overlapping subproblems
+- optimize recursion
+>>>>>>> 2aab2fec016dcc7a0387841e37b77da7aed2bbbd:OpenToRelocate_DSA.txt
 ...
