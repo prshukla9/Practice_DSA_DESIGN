@@ -1,0 +1,1235 @@
+================================================================================
+  JAVA COMPLETE PREP — STREAMS + GENERICS + MEMORY + OOPS BEST-OF
+  6 Years Backend Developer | Tier 2 Product Companies
+  Hinglish + Stories + Full Code + Comment Every Line
+================================================================================
+
+  🔥🔥🔥 MOST IMPORTANT  — Har interview mein, pakka aayega
+  🔥🔥   IMPORTANT       — 60-70% interviews
+  🔥     READ ME         — Deep dive / senior level
+
+================================================================================
+SECTION 1: 🔥🔥🔥 JAVA 8 — STREAMS API (SABSE ZYADA PUCHA JAATA HAI)
+================================================================================
+
+Q1. Stream kya hota hai? Pipeline explain karo.
+
+STORY — Assembly line analogy:
+  Raw materials (List) → Conveyor belt (Stream) → Operations (filter/map) → Final product (collect)
+  Har operation ek station hai — data ek ek karke guzarta hai.
+
+STREAM vs COLLECTION:
+  Collection = Data store karta hai (List, Set)
+  Stream     = Data process karta hai — NO storage, one-time use, lazy evaluation
+
+TWO TYPES OF OPERATIONS:
+  Intermediate (Lazy — tabhi chalta hai jab terminal ho):
+    filter(), map(), flatMap(), sorted(), distinct(), limit(), skip(), peek()
+
+  Terminal (Triggers actual processing):
+    collect(), forEach(), count(), findFirst(), anyMatch(), reduce(), toList()
+
+// ============================================================
+// BASIC PIPELINE — Step by step:
+// ============================================================
+List<String> names = List.of("Prashant", "Rahul", "Priya", "Ram", "Pooja");
+
+List<String> result = names.stream()           // 1. Collection → Stream
+    .filter(n -> n.startsWith("P"))            // 2. INTERMEDIATE: Sirf P se shuru wale
+    .map(String::toUpperCase)                  // 3. INTERMEDIATE: Uppercase karo
+    .sorted()                                  // 4. INTERMEDIATE: Sort karo
+    .collect(Collectors.toList());             // 5. TERMINAL: Wapas List mein
+// result: ["POOJA", "PRASHANT", "PRIYA"]
+
+// ============================================================
+// MAP vs FLATMAP — MOST ASKED DIFFERENCE
+// ============================================================
+// MAP: Har element → ek element (1-to-1 transformation)
+List<String> upper = names.stream()
+    .map(String::toUpperCase)   // "prashant" → "PRASHANT"
+    .toList();
+
+// FLATMAP: Nested collections → Ek flat stream (1-to-many + flatten)
+List<List<Integer>> nested = List.of(
+    List.of(1, 2, 3),
+    List.of(4, 5),
+    List.of(6, 7, 8)
+);
+
+List<Integer> flat = nested.stream()
+    .flatMap(Collection::stream)  // Each inner list → stream, all merged!
+    .collect(Collectors.toList());
+// flat: [1, 2, 3, 4, 5, 6, 7, 8]
+
+// REAL WORLD: Patient ke saare prescriptions fetch karo
+List<String> allMedicines = patients.stream()
+    .flatMap(p -> p.getPrescriptions().stream())  // Each patient → List<Prescription>
+    .map(Prescription::getMedicineName)
+    .distinct()
+    .collect(Collectors.toList());
+
+// ============================================================
+// COLLECTORS — groupingBy, partitioningBy, joining (Interview favourite!)
+// ============================================================
+
+// groupingBy — HashMap<Key, List<Value>>
+Map<String, List<Employee>> byDept = employees.stream()
+    .collect(Collectors.groupingBy(Employee::getDepartment));
+// {"IT" → [emp1, emp3], "HR" → [emp2, emp4]}
+
+// groupingBy with downstream collector — count per department
+Map<String, Long> countByDept = employees.stream()
+    .collect(Collectors.groupingBy(
+        Employee::getDepartment,
+        Collectors.counting()        // Downstream — count karke rakh
+    ));
+// {"IT" → 15, "HR" → 8}
+
+// groupingBy with average salary
+Map<String, Double> avgSalaryByDept = employees.stream()
+    .collect(Collectors.groupingBy(
+        Employee::getDepartment,
+        Collectors.averagingDouble(Employee::getSalary)
+    ));
+
+// partitioningBy — Boolean key (true/false split)
+Map<Boolean, List<Employee>> juniorSenior = employees.stream()
+    .collect(Collectors.partitioningBy(e -> e.getYears() >= 5));
+// {true → [senior list], false → [junior list]}
+
+// joining — String concatenation
+String names = employees.stream()
+    .map(Employee::getName)
+    .collect(Collectors.joining(", ", "[", "]")); // delimiter, prefix, suffix
+// "[Alice, Bob, Charlie]"
+
+// ============================================================
+// REDUCE — Aggregation
+// ============================================================
+// Sum: Identity (starting value) + BinaryOperator
+int totalSalary = salaries.stream()
+    .reduce(0, Integer::sum);           // 0 + each salary
+
+// Max element
+Optional<Employee> highest = employees.stream()
+    .reduce((e1, e2) -> e1.getSalary() > e2.getSalary() ? e1 : e2);
+
+// ============================================================
+// FIND + MATCH operations
+// ============================================================
+// findFirst(): First element (ordered stream)
+Optional<Employee> first = employees.stream()
+    .filter(e -> e.getDept().equals("IT"))
+    .findFirst();
+
+// anyMatch / allMatch / noneMatch:
+boolean hasIT    = employees.stream().anyMatch(e -> e.getDept().equals("IT"));
+boolean allActive= employees.stream().allMatch(Employee::isActive);
+boolean noneNeg  = salaries.stream().noneMatch(s -> s < 0);
+
+// ============================================================
+// SORTING with Comparator
+// ============================================================
+List<Employee> sorted = employees.stream()
+    .sorted(Comparator.comparing(Employee::getSalary)
+        .thenComparing(Employee::getName)
+        .reversed())  // Highest salary first
+    .collect(Collectors.toList());
+
+Q2. Lazy Evaluation kya hota hai? Interview mein kyon important?
+
+// LAZY = Intermediate operations tabhi chalta hai jab terminal ho!
+// Iska fayda: Unnecessary processing avoid
+
+Stream<String> stream = names.stream()
+    .filter(n -> {
+        System.out.println("Filtering: " + n); // Yeh print NAHI hoga!
+        return n.startsWith("P");
+    })
+    .map(String::toUpperCase);
+// ABHI TAK KUCH NAHI HUA — terminal operation nahi hai!
+
+stream.findFirst(); // AB filtering start hogi — aur SIRF 1 element tak!
+// Output: "Filtering: Prashant" → Found! Stop.
+// Rahul, Priya, Ram, Pooja process hi NAHI hue — LAZY optimization!
+
+Q3. Parallel Stream — kab use karo, kab nahi?
+
+// Parallel stream: ForkJoinPool mein kaam — multiple threads
+List<Integer> nums = IntStream.rangeClosed(1, 1_000_000).boxed().toList();
+
+long sum = nums.parallelStream()
+    .mapToLong(Integer::longValue)
+    .sum();  // Auto-split across CPU cores!
+
+// KAB USE KARO:
+// ✅ Large data (100K+), CPU-intensive operations, no shared mutable state
+// ✅ Independent operations (order matters nahi)
+
+// KAB MAT KARO:
+// ❌ Small data — thread overhead > benefit
+// ❌ Shared mutable state → Race condition!
+// ❌ Order-sensitive operations
+// ❌ I/O bound operations (DB calls — thread pool exhaust hoga)
+
+// DANGEROUS — Race condition:
+List<Integer> result = new ArrayList<>();  // NOT thread-safe!
+numbers.parallelStream()
+    .filter(n -> n % 2 == 0)
+    .forEach(result::add);  // Multiple threads add kar rahe hain → CORRUPTED!
+
+// SAFE WAY:
+List<Integer> safe = numbers.parallelStream()
+    .filter(n -> n % 2 == 0)
+    .collect(Collectors.toList());  // collect() is thread-safe
+
+================================================================================
+SECTION 2: 🔥🔥🔥 LAMBDA + FUNCTIONAL INTERFACES
+================================================================================
+
+Q4. Functional Interface kya hota hai?
+
+DEFINITION: Exactly ONE abstract method wala interface.
+  @FunctionalInterface annotation (optional but good practice — compiler check)
+
+// BUILT-IN FUNCTIONAL INTERFACES — Yeh yaad karo:
+
+// 1. Function<T, R> — Input T → Output R (transform)
+Function<String, Integer> lengthFn = s -> s.length();
+Function<String, String> upper = String::toUpperCase;  // Method reference!
+int len = lengthFn.apply("Prashant");  // 8
+
+// compose/andThen for chaining:
+Function<Integer, Integer> times2 = x -> x * 2;
+Function<Integer, Integer> plus3  = x -> x + 3;
+Function<Integer, Integer> times2ThenPlus3 = times2.andThen(plus3);
+times2ThenPlus3.apply(5); // (5*2)+3 = 13
+
+// 2. Predicate<T> — Input T → boolean (condition check)
+Predicate<String> isLong   = s -> s.length() > 5;
+Predicate<String> startsWithA = s -> s.startsWith("A");
+
+// Predicate chaining:
+Predicate<String> combined = isLong.and(startsWithA);  // Both conditions
+Predicate<String> either   = isLong.or(startsWithA);   // Either condition
+Predicate<String> notLong  = isLong.negate();           // NOT
+
+// 3. Consumer<T> — Input T → void (side effect only, no return)
+Consumer<String> printer  = System.out::println;
+Consumer<Employee> saver  = employeeRepo::save;
+Consumer<String> logUpper = s -> log.info(s.toUpperCase());
+
+// BiConsumer<T, U> — two inputs:
+BiConsumer<String, Integer> printWithAge = (name, age) ->
+    System.out.println(name + " is " + age);
+
+// 4. Supplier<T> — No input → Output T (factory/lazy init)
+Supplier<List<String>> listMaker = ArrayList::new;
+Supplier<UUID> idMaker = UUID::randomUUID;
+
+// Lazy initialization with Supplier:
+Supplier<HeavyObject> lazy = () -> new HeavyObject(); // Created only when .get() called
+HeavyObject obj = lazy.get(); // Object create hota hai ABHI
+
+// 5. BiFunction<T, U, R> — Two inputs → one output
+BiFunction<String, Integer, String> repeat = (s, n) -> s.repeat(n);
+repeat.apply("Hi", 3); // "HiHiHi"
+
+// 6. UnaryOperator<T> — Function jahan input aur output same type
+UnaryOperator<String> trim = String::trim;
+UnaryOperator<Integer> square = n -> n * n;
+
+// 7. BinaryOperator<T> — BiFunction jahan sab same type
+BinaryOperator<Integer> sum = Integer::sum;
+BinaryOperator<String> concat = String::concat;
+
+Q5. Method References — 4 types
+
+// :: operator — Lambda ka shorthand when just calling a method
+
+// TYPE 1: Static method reference
+// Lambda:         n -> Math.abs(n)
+// Method ref:     Math::abs
+Function<Integer, Integer> abs = Math::abs;
+
+// TYPE 2: Instance method of particular object
+// Lambda:         s -> System.out.println(s)
+// Method ref:     System.out::println
+Consumer<String> printer = System.out::println;
+
+// TYPE 3: Instance method of arbitrary object of a type
+// Lambda:         s -> s.toUpperCase()
+// Method ref:     String::toUpperCase
+Function<String, String> upper = String::toUpperCase;
+// "Ek string aayegi, uska toUpperCase call hoga"
+
+// TYPE 4: Constructor reference
+// Lambda:         () -> new ArrayList<>()
+// Method ref:     ArrayList::new
+Supplier<List<String>> maker = ArrayList::new;
+
+================================================================================
+SECTION 3: 🔥🔥🔥 OPTIONAL — PROPER USE (NullPointerException KI MAUT)
+================================================================================
+
+Q6. Optional kya hai? Kaise use karo?
+
+STORY — Gift box analogy:
+  Purana code: Direct gift dete the — agar andar kuch nahi → BLAST (NPE)!
+  Optional = Gift box with check — "Is there something inside?" → Then open.
+
+// ============================================================
+// OPTIONAL CREATION:
+// ============================================================
+Optional<String> present = Optional.of("Hello");        // Value guaranteed (NPE if null!)
+Optional<String> maybe   = Optional.ofNullable(name);   // Can be null — safe
+Optional<String> empty   = Optional.empty();             // Explicitly empty
+
+// ============================================================
+// RETRIEVAL — DO'S AND DON'TS:
+// ============================================================
+
+// ❌ BAD — .get() without check → NoSuchElementException!
+String val = optional.get(); // NEVER do this directly!
+
+// ❌ ALSO BAD — defeats the purpose of Optional
+if (optional.isPresent()) {
+    String v = optional.get(); // Same as null check — old pattern
+}
+
+// ✅ GOOD — orElse (default value if empty)
+String name = optional.orElse("Unknown");
+
+// ✅ GOOD — orElseGet (lazy — supplier called only if empty)
+String name = optional.orElseGet(() -> fetchDefaultName()); // Expensive call only if needed
+
+// ✅ GOOD — orElseThrow (custom exception)
+String name = optional.orElseThrow(() ->
+    new PatientNotFoundException("Patient not found"));
+
+// ✅ GOOD — map (transform if present, empty if not)
+Optional<String> upper = optional.map(String::toUpperCase);
+
+// ✅ GOOD — flatMap (when mapper returns Optional)
+Optional<String> city = userOptional
+    .flatMap(user -> user.getAddress())  // getAddress() returns Optional<Address>
+    .map(Address::getCity);
+
+// ✅ GOOD — ifPresent (side effect only if present)
+optional.ifPresent(val -> log.info("Found: {}", val));
+
+// ✅ GOOD — filter (narrow down)
+Optional<String> longName = optional
+    .filter(s -> s.length() > 5);
+
+// ============================================================
+// REAL PROJECT PATTERN — Repository + Optional:
+// ============================================================
+@Service
+public class PatientService {
+
+    public PatientDTO getPatient(String id) {
+        // Repository returns Optional<Patient>
+        return patientRepo.findById(id)        // Optional<Patient>
+            .map(PatientMapper::toDTO)         // Optional<PatientDTO>
+            .orElseThrow(() ->                 // Empty → throw
+                new PatientNotFoundException("Patient not found: " + id));
+    }
+
+    public String getPatientCity(String patientId) {
+        return patientRepo.findById(patientId) // Optional<Patient>
+            .flatMap(Patient::getAddress)      // Optional<Address> (address optional hai)
+            .map(Address::getCity)             // Optional<String>
+            .orElse("City not available");     // String
+    }
+}
+
+// ============================================================
+// ANTI-PATTERNS — Interview mein galat mat bolna:
+// ============================================================
+
+// ❌ Optional as method parameter:
+void processPatient(Optional<Patient> patient) {} // BAD — just use @Nullable
+// ✅ Use overloading or @Nullable instead
+
+// ❌ Optional in class fields:
+class Patient {
+    private Optional<String> middleName; // BAD — Serialization issue, unnecessary overhead
+}
+// ✅ Use String middleName (nullable) for fields
+
+// ❌ Wrapping collections:
+Optional<List<Patient>> patients; // BAD — Empty list is better than empty Optional
+// ✅ Return empty list: return List.of() instead of Optional.empty()
+
+================================================================================
+SECTION 4: 🔥🔥🔥 JVM MEMORY MANAGEMENT (MISSING TOPIC — FULL COVER)
+================================================================================
+
+Q7. JVM Memory Areas — explain karo
+
+STORY — Office analogy:
+  JVM = ek badi office building
+  Har employee (Thread) ka apna desk (Stack) hota hai
+  Shared conference room (Heap) = sab milke use karte hain
+  Whiteboard (Metaspace) = Class definitions — sab dekhte hain
+
+JVM MEMORY AREAS:
+
+1. HEAP — Sabse bada, sab threads share karte hain
+   - Objects store hote hain (new keyword se bane)
+   - Garbage collected
+   - Sub-divisions:
+     Young Generation:
+       Eden Space   → Naye objects yahan bante hain
+       Survivor 0   → Minor GC survive karne wale
+       Survivor 1   → Doosra round survive karne wale
+     Old Generation (Tenured) → Long-lived objects (multiple GC survive kiye)
+
+2. STACK — Har thread ka apna, automatically managed
+   - Method call frames store hote hain
+   - Local variables + references
+   - LIFO (Last In First Out)
+   - StackOverflowError = Bahut deep recursion (stack full!)
+
+3. METASPACE (Java 8+ — replaces PermGen)
+   - Class definitions, method metadata, static variables
+   - Native memory mein hai (JVM heap se bahar)
+   - Default: No fixed limit (auto-grow) → OutOfMemoryError agar OS memory khatam
+
+4. PC REGISTER — Current instruction pointer per thread
+
+5. NATIVE METHOD STACK — JNI (C/C++) calls ke liye
+
+// KEY SIZES (JVM flags):
+// -Xms256m     = Initial heap size
+// -Xmx1g       = Max heap size
+// -Xss512k     = Thread stack size
+// -XX:MetaspaceSize=128m  = Initial Metaspace
+
+Q8. GC kaise kaam karta hai? Algorithms explain karo.
+
+STORY — Office cleaning analogy:
+  Objects = Kaam ke papers
+  GC = Office cleaner
+  "Koi bhi paper jisko koi nahi pakad raha (no reference) → Dustbin!"
+
+GC ROOTS (Starting points — jo hamesha reachable hain):
+  - Stack variables (local variables)
+  - Static variables
+  - JNI references
+
+MARK AND SWEEP (Basic algorithm):
+  Phase 1 MARK: GC roots se start karo → Sab reachable objects mark karo
+  Phase 2 SWEEP: Unmarked objects = unreachable = garbage → Free memory
+  Phase 3 COMPACT: Memory fragmentation fix karo (optional)
+
+MINOR GC vs MAJOR GC vs FULL GC:
+  Minor GC: Sirf Young Generation clean — Fast (milliseconds)
+            Eden full → Live objects → Survivor spaces → Old Gen eventually
+  Major GC: Old Generation clean — Slow (seconds)
+  Full GC:  Everything — STOP THE WORLD — Avoid in production!
+
+GC ALGORITHMS:
+
+1. SERIAL GC (-XX:+UseSerialGC)
+   Single thread — Not for production
+   Use: Small apps, client-side
+
+2. PARALLEL GC (-XX:+UseParallelGC)
+   Multiple threads for GC — Still stop the world
+   Use: Batch processing (throughput priority)
+
+3. G1 GC (-XX:+UseG1GC) — DEFAULT Java 9+
+   "Garbage First" — Divides heap into equal-sized regions
+   Prioritizes regions with most garbage first
+   Low pause time goal set kar sakte ho: -XX:MaxGCPauseMillis=200
+   USE: Most production apps — good balance
+
+4. ZGC (-XX:+UseZGC) — Java 11+
+   Concurrent — Almost no stop-the-world (< 1ms pauses!)
+   Handles multi-TB heaps
+   USE: Latency-critical applications (real-time systems)
+   Healthcare mein: AI query service pe ZGC → AI latency consistent!
+
+5. SHENANDOAH — Similar to ZGC, RedHat
+   Concurrent compaction
+   USE: Similar to ZGC
+
+GC TUNING (Blue Yonder jaise high-throughput):
+// G1 GC settings for Spring Boot microservice:
+// -XX:+UseG1GC
+// -XX:MaxGCPauseMillis=200    # Target max pause
+// -XX:G1HeapRegionSize=16m    # Region size (adjust based on heap)
+// -XX:G1NewSizePercent=30     # Young gen min %
+// -XX:G1MaxNewSizePercent=40  # Young gen max %
+
+Q9. Memory Leak Spring Boot mein — kaise hota hai? Debug kaise karo?
+
+COMMON CAUSES:
+
+1. STATIC COLLECTIONS:
+   private static final List<Object> cache = new ArrayList<>();
+   // Static → GC never collects → Memory fills up over time!
+   // FIX: Use bounded cache (Caffeine/Guava) with eviction policy
+
+2. UNCLOSED RESOURCES (Stream, Connection):
+   InputStream is = getInputStream();
+   // Process karo...
+   // is.close() bhool gaye → Memory + file handle leak!
+   // FIX: try-with-resources HAMESHA
+
+3. THREADLOCAL NOT REMOVED:
+   ThreadLocal<SomeObject> local = new ThreadLocal<>();
+   local.set(new SomeObject());
+   // Thread pool mein thread reuse hota hai → Old value stays!
+   // FIX: local.remove() in finally block HAMESHA
+
+4. LISTENERS/CALLBACKS NOT DEREGISTERED:
+   eventBus.register(this); // Registered
+   // Deregister nahi kiya → Object GC-able nahi → Listener accumulate!
+   // FIX: @PreDestroy mein eventBus.unregister(this)
+
+5. CACHE WITHOUT EVICTION:
+   @Cacheable("patients") // Entries never evicted — keeps growing!
+   // FIX: TTL set karo, max size set karo
+
+HOW TO DEBUG:
+
+Step 1: Symptoms — Heap usage increasing over time (CloudWatch)
+Step 2: Heap dump lena:
+   jmap -dump:format=b,file=heap.hprof <pid>
+   Or: -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/dumps/
+
+Step 3: Analyze with Eclipse MAT (Memory Analyzer Tool)
+   - "Leak Suspects" report
+   - Biggest objects find karo
+   - Who is holding reference?
+
+Step 4: GC logs analyze:
+   -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Xloggc:/logs/gc.log
+   Pattern: Old Gen increasing → Memory leak!
+
+// PRODUCTION CHECK:
+@Scheduled(fixedDelay = 60000)
+public void checkMemory() {
+    MemoryMXBean memBean = ManagementFactory.getMemoryMXBean();
+    long usedHeap = memBean.getHeapMemoryUsage().getUsed() / (1024 * 1024); // MB
+    long maxHeap  = memBean.getHeapMemoryUsage().getMax() / (1024 * 1024);
+    double utilization = (double) usedHeap / maxHeap * 100;
+
+    if (utilization > 85) {
+        log.warn("HIGH HEAP USAGE: {}% ({}/{}MB)", utilization, usedHeap, maxHeap);
+        // Alert → PagerDuty
+    }
+}
+
+Q10. String pool kya hota hai? intern() explain karo.
+
+// String literals — Automatically in String pool (Heap ka part)
+String s1 = "hello";   // Pool mein "hello" create
+String s2 = "hello";   // SAME "hello" return — no new object!
+System.out.println(s1 == s2);       // TRUE — Same reference!
+System.out.println(s1.equals(s2)); // TRUE — Same value
+
+// new keyword — ALWAYS new object (pool bypass)
+String s3 = new String("hello");   // New object in heap (not pool)
+String s4 = new String("hello");   // Another new object
+System.out.println(s3 == s4);       // FALSE — Different objects!
+System.out.println(s3.equals(s4)); // TRUE — Same value
+
+// intern() — Force put in pool / get from pool
+String s5 = new String("hello").intern(); // Moved to pool!
+System.out.println(s1 == s5);    // TRUE — Same pool reference!
+
+// WHY IMMUTABLE? 3 reasons:
+// 1. Thread safety — Multiple threads same string safely share
+// 2. HashMap key — hashCode consistent (mutable hoti → hashCode change → bug!)
+// 3. Security — Class names, passwords not modifiable in transit
+
+// String vs StringBuilder vs StringBuffer:
+// String:        IMMUTABLE — Every concat = new object → Slow in loops
+// StringBuilder: MUTABLE — NOT thread safe → FAST (single thread use)
+// StringBuffer:  MUTABLE — Thread SAFE (synchronized) → SLOWER (multi-thread)
+
+// ❌ BAD — Loop mein String concat:
+String result = "";
+for (int i = 0; i < 1000; i++) {
+    result += i;  // 1000 String objects created! O(n²)
+}
+
+// ✅ GOOD — StringBuilder:
+StringBuilder sb = new StringBuilder();
+for (int i = 0; i < 1000; i++) {
+    sb.append(i);  // Single object, amortized O(n)
+}
+String result = sb.toString();
+
+================================================================================
+SECTION 5: 🔥🔥🔥 COLLECTIONS — MOST ASKED GAPS
+================================================================================
+
+Q11. ConcurrentHashMap vs HashMap vs Hashtable
+
+STORY — Library analogy:
+  HashMap = Library without security guard — Sab freely andar jate hain
+             Multi-thread = Chaos (concurrent modification!)
+  Hashtable = Library with ONE guard at door — Ek ek karke andar — Safe but SLOW
+  ConcurrentHashMap = Library with multiple counters — Smart locking — FAST + SAFE
+
+HASHMAP:
+  - NOT thread safe
+  - Null key: 1 allowed. Null values: Multiple allowed.
+  - Fail-fast iterator
+  - HashMap internal: Array of buckets + LinkedList/Tree per bucket (Java 8: tree at 8)
+
+HASHTABLE (Legacy — avoid):
+  - Thread safe — Entire map pe single synchronized lock
+  - No null keys or values
+  - Use ConcurrentHashMap instead — better performance
+
+CONCURRENTHASHMAP (USE THIS in multi-threaded):
+  - Thread safe
+  - Segment locking (Java 7) → Node-level locking (Java 8)
+  - Only the modified bucket locked — other buckets free!
+  - No null keys or values (by design — ambiguity avoid)
+  - Fail-safe iterator (no ConcurrentModificationException)
+  - putIfAbsent(), computeIfAbsent(), merge() — atomic operations
+
+// INTERNAL — Java 8 ConcurrentHashMap:
+// Array of Nodes (like HashMap)
+// Synchronize sirf affected node/bin pe (CAS operations)
+// ReservationNode, TreeBin, ForwardingNode for resize
+
+// USAGE:
+ConcurrentHashMap<String, List<Patient>> patientsByDoctor = new ConcurrentHashMap<>();
+
+// computeIfAbsent — atomic! Thread-safe list creation
+patientsByDoctor.computeIfAbsent(doctorId, k -> new ArrayList<>())
+                .add(patient);
+
+// putIfAbsent — only insert if key absent (atomic check+insert)
+patientsByDoctor.putIfAbsent("DOC-001", new ArrayList<>());
+
+Q12. Fail-fast vs Fail-safe Iterators
+
+FAIL-FAST (HashMap, ArrayList, HashSet):
+  - modCount check karta hai — structural modification detect karo
+  - Concurrent modification hoi → ConcurrentModificationException!
+  - Internal: modCount field increment on every structural change
+  - Iterator creation pe modCount snapshot liya — compare karo on next()
+
+  List<String> list = new ArrayList<>(List.of("A", "B", "C"));
+  Iterator<String> it = list.iterator();
+  list.add("D");      // Structural modification AFTER iterator create!
+  it.next();          // THROWS ConcurrentModificationException!
+
+  // FIX: Use Iterator's own remove(), or CopyOnWriteArrayList, or ListIterator
+
+FAIL-SAFE (ConcurrentHashMap, CopyOnWriteArrayList):
+  - Copy pe iterate karta hai (ya lock se protect)
+  - No exception — but might not see latest changes
+
+  CopyOnWriteArrayList<String> list = new CopyOnWriteArrayList<>(List.of("A", "B", "C"));
+  Iterator<String> it = list.iterator(); // Snapshot of list
+  list.add("D");       // Add hoga — but iterator CURRENT snapshot se chalega
+  it.next();           // NO exception — iterates OLD copy
+
+  // Use CopyOnWriteArrayList when: Read-heavy, occasional writes
+
+Q13. TreeMap vs LinkedHashMap vs HashMap
+
+HASHMAP:
+  - No order guaranteed
+  - O(1) get/put (average)
+  - Most common — performance priority
+
+LINKEDHASHMAP:
+  - Insertion order ya access order maintain karta hai
+  - Internally: HashMap + Doubly Linked List
+  - LRU cache implement karne mein use! (removeEldestEntry override karo)
+  - O(1) operations
+
+  // LRU Cache using LinkedHashMap:
+  Map<Integer, Integer> lruCache = new LinkedHashMap<>(capacity, 0.75f, true) {
+      @Override
+      protected boolean removeEldestEntry(Map.Entry eldest) {
+          return size() > capacity;  // Auto-evict oldest accessed
+      }
+  };
+
+TREEMAP:
+  - Sorted order maintain karta hai (natural ordering ya custom Comparator)
+  - Internally: Red-Black Tree
+  - O(log n) operations — slower than HashMap
+  - NavigableMap features: headMap(), tailMap(), floorKey(), ceilingKey()
+
+  TreeMap<String, Integer> scores = new TreeMap<>();  // Alphabetically sorted keys
+  scores.put("Prashant", 95);
+  scores.put("Alice", 88);
+  scores.put("Zara", 72);
+  System.out.println(scores);  // {Alice=88, Prashant=95, Zara=72} — SORTED!
+
+  // Range queries — TreeMap specialty:
+  scores.headMap("M");      // All keys < "M" — {Alice=88}
+  scores.tailMap("P");      // All keys >= "P" — {Prashant=95, Zara=72}
+  scores.subMap("A", "Q"); // Between A and Q
+
+  // Use case: Leaderboard, date-range queries, ordered processing
+
+Q14. Comparable vs Comparator — Difference + When to use
+
+COMPARABLE (java.lang.Comparable):
+  - Class khud compare logic define karta hai
+  - compareTo() implement karo
+  - Natural ordering — ek hi sorting logic
+  - class ke andar likha jaata hai
+
+COMPARATOR (java.util.Comparator):
+  - External comparison — Class change mat karo
+  - compare() implement karo
+  - Multiple sorting strategies possible
+  - Functional interface! → Lambda se use karo
+
+// Comparable — Natural ordering:
+public class Employee implements Comparable<Employee> {
+    private String name;
+    private double salary;
+
+    @Override
+    public int compareTo(Employee other) {
+        return Double.compare(this.salary, other.salary); // Sort by salary
+        // Negative → this comes first
+        // Zero → Equal
+        // Positive → other comes first
+    }
+}
+// Usage: Collections.sort(employees) — Uses compareTo
+
+// Comparator — External, multiple orderings:
+Comparator<Employee> byName = Comparator.comparing(Employee::getName);
+Comparator<Employee> bySalaryDesc = Comparator.comparingDouble(Employee::getSalary).reversed();
+Comparator<Employee> byDeptThenSalary = Comparator.comparing(Employee::getDept)
+    .thenComparingDouble(Employee::getSalary);
+
+employees.sort(byName);
+employees.sort(bySalaryDesc);
+
+// Interview classic — null-safe comparator:
+Comparator<Employee> nullSafe = Comparator.nullsLast(
+    Comparator.comparing(Employee::getName));
+
+================================================================================
+SECTION 6: 🔥🔥🔥 GENERICS — TYPE SAFETY (MISSING TOPIC)
+================================================================================
+
+Q15. Generics kya hain? Kyon use karo?
+
+// WITHOUT GENERICS — Runtime ClassCastException possible:
+List list = new ArrayList();
+list.add("Hello");
+list.add(42);      // Integer bhi add ho gaya!
+String s = (String) list.get(1); // RUNTIME ERROR: ClassCastException!
+
+// WITH GENERICS — Compile-time safety:
+List<String> list = new ArrayList<>();
+list.add("Hello");
+// list.add(42); // COMPILE ERROR — caught early!
+String s = list.get(0); // No cast needed — type known!
+
+Q16. Bounded Type Parameters — <T extends X>
+
+// Upper Bound — T must be X or subclass
+public <T extends Comparable<T>> T findMax(List<T> list) {
+    return list.stream()
+        .max(Comparator.naturalOrder())
+        .orElseThrow();
+}
+// Works with List<Integer>, List<String>, List<Employee> (if Comparable implemented)
+// Does NOT work with List<Object> — Object doesn't implement Comparable
+
+// Multiple bounds:
+public <T extends Comparable<T> & Serializable> void process(T item) {
+    // T must implement BOTH Comparable AND Serializable
+}
+
+Q17. Wildcards — ?, ? extends T, ? super T (PECS rule)
+
+// Wildcard ? = "Unknown type"
+
+// UPPER BOUNDED — ? extends T (PRODUCER — read only, use: producing/reading)
+public double sumList(List<? extends Number> list) {
+    return list.stream().mapToDouble(Number::doubleValue).sum();
+}
+// Works with: List<Integer>, List<Double>, List<Float>
+// Can READ (Number type guaranteed)
+// Cannot ADD (don't know exact type — could corrupt)
+
+// LOWER BOUNDED — ? super T (CONSUMER — write, use: consuming/adding)
+public void addNumbers(List<? super Integer> list) {
+    list.add(1);   // Safe to add Integer
+    list.add(2);
+}
+// Works with: List<Integer>, List<Number>, List<Object>
+// Can ADD Integer (guaranteed Integer or parent)
+// Cannot READ specific type (unknown exact type)
+
+// PECS = Producer Extends, Consumer Super (Joshua Bloch)
+// Reading FROM list (it PRODUCES values) → ? extends T
+// Adding TO list (it CONSUMES values) → ? super T
+
+// EXAMPLE: Copy method
+public <T> void copy(List<? extends T> src, List<? super T> dest) {
+    for (T item : src) {  // src produces T
+        dest.add(item);   // dest consumes T
+    }
+}
+
+Q18. Type Erasure — kya hota hai?
+
+// Generics sirf COMPILE TIME pe hain — Runtime pe erase ho jaate hain!
+// Java backward compatibility ke liye (pre-generics code ke saath)
+
+List<String> strings = new ArrayList<>();
+List<Integer> integers = new ArrayList<>();
+
+// At runtime, both become:
+// List (raw type) — no String, no Integer info!
+
+System.out.println(strings.getClass() == integers.getClass()); // TRUE!
+
+// CONSEQUENCES:
+// 1. Runtime mein generic type pata nahi
+if (obj instanceof List<String>) {} // COMPILE ERROR — can't check generic!
+if (obj instanceof List<?>) {}      // OK — unbounded wildcard allowed
+
+// 2. Generic array creation not allowed:
+// T[] arr = new T[10]; // COMPILE ERROR
+T[] arr = (T[]) new Object[10]; // Workaround (with unchecked warning)
+
+// 3. Overloading — same erasure = same method (duplicate!)
+// void process(List<String> list) {}
+// void process(List<Integer> list) {} // COMPILE ERROR — both become process(List)
+
+================================================================================
+SECTION 7: 🔥🔥 IMPORTANT — OOPS BEST-OF (TOP PICKS)
+================================================================================
+
+Q19. equals() + hashCode() Contract — MUST KNOW
+
+CONTRACT:
+  1. equals() true → hashCode() MUST be equal
+  2. hashCode() equal → equals() MAY OR MAY NOT be true (collision OK)
+  3. equals() false → hashCode() CAN be different (ideally should be)
+
+// WHY IT MATTERS — HashMap/HashSet use karta hai:
+//   hashCode() → Which bucket?
+//   equals()   → Which entry in bucket?
+// Agar contract break → Objects "disappear" in HashMap!
+
+// CORRECT IMPLEMENTATION:
+public class Patient {
+    private String patientId;
+    private String name;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;           // Same reference? Quick true
+        if (!(o instanceof Patient)) return false; // Wrong type? false
+        Patient p = (Patient) o;
+        return Objects.equals(patientId, p.patientId); // Business key!
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(patientId);  // Same fields as equals!
+    }
+}
+
+// COMMON MISTAKE — Override equals but not hashCode:
+Set<Patient> patients = new HashSet<>();
+patients.add(new Patient("P001", "Prashant"));
+patients.contains(new Patient("P001", "Prashant")); // FALSE! (hashCode different)
+// BECAUSE: Default hashCode = memory address → Different objects → Different hash!
+
+Q20. Immutable Class — How to make properly
+
+// Immutable = Object ki state change nahi ho sakti creation ke baad
+// Benefits: Thread safety, HashMap key safe, easy to reason about
+
+public final class PatientRecord {           // final — subclass nahi ban sakti
+    private final String patientId;          // final — reassign nahi ho sakta
+    private final String diagnosis;
+    private final List<String> medications;  // Mutable collection — special handling!
+    private final LocalDate recordDate;      // Immutable type — safe as-is
+
+    public PatientRecord(String patientId, String diagnosis,
+                         List<String> medications, LocalDate recordDate) {
+        this.patientId  = patientId;
+        this.diagnosis  = diagnosis;
+        // DEFENSIVE COPY — caller ka list reference mat rakh!
+        this.medications = List.copyOf(medications); // Unmodifiable copy!
+        this.recordDate = recordDate;
+    }
+
+    public String getPatientId()   { return patientId; }
+    public String getDiagnosis()   { return diagnosis; }
+
+    // Return COPY — internal list expose mat karo
+    public List<String> getMedications() {
+        return Collections.unmodifiableList(medications);
+        // Or: return List.copyOf(medications);
+    }
+
+    // NO setters!
+    // If "modification" needed → return new object (like String does):
+    public PatientRecord withDiagnosis(String newDiagnosis) {
+        return new PatientRecord(patientId, newDiagnosis, medications, recordDate);
+    }
+}
+
+Q21. SOLID Quick Reference — Real Project Examples
+
+// S — Single Responsibility:
+// BAD: PatientService jo DB + email + PDF sab karta hai
+// GOOD: PatientService (CRUD), NotificationService (email), ReportService (PDF)
+
+// O — Open/Closed:
+// BAD: if-else for payment type in PaymentService
+// GOOD: PaymentProcessor interface + StripeProcessor/RazorpayProcessor implementations
+interface PaymentProcessor { PaymentResult process(Payment p); }
+// New gateway? → New class, existing code untouched!
+
+// L — Liskov Substitution:
+// Parent class ki jagah Child use karo → Behaviour break nahi hona chahiye
+// BAD: Square extends Rectangle → setWidth(5) → height bhi change! Violation!
+
+// I — Interface Segregation:
+// BAD: Fat interface with 10 methods — implementors force to implement unused
+// GOOD: Small focused interfaces — PatientReader, PatientWriter separate
+
+// D — Dependency Inversion:
+// BAD: Service directly creates new MySQLRepository()
+// GOOD: Service depends on PatientRepository interface → Spring injects impl
+
+Q22. Design Patterns — Most Important 3
+
+// STRATEGY — Runtime algorithm swap:
+interface SortingStrategy { void sort(List<Patient> patients); }
+class ByName   implements SortingStrategy { ... }
+class BySalary implements SortingStrategy { ... }
+
+class PatientList {
+    private SortingStrategy strategy; // Inject at runtime
+    void setStrategy(SortingStrategy s) { this.strategy = s; }
+    void sort() { strategy.sort(patients); } // Delegate!
+}
+
+// BUILDER — Complex object construction:
+Patient patient = Patient.builder()
+    .id("P001").name("Prashant").age(29)
+    .diagnosis("Hypertension")
+    .build();
+// Readable, optional fields, validation in build()
+
+// FACTORY — Object creation logic hide:
+public class NotificationFactory {
+    public static Notification create(String type) {
+        return switch (type) {
+            case "EMAIL" -> new EmailNotification();
+            case "SMS"   -> new SMSNotification();
+            case "PUSH"  -> new PushNotification();
+            default      -> throw new IllegalArgumentException("Unknown: " + type);
+        };
+    }
+}
+// Caller: NotificationFactory.create("EMAIL") — no new keyword, no if-else
+
+================================================================================
+SECTION 8: 🔥🔥 IMPORTANT — REFERENCE TYPES + GC
+================================================================================
+
+Q23. Strong, Soft, Weak, Phantom References
+
+STORY — Baggage claim analogy:
+  Strong   = Baggage belt pe bag — koi le nahi gaya → Cannot be collected
+  Soft     = Unclaimed baggage room — GC karta hai sirf memory pressure mein
+  Weak     = Temporary holding — Next GC cycle pe collect (pressure ho ya na ho)
+  Phantom  = Already collected — Post-mortem notification only
+
+// STRONG (default — normal references):
+Object obj = new Object(); // Strong reference
+obj = null; // GC-eligible now
+
+// SOFT (memory-sensitive cache):
+SoftReference<LargeImage> softRef = new SoftReference<>(new LargeImage());
+LargeImage img = softRef.get(); // null if GC collected it (only under memory pressure)
+if (img == null) { img = loadFromDisk(); } // Cache miss — reload
+// Use: Image cache, in-memory cache
+
+// WEAK (prevent memory leaks — non-essential references):
+WeakReference<Patient> weakRef = new WeakReference<>(patient);
+Patient p = weakRef.get(); // null if GC collected (next cycle!)
+// Use: WeakHashMap keys, listener registries (avoid memory leak)
+
+// WEAKHASHMAP — Keys automatically removed when no strong reference:
+WeakHashMap<Patient, String> cache = new WeakHashMap<>();
+// Patient ko koi strong reference na ho → Automatic cache entry removal!
+
+// PHANTOM (post-GC cleanup — rarely used directly):
+PhantomReference<Object> phantom = new PhantomReference<>(obj, referenceQueue);
+// obj.get() always returns null
+// Use: Resource cleanup AFTER object collected (alternative to finalize)
+
+Q24. Java Memory Model + Happens-Before
+
+// JMM = Rules jo define karta hai ki threads ke beech memory visibility kaisi hogi
+
+// PROBLEM — Thread caching:
+int x = 0;
+Thread A: x = 1;        // A writes x
+Thread B: read x?        // B might read 0 (cached!) — NOT guaranteed to see A's write!
+
+// HAPPENS-BEFORE GUARANTEE:
+// 1. synchronized block exit → All writes visible to next lock acquirer
+// 2. volatile write → Visible to all subsequent volatile reads of same variable
+// 3. Thread.start() → Parent thread writes visible to child thread
+// 4. Thread.join() → All child writes visible after join completes
+
+// volatile — Visibility guarantee (not atomicity!):
+volatile boolean running = true;
+
+// Thread A:
+running = false; // Volatile write — immediately visible to all threads
+
+// Thread B:
+while (running) {} // Reads volatile — sees A's write! (without volatile, might loop forever)
+
+// volatile DOES NOT help with:
+volatile int counter = 0;
+counter++; // NOT atomic! Read-modify-write = 3 operations
+// Use AtomicInteger for this!
+
+================================================================================
+SECTION 9: 🔥🔥 IMPORTANT — JAVA 17+ FEATURES
+================================================================================
+
+Q25. Records (Java 16) — Immutable data classes
+
+// Records = Concise syntax for immutable data holders
+// Auto-generates: constructor, getters, equals, hashCode, toString
+
+// OLD WAY — Boilerplate nightmare:
+public final class PatientDTO {
+    private final String id;
+    private final String name;
+    private final int age;
+    // Constructor, getters, equals, hashCode, toString... 50+ lines!
+}
+
+// RECORD WAY — 1 line!
+public record PatientDTO(String id, String name, int age) {}
+// Auto-generated: constructor, id(), name(), age(), equals, hashCode, toString!
+
+// Usage:
+PatientDTO p = new PatientDTO("P001", "Prashant", 29);
+p.id();    // "P001" (getter, not getId()!)
+p.name();  // "Prashant"
+
+// Custom methods OK:
+public record Temperature(double celsius) {
+    // Compact constructor — validation:
+    public Temperature {
+        if (celsius < -273.15) throw new IllegalArgumentException("Below absolute zero!");
+    }
+
+    // Custom method:
+    public double toFahrenheit() { return celsius * 9/5 + 32; }
+}
+
+// Records implement interface:
+public record PatientDTO(String id, String name) implements Identifiable {}
+
+// LIMITATION: Cannot extend class (extends Record implicitly), no mutable state
+
+Q26. Sealed Classes (Java 17) — Restricted inheritance
+
+// SEALED = "Sirf yeh specific classes extend/implement kar sakti hain"
+// Exhaustive pattern matching enable karta hai!
+
+public sealed class Shape permits Circle, Rectangle, Triangle {}
+
+public final class Circle    extends Shape { double radius; }
+public final class Rectangle extends Shape { double width, height; }
+public non-sealed class Triangle extends Shape {} // Triangle further extendable
+
+// WHY: Compiler knows ALL possible subtypes → Exhaustive switch!
+double area = switch (shape) {
+    case Circle c    -> Math.PI * c.radius() * c.radius();
+    case Rectangle r -> r.width() * r.height();
+    case Triangle t  -> computeTriangleArea(t);
+    // No default needed! Compiler verifies all cases covered!
+};
+
+Q27. Pattern Matching — instanceof (Java 16)
+
+// OLD WAY — Cast needed after instanceof:
+if (obj instanceof String) {
+    String s = (String) obj; // Redundant cast!
+    System.out.println(s.length());
+}
+
+// NEW WAY — Pattern matching:
+if (obj instanceof String s) {  // Automatic cast + bind to 's'!
+    System.out.println(s.length()); // 's' available immediately
+}
+
+// With condition:
+if (obj instanceof String s && s.length() > 5) {
+    System.out.println("Long string: " + s);
+}
+
+// Switch pattern matching (Java 21):
+String result = switch (obj) {
+    case Integer i -> "Integer: " + i;
+    case String s  -> "String: " + s.toUpperCase();
+    case null      -> "null";
+    default        -> "Unknown: " + obj;
+};
+
+================================================================================
+SECTION 10: 🔥 READ ME — ADVANCED TOPICS
+================================================================================
+
+Q28. var keyword (Java 10) — Local Type Inference
+
+// var = Compiler infers type — Less verbosity
+// ONLY for local variables (not fields, not method params)
+
+var list = new ArrayList<String>(); // Type: ArrayList<String>
+var map  = new HashMap<String, List<Integer>>(); // Inferred!
+
+// Makes long generic types readable:
+// OLD:
+Map<String, List<PatientRecord>> patientMap = new HashMap<>();
+// NEW:
+var patientMap = new HashMap<String, List<PatientRecord>>();
+
+// Works in enhanced for:
+for (var patient : patients) { // patient inferred as Patient type
+    process(patient);
+}
+
+// WHEN NOT TO USE var:
+var x = 42;       // OK — clearly Integer
+var result = compute(); // BAD if compute() return type not obvious — readability lost!
+
+Q29. Inner Classes — 4 Types
+
+// 1. STATIC NESTED CLASS — Most common in production
+public class Outer {
+    static class StaticNested { // Outer instance nahi chahiye
+        void method() {}
+    }
+}
+// Use: Builder pattern (MyClass.Builder), Node in LinkedList
+
+// 2. INNER CLASS (Non-static) — Outer instance ke saath bound
+public class Outer {
+    class Inner { // Outer ka 'this' accessible!
+        void method() {
+            Outer.this.doSomething(); // Outer ke members access
+        }
+    }
+}
+
+// 3. LOCAL CLASS — Method ke andar (rare)
+void method() {
+    class LocalHelper {
+        void help() {}
+    }
+    new LocalHelper().help();
+}
+
+// 4. ANONYMOUS CLASS — Interface/Abstract class instant implementation:
+Runnable r = new Runnable() {
+    @Override
+    public void run() { System.out.println("Running!"); }
+};
+// Modern: Use Lambda instead → Runnable r = () -> System.out.println("Running!");
+
+// Anonymous class use karo JAB: Interface mein multiple methods hain
+Comparator<Patient> comp = new Comparator<>() {
+    @Override
+    public int compare(Patient a, Patient b) {
+        return a.getName().compareTo(b.getName());
+    }
+    // Additional overrides possible in anonymous class
+};
+
+================================================================================
+QUICK CHEAT SHEET — COMPLETE JAVA
+================================================================================
+
+STREAMS:
+  filter()     → Condition — Remove non-matching
+  map()        → 1-to-1 transform
+  flatMap()    → 1-to-many transform + flatten
+  collect()    → Terminal — Convert to collection
+  reduce()     → Aggregate to single value
+  groupingBy() → Map<Key, List<V>> (like SQL GROUP BY)
+
+FUNCTIONAL INTERFACES:
+  Function<T,R>    → transform     | .apply()
+  Predicate<T>     → condition     | .test()
+  Consumer<T>      → side effect   | .accept()
+  Supplier<T>      → factory       | .get()
+  BinaryOperator<T>→ T,T → T      | .apply()
+
+OPTIONAL:
+  ofNullable() → Safe creation
+  orElse()     → Default value
+  orElseGet()  → Lazy default
+  orElseThrow()→ Custom exception
+  map()        → Transform if present
+  flatMap()    → When mapper returns Optional
+
+MEMORY:
+  Heap         → Objects (Young + Old Gen)
+  Stack        → Method frames + locals (per thread)
+  Metaspace    → Class definitions (native memory)
+  GC Algorithms: Serial < Parallel < G1 (default) < ZGC (low latency)
+
+REFERENCES:
+  Strong       → Default — GC cannot collect
+  Soft         → GC collects only on memory pressure
+  Weak         → GC collects next cycle
+  Phantom      → Post-collection notification
+
+GENERICS:
+  ? extends T  → Read (Producer Extends) — input
+  ? super T    → Write (Consumer Super)  — output
+  Type Erasure → Generic info lost at runtime
+
+COLLECTIONS:
+  HashMap          → Fast, unordered, not thread-safe
+  LinkedHashMap    → Insertion/access order, LRU cache
+  TreeMap          → Sorted, O(log n)
+  ConcurrentHashMap→ Thread-safe, node-level locking
+  Fail-fast        → ArrayList, HashMap → CME on modification
+  Fail-safe        → CopyOnWriteArrayList, ConcurrentHashMap → no CME
+
+STRING:
+  String        → Immutable, pool
+  StringBuilder → Mutable, NOT thread-safe, fast (use in loops)
+  StringBuffer  → Mutable, thread-safe, slower
+
+JAVA 17+:
+  Record        → Immutable data class (auto: constructor, getters, equals)
+  Sealed Class  → Restrict who can extend
+  var           → Local type inference
+  Pattern match → instanceof String s without cast
+
+================================================================================
+END — 29LPA_Generic_Questions_Se_Banade.txt
+================================================================================

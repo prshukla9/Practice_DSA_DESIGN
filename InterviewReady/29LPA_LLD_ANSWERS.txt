@@ -1,0 +1,1287 @@
+================================================================================
+  LLD — LOW LEVEL DESIGN COMPLETE INTERVIEW PREP
+  6 Years Java Backend | Tier 2 Product Companies
+  Hinglish + Class Diagrams + Full Java Code + Concurrency + Scenarios
+================================================================================
+
+================================================================================
+SECTION 0: PRIORITY GUIDE — PEHLE KYA PADHO
+================================================================================
+
+TIER 1 — MUST DO (Almost certain):
+  🔥🔥🔥  1. LRU Cache            — Most asked, tests DS knowledge + OOP
+  🔥🔥🔥  2. Parking Lot          — Classic OOP, design patterns, extensibility
+  🔥🔥🔥  3. Rate Limiter (LLD)   — Token bucket, thread safety, real-world
+  🔥🔥🔥  4. BookMyShow           — Concurrency + locking, seat reservation
+  🔥🔥🔥  5. Elevator System      — State machine, scheduling algorithms
+
+TIER 2 — GOOD TO KNOW:
+  🔥🔥    6. Splitwise            — Graph + OOP design
+  🔥🔥    7. ATM Machine          — State machine, transactions
+  🔥🔥    8. Vending Machine      — Simple state machine, good for warm-up
+  🔥🔥    9. Task Scheduler       — Priority queue + threading
+  🔥🔥   10. Message Queue (LLD)  — Producer-consumer pattern, blocking queue
+
+TIER 3 — LESS IMPORTANT:
+  🔥     Tic Tac Toe / Snake Game   — Too simple for 6 years
+  🔥     Library Management          — CRUD-heavy, less design thinking
+  🔥     LFU Cache                   — Less asked than LRU
+  🔥     Consistent Hashing (LLD)    — Niche, mostly HLD topic
+
+LLD INTERVIEW APPROACH:
+  Step 1: Requirements clarify (2 min) — Features, scale, constraints
+  Step 2: Identify entities/classes (2 min) — Nouns = Classes
+  Step 3: Class diagram + relationships (3 min) — Has-a, Is-a
+  Step 4: Design patterns (1 min) — Which pattern fits?
+  Step 5: Key methods (5 min) — Core logic with concurrency if needed
+  Step 6: Edge cases (2 min) — Thread safety, null checks, overflow
+
+================================================================================
+SECTION 1: LLD #1 — LRU CACHE
+================================================================================
+
+Q. "Design LRU Cache with O(1) get and put"
+
+── REQUIREMENTS ──────────────────────────────────────────────
+  get(key) → value (O(1)), -1 if not found
+  put(key, value) → (O(1)), evict LRU when full
+  Thread-safe (bonus)
+
+── WHY HASHMAP + DOUBLY LINKED LIST ──────────────────────────
+  HashMap alone: O(1) get/put but can't track order
+  Array/List alone: O(n) for lookup
+
+  COMBINED:
+    HashMap<key, Node> → O(1) lookup to find Node
+    Doubly Linked List → Maintain access order (head=MRU, tail=LRU)
+    On access: Move node to head (O(1) with prev/next pointers)
+    On eviction: Remove tail (O(1))
+
+── CLASS DESIGN ──────────────────────────────────────────────
+
+  LRUCache
+    - capacity: int
+    - map: HashMap<Integer, DLinkedNode>
+    - head: DLinkedNode (dummy — MRU side)
+    - tail: DLinkedNode (dummy — LRU side)
+
+  DLinkedNode
+    - key: int
+    - value: int
+    - prev: DLinkedNode
+    - next: DLinkedNode
+
+── FULL JAVA CODE ────────────────────────────────────────────
+
+public class LRUCache {
+
+    // Node of doubly linked list
+    private static class DLinkedNode {
+        int key;
+        int value;
+        DLinkedNode prev;
+        DLinkedNode next;
+
+        DLinkedNode(int key, int value) {
+            this.key = key;
+            this.value = value;
+        }
+    }
+
+    private final int capacity;
+    private final HashMap<Integer, DLinkedNode> map;
+    private final DLinkedNode head; // Dummy head (MRU side)
+    private final DLinkedNode tail; // Dummy tail (LRU side)
+
+    public LRUCache(int capacity) {
+        this.capacity = capacity;
+        this.map = new HashMap<>();
+
+        // Dummy nodes — boundary handling easier
+        head = new DLinkedNode(0, 0);
+        tail = new DLinkedNode(0, 0);
+        head.next = tail;
+        tail.prev = head;
+    }
+
+    // Get value — O(1)
+    public int get(int key) {
+        DLinkedNode node = map.get(key);
+        if (node == null) return -1; // Key not found
+
+        // MOVE TO HEAD — recently used!
+        moveToHead(node);
+        return node.value;
+    }
+
+    // Put key-value — O(1)
+    public void put(int key, int value) {
+        DLinkedNode node = map.get(key);
+
+        if (node != null) {
+            // KEY EXISTS: Update + move to head
+            node.value = value;
+            moveToHead(node);
+        } else {
+            // NEW KEY
+            DLinkedNode newNode = new DLinkedNode(key, value);
+
+            if (map.size() == capacity) {
+                // EVICT LRU: Remove tail node
+                DLinkedNode lru = removeTail();
+                map.remove(lru.key); // HashMap se bhi remove!
+            }
+
+            // Add new node at head (MRU position)
+            addToHead(newNode);
+            map.put(key, newNode);
+        }
+    }
+
+    // Helper: Add node right after head (MRU position)
+    private void addToHead(DLinkedNode node) {
+        node.prev = head;
+        node.next = head.next;
+        head.next.prev = node;
+        head.next = node;
+    }
+
+    // Helper: Remove a node from linked list
+    private void removeNode(DLinkedNode node) {
+        node.prev.next = node.next;
+        node.next.prev = node.prev;
+    }
+
+    // Helper: Move existing node to head
+    private void moveToHead(DLinkedNode node) {
+        removeNode(node);
+        addToHead(node);
+    }
+
+    // Helper: Remove and return LRU node (before tail)
+    private DLinkedNode removeTail() {
+        DLinkedNode lru = tail.prev; // Last real node
+        removeNode(lru);
+        return lru;
+    }
+}
+
+// THREAD-SAFE VERSION:
+public class ThreadSafeLRUCache extends LRUCache {
+    private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
+
+    @Override
+    public int get(int key) {
+        rwLock.readLock().lock();
+        try {
+            // moveToHead needs write access — use write lock
+        } finally {
+            rwLock.readLock().unlock();
+        }
+        // Actually: get modifies order → write lock needed for both
+        rwLock.writeLock().lock();
+        try {
+            return super.get(key);
+        } finally {
+            rwLock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public void put(int key, int value) {
+        rwLock.writeLock().lock();
+        try {
+            super.put(key, value);
+        } finally {
+            rwLock.writeLock().unlock();
+        }
+    }
+}
+
+// SIMPLEST JAVA BUILT-IN (mention in interview as bonus):
+// LinkedHashMap with accessOrder=true already implements LRU!
+Map<Integer, Integer> lruCache = new LinkedHashMap<>(capacity, 0.75f, true) {
+    @Override
+    protected boolean removeEldestEntry(Map.Entry eldest) {
+        return size() > capacity; // Auto evict when over capacity
+    }
+};
+
+── SCENARIO QUESTIONS ────────────────────────────────────────
+
+Q. "LFU Cache kaise different hai LRU se?"
+A. "LRU: Least Recently Used — Time-based eviction (kab use kiya)
+   LFU: Least Frequently Used — Count-based eviction (kitni baar use kiya)
+   LFU complex: Frequency map + Linked list per frequency level
+   Real world: Redis mein both available as eviction policies"
+
+Q. "Thread safety exactly kahan zaruri hai?"
+A. "get() bhi state modify karta hai (moveToHead) → Write lock for both.
+   Alternative: ConcurrentHashMap + synchronized methods per operation.
+   Trade-off: Lock contention vs correctness."
+
+================================================================================
+SECTION 2: LLD #2 — PARKING LOT SYSTEM
+================================================================================
+
+Q. "Design a Parking Lot system"
+
+── REQUIREMENTS ──────────────────────────────────────────────
+  Multiple floors, multiple vehicle types (Bike, Car, Bus/Truck)
+  Park vehicle → Assign spot, Generate ticket
+  Exit vehicle → Calculate fee, Release spot
+  Display available spots per floor
+
+── ENTITIES (Nouns = Classes) ────────────────────────────────
+  ParkingLot, Floor, ParkingSpot, Vehicle, Ticket, PricingStrategy
+
+── CLASS DIAGRAM ─────────────────────────────────────────────
+
+  ParkingLot
+    - floors: List<Floor>
+    - findAvailableSpot(vehicleType): ParkingSpot
+    - park(vehicle): Ticket
+    - exit(ticket): double (fee)
+
+  Floor
+    - floorNumber: int
+    - spots: List<ParkingSpot>
+    - getAvailableSpots(type): List<ParkingSpot>
+
+  ParkingSpot
+    - spotId: String
+    - type: SpotType (BIKE, CAR, LARGE)
+    - isOccupied: boolean
+    - currentTicket: Ticket
+    + park(vehicle): void
+    + vacate(): void
+
+  Vehicle (Abstract)
+    - vehicleNumber: String
+    - vehicleType: VehicleType
+  BikeVehicle extends Vehicle
+  CarVehicle extends Vehicle
+  TruckVehicle extends Vehicle
+
+  Ticket
+    - ticketId: String
+    - vehicle: Vehicle
+    - spot: ParkingSpot
+    - entryTime: LocalDateTime
+    - exitTime: LocalDateTime
+
+  PricingStrategy (Interface)  ← Strategy Pattern!
+    + calculateFee(ticket): double
+  HourlyPricingStrategy implements PricingStrategy
+  FlatRatePricingStrategy implements PricingStrategy
+  WeekendPricingStrategy implements PricingStrategy
+
+── DESIGN PATTERNS USED ──────────────────────────────────────
+  Strategy Pattern: PricingStrategy — algo swap without changing ParkingLot
+  Factory Pattern: VehicleFactory.create(type) → correct Vehicle subclass
+  Singleton: ParkingLot (only one system instance)
+
+── FULL JAVA CODE ────────────────────────────────────────────
+
+// Vehicle Types
+public enum VehicleType { BIKE, CAR, TRUCK }
+public enum SpotType { BIKE, CAR, LARGE }
+
+// Vehicle hierarchy
+public abstract class Vehicle {
+    private final String vehicleNumber;
+    private final VehicleType type;
+
+    public Vehicle(String vehicleNumber, VehicleType type) {
+        this.vehicleNumber = vehicleNumber;
+        this.type = type;
+    }
+    public VehicleType getType() { return type; }
+    public String getVehicleNumber() { return vehicleNumber; }
+}
+
+public class Car extends Vehicle {
+    public Car(String number) { super(number, VehicleType.CAR); }
+}
+public class Bike extends Vehicle {
+    public Bike(String number) { super(number, VehicleType.BIKE); }
+}
+
+// Pricing Strategy — easily swappable!
+public interface PricingStrategy {
+    double calculateFee(Ticket ticket);
+}
+
+public class HourlyPricingStrategy implements PricingStrategy {
+    private static final Map<VehicleType, Double> RATES = Map.of(
+        VehicleType.BIKE,  10.0, // Rs 10/hour
+        VehicleType.CAR,   20.0, // Rs 20/hour
+        VehicleType.TRUCK, 50.0  // Rs 50/hour
+    );
+
+    @Override
+    public double calculateFee(Ticket ticket) {
+        long hours = ChronoUnit.HOURS.between(
+            ticket.getEntryTime(), LocalDateTime.now()) + 1; // Min 1 hour
+        return hours * RATES.get(ticket.getVehicle().getType());
+    }
+}
+
+// Parking Spot
+public class ParkingSpot {
+    private final String spotId;
+    private final SpotType type;
+    private volatile boolean occupied = false; // volatile for visibility
+    private Ticket currentTicket;
+
+    // Which vehicle types can park in which spot?
+    public boolean canFit(VehicleType vehicleType) {
+        return switch (vehicleType) {
+            case BIKE  -> type == SpotType.BIKE || type == SpotType.CAR;
+            case CAR   -> type == SpotType.CAR;
+            case TRUCK -> type == SpotType.LARGE;
+        };
+    }
+
+    // Synchronized — thread safety!
+    public synchronized boolean park(Ticket ticket) {
+        if (occupied) return false; // Double-check
+        this.occupied = true;
+        this.currentTicket = ticket;
+        return true;
+    }
+
+    public synchronized void vacate() {
+        this.occupied = false;
+        this.currentTicket = null;
+    }
+
+    public boolean isOccupied() { return occupied; }
+    public SpotType getType() { return type; }
+    public String getSpotId() { return spotId; }
+}
+
+// Ticket
+public class Ticket {
+    private final String ticketId = UUID.randomUUID().toString();
+    private final Vehicle vehicle;
+    private final ParkingSpot spot;
+    private final LocalDateTime entryTime = LocalDateTime.now();
+    private LocalDateTime exitTime;
+
+    // Getters...
+    public void setExitTime(LocalDateTime time) { this.exitTime = time; }
+}
+
+// Floor
+public class Floor {
+    private final int floorNumber;
+    private final List<ParkingSpot> spots;
+
+    public Optional<ParkingSpot> findAvailableSpot(VehicleType type) {
+        return spots.stream()
+            .filter(s -> !s.isOccupied() && s.canFit(type))
+            .findFirst();
+    }
+
+    public long getAvailableCount(SpotType type) {
+        return spots.stream()
+            .filter(s -> s.getType() == type && !s.isOccupied())
+            .count();
+    }
+}
+
+// Main ParkingLot — Singleton
+public class ParkingLot {
+    private static ParkingLot instance;
+    private final List<Floor> floors;
+    private final PricingStrategy pricingStrategy;
+    private final Map<String, Ticket> activeTickets = new ConcurrentHashMap<>();
+
+    private ParkingLot(List<Floor> floors, PricingStrategy strategy) {
+        this.floors = floors;
+        this.pricingStrategy = strategy;
+    }
+
+    public static synchronized ParkingLot getInstance(List<Floor> floors, PricingStrategy strategy) {
+        if (instance == null) instance = new ParkingLot(floors, strategy);
+        return instance;
+    }
+
+    // PARK — Find spot + create ticket
+    public Ticket park(Vehicle vehicle) {
+        for (Floor floor : floors) {
+            Optional<ParkingSpot> spot = floor.findAvailableSpot(vehicle.getType());
+            if (spot.isPresent()) {
+                Ticket ticket = new Ticket(vehicle, spot.get());
+                spot.get().park(ticket);
+                activeTickets.put(ticket.getTicketId(), ticket);
+                return ticket;
+            }
+        }
+        throw new ParkingFullException("No spots available for: " + vehicle.getType());
+    }
+
+    // EXIT — Calculate fee + vacate spot
+    public double exit(String ticketId) {
+        Ticket ticket = activeTickets.remove(ticketId);
+        if (ticket == null) throw new InvalidTicketException(ticketId);
+
+        ticket.setExitTime(LocalDateTime.now());
+        double fee = pricingStrategy.calculateFee(ticket);
+        ticket.getSpot().vacate();
+        return fee;
+    }
+
+    // Display available spots
+    public void displayAvailability() {
+        floors.forEach(floor -> {
+            System.out.printf("Floor %d: Bike=%d, Car=%d, Large=%d%n",
+                floor.getFloorNumber(),
+                floor.getAvailableCount(SpotType.BIKE),
+                floor.getAvailableCount(SpotType.CAR),
+                floor.getAvailableCount(SpotType.LARGE));
+        });
+    }
+}
+
+── SCENARIO QUESTIONS ────────────────────────────────────────
+
+Q. "New vehicle type add karna ho — kya change karna padega?"
+A. "OCP ke liye:
+   1. VehicleType enum → new value add
+   2. New Vehicle subclass create karo
+   3. ParkingSpot.canFit() mein rule add karo
+   4. PricingStrategy mein rate add karo
+   Core logic change NAHI — Open for extension, closed for modification!"
+
+Q. "Concurrent parking — race condition?"
+A. "ParkingSpot.park() synchronized hai.
+   ParkingLot mein ConcurrentHashMap for activeTickets.
+   But: floor.findAvailableSpot() → spot.park() ke beech gap hai!
+   Better: Optimistic locking — spot.park() returns false agar already occupied
+   Caller retry karta hai next spot pe."
+
+================================================================================
+SECTION 3: LLD #3 — RATE LIMITER (TOKEN BUCKET — THREAD SAFE)
+================================================================================
+
+Q. "Implement a Thread-safe Token Bucket Rate Limiter"
+
+── DESIGN ────────────────────────────────────────────────────
+
+  RateLimiter (Interface)
+    + isAllowed(userId): boolean
+
+  TokenBucketRateLimiter implements RateLimiter
+    - buckets: ConcurrentHashMap<String, Bucket>
+    - capacity: int
+    - refillRatePerSecond: int
+
+  Bucket
+    - tokens: double (AtomicDouble or sync)
+    - lastRefillTime: long (System.nanoTime)
+    - lock: ReentrantLock
+
+── FULL JAVA CODE ────────────────────────────────────────────
+
+public class TokenBucketRateLimiter {
+
+    private final int capacity;           // Max tokens in bucket
+    private final double refillRate;      // Tokens per second
+
+    // Per-user bucket store
+    private final ConcurrentHashMap<String, Bucket> buckets
+        = new ConcurrentHashMap<>();
+
+    public TokenBucketRateLimiter(int capacity, double refillRatePerSecond) {
+        this.capacity = capacity;
+        this.refillRate = refillRatePerSecond;
+    }
+
+    // Main method — is this request allowed?
+    public boolean isAllowed(String userId) {
+        // computeIfAbsent — thread-safe bucket creation
+        Bucket bucket = buckets.computeIfAbsent(
+            userId, k -> new Bucket(capacity, refillRate));
+        return bucket.tryConsume();
+    }
+
+    // Inner class — one bucket per user
+    private static class Bucket {
+        private double tokens;
+        private long lastRefillNano;
+        private final int capacity;
+        private final double refillRate;
+        private final ReentrantLock lock = new ReentrantLock();
+
+        Bucket(int capacity, double refillRate) {
+            this.capacity = capacity;
+            this.refillRate = refillRate;
+            this.tokens = capacity; // Start with full bucket
+            this.lastRefillNano = System.nanoTime();
+        }
+
+        // Try to consume 1 token — returns true if allowed
+        boolean tryConsume() {
+            lock.lock(); // Only one thread at a time per user
+            try {
+                refill(); // First refill based on elapsed time
+
+                if (tokens >= 1.0) {
+                    tokens -= 1.0;
+                    return true;  // ALLOWED
+                }
+                return false;     // REJECTED
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        // Refill tokens based on elapsed time since last refill
+        private void refill() {
+            long now = System.nanoTime();
+            double elapsedSeconds = (now - lastRefillNano) / 1_000_000_000.0;
+            double tokensToAdd = elapsedSeconds * refillRate;
+
+            if (tokensToAdd > 0) {
+                tokens = Math.min(capacity, tokens + tokensToAdd); // Cap at capacity
+                lastRefillNano = now;
+            }
+        }
+    }
+}
+
+// USAGE in Spring Filter:
+@Component
+@Order(1)
+public class RateLimiterFilter extends OncePerRequestFilter {
+
+    private final TokenBucketRateLimiter rateLimiter
+        = new TokenBucketRateLimiter(100, 10); // 100 tokens, 10/sec refill
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain chain) throws IOException, ServletException {
+        String userId = request.getHeader("X-User-Id");
+        if (userId == null) userId = request.getRemoteAddr(); // Fallback to IP
+
+        if (!rateLimiter.isAllowed(userId)) {
+            response.setStatus(429);
+            response.setHeader("Retry-After", "1");
+            response.getWriter().write("{\"error\": \"Too many requests\"}");
+            return;
+        }
+        chain.doFilter(request, response);
+    }
+}
+
+── SLIDING WINDOW RATE LIMITER (Bonus — if asked) ────────────
+
+public class SlidingWindowRateLimiter {
+
+    private final int maxRequests;
+    private final long windowMs;
+    // Per user: timestamp queue
+    private final ConcurrentHashMap<String, Deque<Long>> requestLogs
+        = new ConcurrentHashMap<>();
+
+    public SlidingWindowRateLimiter(int maxRequests, long windowMs) {
+        this.maxRequests = maxRequests;
+        this.windowMs = windowMs;
+    }
+
+    public synchronized boolean isAllowed(String userId) {
+        long now = System.currentTimeMillis();
+        long windowStart = now - windowMs;
+
+        Deque<Long> timestamps = requestLogs.computeIfAbsent(
+            userId, k -> new ArrayDeque<>());
+
+        // Remove old timestamps outside window
+        while (!timestamps.isEmpty() && timestamps.peekFirst() < windowStart) {
+            timestamps.pollFirst();
+        }
+
+        if (timestamps.size() < maxRequests) {
+            timestamps.addLast(now);
+            return true;
+        }
+        return false;
+    }
+}
+
+── SCENARIO QUESTIONS ────────────────────────────────────────
+
+Q. "Memory leak — buckets map badha jaayega?"
+A. "Stale buckets cleanup karo:
+   ScheduledExecutorService: Every hour → Remove buckets unused for > 1 hour
+   Or: Weak references use karo (WeakHashMap)"
+
+Q. "Distributed mein yeh kaam nahi karega?"
+A. "Haan, ye single-JVM implementation hai.
+   Distributed: Redis + Lua script (atomic) use karo.
+   Lua script ensures atomicity across Redis cluster nodes."
+
+================================================================================
+SECTION 4: LLD #4 — BOOKMYSHOW (CONCURRENCY — MOST IMPORTANT)
+================================================================================
+
+Q. "Design seat booking system like BookMyShow — handle concurrency"
+
+── REQUIREMENTS ──────────────────────────────────────────────
+  Show → Seats available
+  User seat select kare → Temporary hold (10 min)
+  Payment complete → Confirm booking
+  Hold expire → Seat release
+  Concurrent users → No double booking!
+
+── ENTITIES ──────────────────────────────────────────────────
+  Movie, Show, Screen, Seat, Booking, User
+
+── THE CONCURRENCY PROBLEM ───────────────────────────────────
+  SCENARIO: 500 users "A1" seat dekhte hain → AVAILABLE
+            500 users simultaneously "BOOK A1" press karte hain
+  Without protection: 500 bookings for 1 seat! DISASTER!
+
+── SOLUTION: SEAT LOCKING MECHANISM ─────────────────────────
+
+APPROACH 1: Database Pessimistic Lock (SELECT FOR UPDATE)
+  - Transaction start karo
+  - SELECT * FROM seats WHERE seat_id='A1' FOR UPDATE
+  - Seat available? → Update to LOCKED
+  - COMMIT
+  Problem: High concurrency pe DB bottleneck
+
+APPROACH 2: Optimistic Locking (version column)
+  - Seat fetch karo with version
+  - UPDATE seats SET status='LOCKED', version=v+1 WHERE id='A1' AND version=v
+  - 0 rows updated? → Conflict → Retry or fail
+  Good for low-medium concurrency
+
+APPROACH 3: Redis Distributed Lock (BEST for high traffic) ✅
+  - SETNX "lock:seat:A1" userId EX 600 (10 min TTL)
+  - Success (1) → Seat locked for this user
+  - Fail (0) → Another user locked it → "Seat unavailable"
+
+── FULL JAVA CODE ────────────────────────────────────────────
+
+public enum SeatStatus { AVAILABLE, TEMPORARILY_LOCKED, BOOKED }
+
+@Entity
+public class Seat {
+    @Id private String seatId;
+    private String showId;
+    private String seatNumber; // "A1", "B5"
+    private SeatStatus status;
+
+    @Version // Optimistic locking
+    private Long version;
+}
+
+@Service
+public class BookingService {
+
+    @Autowired private SeatRepository seatRepo;
+    @Autowired private RedisTemplate<String, String> redisTemplate;
+    @Autowired private BookingRepository bookingRepo;
+
+    private static final long LOCK_DURATION_SECONDS = 600; // 10 minutes
+
+    /**
+     * Step 1: Temporarily lock seat for user
+     * Multiple users same time — Redis ensures only 1 wins
+     */
+    public BookingResponse lockSeats(String userId, String showId,
+                                     List<String> seatIds) {
+        List<String> lockedSeats = new ArrayList<>();
+
+        for (String seatId : seatIds) {
+            String lockKey = "seat:lock:" + showId + ":" + seatId;
+
+            // SETNX — atomic! Only succeeds if key doesn't exist
+            Boolean locked = redisTemplate.opsForValue()
+                .setIfAbsent(lockKey, userId,
+                    Duration.ofSeconds(LOCK_DURATION_SECONDS));
+
+            if (Boolean.TRUE.equals(locked)) {
+                lockedSeats.add(seatId);
+            } else {
+                // Someone else locked this seat
+                // Rollback — release all seats we just locked
+                lockedSeats.forEach(s -> releaseLock(showId, s));
+                throw new SeatUnavailableException(
+                    "Seat " + seatId + " is no longer available");
+            }
+        }
+
+        // All seats locked! Create pending booking
+        String bookingId = createPendingBooking(userId, showId, lockedSeats);
+        return new BookingResponse(bookingId, lockedSeats, "LOCKED_FOR_10_MIN");
+    }
+
+    /**
+     * Step 2: Confirm booking after payment success
+     */
+    @Transactional
+    public void confirmBooking(String bookingId, String paymentId) {
+        Booking booking = bookingRepo.findById(bookingId)
+            .orElseThrow(() -> new BookingNotFoundException(bookingId));
+
+        // Verify locks still valid (payment must happen within 10 min)
+        for (String seatId : booking.getSeatIds()) {
+            String lockKey = "seat:lock:" + booking.getShowId() + ":" + seatId;
+            String lockOwner = redisTemplate.opsForValue().get(lockKey);
+
+            if (!booking.getUserId().equals(lockOwner)) {
+                throw new BookingExpiredException("Lock expired for seat: " + seatId);
+            }
+        }
+
+        // Update DB — seats marked BOOKED
+        seatRepo.updateStatusBatch(booking.getSeatIds(), SeatStatus.BOOKED);
+        booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setPaymentId(paymentId);
+        bookingRepo.save(booking);
+
+        // Release Redis locks (seats now permanently booked in DB)
+        booking.getSeatIds().forEach(s -> releaseLock(booking.getShowId(), s));
+    }
+
+    /**
+     * Step 3: Handle lock expiry — if user abandoned payment
+     * Redis TTL handles this automatically!
+     * But we need to sync DB status
+     */
+    @Scheduled(fixedDelay = 60000) // Every minute
+    public void cleanupExpiredLocks() {
+        // Find PENDING bookings older than 10 min
+        List<Booking> expired = bookingRepo.findExpiredPendingBookings(
+            LocalDateTime.now().minusMinutes(10));
+
+        for (Booking b : expired) {
+            b.setStatus(BookingStatus.EXPIRED);
+            // Seats automatically available — Redis lock TTL already expired
+        }
+        bookingRepo.saveAll(expired);
+    }
+
+    private void releaseLock(String showId, String seatId) {
+        redisTemplate.delete("seat:lock:" + showId + ":" + seatId);
+    }
+}
+
+── SCENARIO QUESTIONS ────────────────────────────────────────
+
+Q. "Redis down ho jaaye payment ke beech?"
+A. "Redis HA cluster deploy karo (Sentinel ya Redis Cluster).
+   Fallback: DB mein LOCKED_UNTIL timestamp column rakho.
+   Redis miss → DB check karo (slower but correct)."
+
+Q. "10 seats select karo, 5th pe fail — partial rollback?"
+A. "All-or-nothing: Pehle attempt karo sab seats lock.
+   Koi bhi fail → Already locked seats release karo (shown in code above).
+   User ko message: 'Some selected seats unavailable, please reselect.'"
+
+Q. "Same user same seat 2 baar lock karne ki koshish?"
+A. "Redis SETNX mein value = userId. Check karo: existing value == userId?
+   Agar haan → Idempotent (user refreshed page, same request again) → Allow.
+   Agar nahi → Different user → Reject."
+
+================================================================================
+SECTION 5: LLD #5 — ELEVATOR SYSTEM
+================================================================================
+
+Q. "Design an Elevator System for a 10-floor building"
+
+── REQUIREMENTS ──────────────────────────────────────────────
+  Multiple elevators
+  Internal buttons (floor inside elevator)
+  External buttons (UP/DOWN on each floor)
+  Scheduling: Efficient, minimize wait time
+
+── ENTITIES ──────────────────────────────────────────────────
+  Building, Elevator, ElevatorController, Request, Direction
+
+── STATE MACHINE ─────────────────────────────────────────────
+  Elevator States:
+    IDLE     → Waiting, no requests
+    MOVING_UP  → Going up
+    MOVING_DOWN → Going down
+    STOPPED  → Door open at a floor
+
+── DESIGN ────────────────────────────────────────────────────
+
+public enum Direction { UP, DOWN, IDLE }
+public enum ElevatorState { IDLE, MOVING_UP, MOVING_DOWN, STOPPED }
+
+public class Request {
+    private final int floor;
+    private final Direction direction; // External request: UP/DOWN button
+    // Internal request: direction=null (just floor number)
+
+    public Request(int floor, Direction direction) {
+        this.floor = floor;
+        this.direction = direction;
+    }
+}
+
+public class Elevator {
+    private final int elevatorId;
+    private int currentFloor = 0; // Ground floor
+    private ElevatorState state = ElevatorState.IDLE;
+    private Direction direction = Direction.IDLE;
+
+    // Floors to stop at — sorted set for efficient scanning
+    private final TreeSet<Integer> upQueue    = new TreeSet<>();   // For going UP
+    private final TreeSet<Integer> downQueue  = new TreeSet<>(Comparator.reverseOrder()); // For DOWN
+
+    // SCAN Algorithm (like disk scheduling — elevator moves in one direction)
+    public void addRequest(int floor) {
+        if (state == ElevatorState.IDLE || direction == Direction.UP) {
+            if (floor >= currentFloor) {
+                upQueue.add(floor);   // On the way up
+            } else {
+                downQueue.add(floor); // Will handle on the way down
+            }
+        } else { // Moving DOWN
+            if (floor <= currentFloor) {
+                downQueue.add(floor);
+            } else {
+                upQueue.add(floor);
+            }
+        }
+    }
+
+    // Move one step — called by scheduler
+    public void move() {
+        if (state == ElevatorState.STOPPED) {
+            state = ElevatorState.MOVING_UP; // Resume
+        }
+
+        if (direction == Direction.UP || direction == Direction.IDLE) {
+            if (!upQueue.isEmpty()) {
+                direction = Direction.UP;
+                int nextFloor = upQueue.first(); // Smallest floor above
+                currentFloor = nextFloor;
+                upQueue.remove(nextFloor);
+                openDoor(); // STOPPED state briefly
+            } else if (!downQueue.isEmpty()) {
+                direction = Direction.DOWN; // Reverse!
+            } else {
+                direction = Direction.IDLE;
+                state = ElevatorState.IDLE;
+            }
+        } else { // DOWN
+            if (!downQueue.isEmpty()) {
+                int nextFloor = downQueue.first(); // Largest floor below
+                currentFloor = nextFloor;
+                downQueue.remove(nextFloor);
+                openDoor();
+            } else if (!upQueue.isEmpty()) {
+                direction = Direction.UP;
+            } else {
+                direction = Direction.IDLE;
+                state = ElevatorState.IDLE;
+            }
+        }
+    }
+
+    private void openDoor() {
+        state = ElevatorState.STOPPED;
+        System.out.println("Elevator " + elevatorId + " stopped at floor " + currentFloor);
+        // Wait for passengers... then close
+    }
+
+    public int getCurrentFloor() { return currentFloor; }
+    public ElevatorState getState() { return state; }
+}
+
+// Elevator Controller — dispatch requests to best elevator
+public class ElevatorController {
+    private final List<Elevator> elevators;
+
+    // Find nearest idle or same-direction elevator
+    public void handleExternalRequest(int floor, Direction direction) {
+        Elevator best = findBestElevator(floor, direction);
+        best.addRequest(floor);
+    }
+
+    private Elevator findBestElevator(int requestFloor, Direction requestDir) {
+        return elevators.stream()
+            .min(Comparator.comparingInt(e -> calculateScore(e, requestFloor, requestDir)))
+            .orElseThrow();
+    }
+
+    // Score: Lower = Better. Consider current floor distance + direction match
+    private int calculateScore(Elevator e, int requestFloor, Direction requestDir) {
+        int distance = Math.abs(e.getCurrentFloor() - requestFloor);
+
+        if (e.getState() == ElevatorState.IDLE) {
+            return distance; // Idle elevator — just distance matters
+        }
+
+        // Moving toward request in same direction = low score (pick up on the way)
+        // Moving away = high penalty
+        return distance + 10; // Simplified — real impl checks direction
+    }
+}
+
+── SCENARIO QUESTIONS ────────────────────────────────────────
+
+Q. "SCAN vs LOOK algorithm difference?"
+A. "SCAN: Elevator goes to top/bottom even if no requests there
+   LOOK: Elevator reverses when no more requests in current direction (stops early)
+   LOOK is more efficient — we implemented LOOK (upQueue/downQueue empty check)"
+
+Q. "Emergency floor request (VIP/fire)?"
+A. "Priority queue use karo instead of TreeSet.
+   Emergency request: Highest priority → Jump to front.
+   State change → Clear current queues → Go to emergency floor."
+
+Q. "10 elevators — ek hi building. Kaise coordinate karoge?"
+A. "ElevatorController centralized scheduler hai.
+   Each request → Best elevator assign.
+   Avoid: Multiple elevators rushing to same floor (wasted trips).
+   Real buildings: Destination dispatch (user enters floor BEFORE boarding)"
+
+================================================================================
+SECTION 6: DESIGN PATTERNS — QUICK REFERENCE FOR LLD
+================================================================================
+
+PATTERN          WHEN USE IT                        EXAMPLE IN LLD
+-------------    --------------------------------    ----------------------
+Strategy         Algo swap without core change       PricingStrategy (Parking)
+                                                     RateLimiter algorithm
+Singleton        Only one instance needed            ParkingLot
+                                                     ElevatorController
+Factory          Object creation logic hide          VehicleFactory
+                                                     PaymentProcessorFactory
+Observer         State change → Multiple notified    Seat status → notify users
+                                                     Elevator floor → notify waiter
+State Machine    Object behavior changes by state    Elevator (IDLE/MOVING/STOPPED)
+                                                     Booking (PENDING/CONFIRMED)
+Builder          Complex object construction         BookingRequest.builder()
+Command          Request as object, queue/undo       ElevatorRequest
+Template Method  Common algo, subclass fills steps   PricingStrategy base
+
+================================================================================
+QUICK CHEAT SHEET — LLD INTERVIEW
+================================================================================
+
+QUESTION                      → ANSWER
+------------------------        -----------------------------------------------
+OOP principles                 → Encapsulation, Inheritance, Polymorphism, Abstraction
+Why HashMap + DLL in LRU?      → O(1) lookup + O(1) order update
+Strategy Pattern advantage?    → Add new algo without changing existing code
+Concurrency in parking?        → synchronized park(), ConcurrentHashMap for tickets
+BookMyShow race condition?     → Redis SETNX atomic lock per seat
+Elevator algorithm?            → SCAN/LOOK — directional sweep
+Thread safety how?             → synchronized / ReentrantLock / ConcurrentHashMap
+When AtomicInteger?            → Simple counter — no complex logic
+When synchronized method?      → Multiple fields change together atomically
+When ReentrantLock?            → tryLock needed, fairness needed, finer control
+
+LLD INTERVIEW OPENING:
+"Let me first identify the key entities and their relationships,
+then we can discuss the core design patterns and handle edge cases."
+
+ALWAYS MENTION:
+  SOLID principles compliance
+  Which design pattern used and WHY
+  Thread safety if system is concurrent
+  Extensibility — new feature add karne pe kya change hoga?
+
+================================================================================
+END — LLD_ANSWERS.txt
+================================================================================
+
+================================================================================
+SECTION 7: INTERVIEW GUIDE — YE HAI KYA + INTERVIEWER SE KYA POOCHHO
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+LLD #1 — LRU CACHE
+────────────────────────────────────────────────────────────────────────────────
+
+🎯 YE HAI KYA:
+  LRU (Least Recently Used) Cache ek data structure hai jo limited size mein
+  data store karta hai. Jab full ho jaaye → Sabse purana (least recently used)
+  item nikaal deta hai. O(1) get+put ke liye HashMap + Doubly Linked List combo.
+
+  Real world: Browser cache, CPU L1/L2 cache, Redis eviction policy (allkeys-lru),
+              CDN edge cache, OS page replacement algorithm
+
+🙋 INTERVIEWER SE POOCHHO:
+  1. "Cache size fixed hai ya dynamic?"
+  2. "Thread-safe banana hai? (Concurrent access expected hai?)"
+  3. "Key-Value types kya hain? Generic chahiye ya int-int?"
+  4. "TTL (expiry time) support karna hai items ke liye?"
+  5. "Eviction callback chahiye? (Item nikle toh notify karo kisi ko)"
+
+💣 EXTRA SCENARIO QUESTIONS:
+  Q. "LRU vs LFU — kab kaunsa better hai?"
+  A. "LRU: Time-based — recently use kiya = important raho
+     LFU: Frequency-based — frequently use kiya = important raho
+     LRU better jab: Recency matters (web pages, user sessions)
+     LFU better jab: Popular content (YouTube home page thumbnails)
+     Redis: Dono available as maxmemory-policy config"
+
+  Q. "Cache size 10 hai, 10 items full hain, get() bulaya — kya hoga?"
+  A. "get() evict nahi karta — sirf put() pe eviction hoti hai.
+     get() sirf moveToHead() karta hai — recently used mark karo.
+     put() pe naya item aaya aur size == capacity → tail remove karo."
+
+  Q. "Ye LRU distributed system mein kaise use karoge? (Rakuten level question)"
+  A. "Single JVM LRU sirf ek server pe kaam karta hai.
+     Distributed: Redis use karo with maxmemory-policy = allkeys-lru
+     Redis handle karta hai eviction automatically across cluster
+     Application code: Sirf GET/SET karo Redis mein — Redis khud LRU manage karta hai"
+
+  Q. "Integer overflow — key ya value bahut bada ho?"
+  A. "Generic banana chahiye: LRUCache<K, V>
+     HashMap<K, DLinkedNode<K,V>>
+     Type safety + flexibility dono milti hain"
+
+────────────────────────────────────────────────────────────────────────────────
+LLD #2 — PARKING LOT
+────────────────────────────────────────────────────────────────────────────────
+
+🎯 YE HAI KYA:
+  Parking Lot design OOP principles test karta hai — classes, inheritance,
+  design patterns (Strategy, Singleton, Factory). Isme vehicle types, spot types,
+  pricing logic aur ticket generation cover hote hain.
+
+  Real world: Mall parking, airport parking systems, valet systems
+
+🙋 INTERVIEWER SE POOCHHO:
+  1. "Kitne floors? Kitne spots per floor?"
+  2. "Vehicle types kaunse? Bike, Car, Truck only ya EV bhi?"
+  3. "Pricing model kya hai? Hourly, flat rate, ya free first 30 min?"
+  4. "Payment methods chahiye? Cash ya digital?"
+  5. "Display board chahiye — real-time availability dikhao?"
+  6. "Reserved spots support karna hai? (Handicapped, monthly pass)"
+
+💣 EXTRA SCENARIO QUESTIONS:
+  Q. "Naya vehicle type aaya — Electric Vehicle (EV) with charging spot. Kya change hoga?"
+  A. "OCP (Open-Closed Principle) ke liye:
+     VehicleType enum mein EV add karo.
+     SpotType enum mein EV_CHARGING add karo.
+     EVVehicle extends Vehicle — no change in core logic!
+     PricingStrategy: EVPricingStrategy (per kWh + hourly rate)
+     canFit() mein EV → EV_CHARGING spot rule add karo.
+     Core ParkingLot class touch nahi karna — that's OCP!"
+
+  Q. "Peak hours mein dynamic pricing — weekday vs weekend?"
+  A. "Strategy Pattern exactly yahan shine karta hai!
+     WeekdayPricingStrategy, WeekendPricingStrategy, PeakHourPricingStrategy
+     ParkingLot.pricingStrategy = selectStrategy(currentTime)
+     Factory pattern: PricingStrategyFactory.getStrategy(LocalDateTime.now())"
+
+  Q. "Gaadi ka number plate recognition se automatic exit?"
+  A. "Camera → OCR service → VehicleNumber extract karo.
+     activeTickets map mein vehicleNumber se search karo.
+     Match mila → Automatic exit + fee calculation.
+     Ye ParkingLot.exitByPlate(String plateNumber) method add karo"
+
+  Q. "Monthly pass wale user ko har baar ticket generate karna padega?"
+  A. "MonthlyPass entity alag rakho:
+     user_id, vehicle_number, start_date, end_date, floor_preference
+     Entry pe: MonthlyPass check karo → Valid? → Direct entry, no ticket
+     Pricing: Flat monthly fee already paid, exit pe 0 fee"
+
+────────────────────────────────────────────────────────────────────────────────
+LLD #3 — RATE LIMITER (TOKEN BUCKET)
+────────────────────────────────────────────────────────────────────────────────
+
+🎯 YE HAI KYA:
+  LLD Rate Limiter implementation-level hai — actual Java class design with
+  thread safety. Token Bucket: Bucket mein tokens hain, request aaye → token consume,
+  time jaaye → tokens refill. ReentrantLock se thread safety ensure karte hain.
+
+  Real world: API gateway middleware, Spring Security filters, Zuul/Kong plugins
+
+🙋 INTERVIEWER SE POOCHHO:
+  1. "Per user basis ya global (all users combined limit)?"
+  2. "In-memory (single JVM) ya distributed (multiple servers)?"
+  3. "Token bucket ya sliding window — preference hai?"
+  4. "Burst traffic allow karna hai? (Token bucket allows burst)"
+  5. "Metrics chahiye — kitne reject hue, kitne allowed?"
+
+💣 EXTRA SCENARIO QUESTIONS:
+  Q. "Refill time pe bhi tokens capped rehte hain — kyun?"
+  A. "Math.min(capacity, tokens + tokensToAdd) — ye line important hai.
+     Agar cap nahi kiya:
+     User 1 hour inactive raha → 3600 tokens accumulate ho gaye (at 1/sec rate)
+     Phir 3600 requests ek baar — burst protection defeat ho gayi!
+     Cap = Max burst = capacity (e.g. 100 tokens)"
+
+  Q. "Agar 2 threads same user ke liye simultaneously isAllowed() call karein?"
+  A. "ReentrantLock per Bucket hai — same user ke 2 threads mein ek wait karega.
+     ConcurrentHashMap: Different users ke buckets pe parallel access okay — no lock contention
+     This is why ConcurrentHashMap + per-bucket ReentrantLock is efficient design"
+
+  Q. "Memory leak — infinite users aate rahe toh buckets map bhadta jaayega?"
+  A. "Solutions:
+     1. ScheduledExecutorService: Har 1 hour → inactive buckets remove (lastRefillTime check)
+     2. WeakHashMap: GC automatically reclaim karein unused entries
+     3. Caffeine cache with expiry: .expireAfterAccess(1, TimeUnit.HOURS)
+     Production: Caffeine + expireAfterAccess sabse clean solution"
+
+  Q. "isAllowed() ke saath remaining tokens bhi return karo — kaise?"
+  A. "Return type change karo:
+     public RateLimitResult isAllowed(String userId)
+     RateLimitResult { boolean allowed; int remainingTokens; long retryAfterMs; }
+     Filter mein: X-RateLimit-Remaining: {remainingTokens} header set karo"
+
+────────────────────────────────────────────────────────────────────────────────
+LLD #4 — BOOKMYSHOW (CONCURRENCY — MOST IMPORTANT)
+────────────────────────────────────────────────────────────────────────────────
+
+🎯 YE HAI KYA:
+  BookMyShow ka core challenge concurrency hai — 500 users ek saath ek seat book
+  karne ki koshish karte hain. Redis SETNX (setIfAbsent) atomic operation use karte hain
+  seat ko temporarily lock karne ke liye. Payment ke baad DB mein permanently book.
+
+  Real world: BookMyShow, IRCTC, Ticketmaster, StubHub
+
+🙋 INTERVIEWER SE POOCHHO:
+  1. "Hold duration kitna? 10 minutes standard hai, confirm karo."
+  2. "Multiple seats ek saath book karne chahiye — partial booking allowed?"
+  3. "Seat categories hain? (Gold, Platinum, Silver with different prices)"
+  4. "Waiting list feature chahiye? User cancel kare toh notify others?"
+  5. "Group booking — 6 consecutive seats chahiye?"
+  6. "Payment gateway integration scope mein hai?"
+
+💣 EXTRA SCENARIO QUESTIONS:
+  Q. "6 consecutive seats chahiye — algorithm kya hoga?"
+  A. "Seat availability matrix maintain karo per row.
+     For each row: Find 6 consecutive available seats.
+     Bitmask approach: Row A = 1111111111 (10 seats) → Find 6 consecutive 1s
+     lockSeats() pe sab 6 lock karo atomically (loop with rollback on failure)"
+
+  Q. "Peak load — Avengers movie release pe 10 lakh users same time?"
+  A. "Pre-load: Redis mein seat status load karo before ticket opening.
+     Queue system: Users ko virtual queue mein daalo, numbered token do.
+     Token-based access: 'You are #50,000 in queue, estimated wait: 5 min'
+     Gradual release: 1000 users/sec allow karo — controlled load"
+
+  Q. "Redis TTL expire hone pe DB sync kaise karoge?"
+  A. "Option 1: Redis Keyspace Notifications — expire event → cleanup listener
+     Option 2: @Scheduled job har minute run karo — expired pending bookings check
+     Option 3: Lazy cleanup — seat.status check karo at request time
+     We used Option 2 in code (cleanupExpiredLocks @Scheduled)"
+
+  Q. "Ek user ne 10 different tabs se same seat lock karne ki koshi ki?"
+  A. "SETNX key = 'seat:lock:showId:seatId' value = userId
+     Same user, same seat → SETNX fails (key already exists with same userId)
+     Add check: Existing value == userId? → Refresh TTL (extend lock) → Allow
+     This is idempotent lock — same user safe hai"
+
+────────────────────────────────────────────────────────────────────────────────
+LLD #5 — ELEVATOR SYSTEM
+────────────────────────────────────────────────────────────────────────────────
+
+🎯 YE HAI KYA:
+  Elevator System mein State Machine aur LOOK/SCAN scheduling algorithm cover
+  hota hai. Elevator UP jaata hai → Saare up requests handle karta hai → Phir
+  reverse → DOWN requests. TreeSet se efficiently next floor find karte hain.
+
+  Real world: Building elevators, data center cooling systems, resource scheduling
+
+🙋 INTERVIEWER SE POOCHHO:
+  1. "Kitne elevators? Kitni floors?"
+  2. "Express elevators hain? (Floor 1-10 only, 10-20 only?)"
+  3. "Weight/capacity limit handle karna hai?"
+  4. "Emergency floor (Ground/Lobby) priority required?"
+  5. "Peak hour logic chahiye? (8AM-10AM sabhi elevators ground pe wait karein)"
+  6. "Maintenance mode — ek elevator ko service se bahar karna?"
+
+💣 EXTRA SCENARIO QUESTIONS:
+  Q. "Sabhi 3 elevators floor 1 pe hain aur floor 10 pe request aayi — kaunsa jaayega?"
+  A. "ElevatorController.findBestElevator() call hoga.
+     Score = distance only (sab IDLE hain) = 9 floors for all.
+     Tie-break: Elevator ID lowest waala jaayega (deterministic).
+     Better: Round-robin among tied elevators — distribute wear evenly"
+
+  Q. "Elevator stuck ho jaaye — kaise detect aur handle karoge?"
+  A. "Heartbeat mechanism: Har 5 second mein elevator status update karo.
+     Controller: Last heartbeat > 30 seconds → STUCK assume karo.
+     Action: 1. Alert maintenance 2. Mark OUT_OF_SERVICE 3. Redistribute requests
+     Elevator.state = MAINTENANCE → ElevatorController skip karo isko"
+
+  Q. "Rush hour: Floor 1 pe 50 log hain. Optimize kaise karoge?"
+  A. "Peak hour detection: 8AM-10AM, 5PM-7PM
+     Strategy: All elevators return to Floor 1 when IDLE during peak hours
+     Zoning: Elevator A = Floor 1-5, Elevator B = 6-10, Elevator C = express
+     Pre-positioning: Based on historical data (ML can predict)"
+
+  Q. "Person enter karne ke baad wrong floor press kar diya — cancel button?"
+  A. "Request remove karo from upQueue/downQueue.
+     TreeSet.remove(floor) → O(log n)
+     New destination add karo.
+     Edge case: Already passing that floor → Door open hua tha already?"
+
+================================================================================
+LLD INTERVIEW APPROACH — STEP BY STEP (ALWAYS FOLLOW THIS)
+================================================================================
+
+STEP 1 — REQUIREMENTS (2 min):
+  "Let me clarify requirements before designing.
+   [Poochho 2-3 questions from the list above]"
+
+STEP 2 — IDENTIFY ENTITIES (2 min):
+  "Nouns = Classes. Let me identify key entities first."
+  LRU: LRUCache, DLinkedNode
+  Parking: ParkingLot, Floor, ParkingSpot, Vehicle, Ticket
+  BookMyShow: Show, Screen, Seat, Booking, User
+  Elevator: Building, Elevator, ElevatorController, Request
+
+STEP 3 — CLASS RELATIONSHIPS (3 min):
+  "Has-a (composition) vs Is-a (inheritance)"
+  ParkingLot HAS-A List<Floor>
+  Floor HAS-A List<ParkingSpot>
+  Car IS-A Vehicle
+
+STEP 4 — DESIGN PATTERN MENTION (1 min):
+  Interviewer love karte hain jab tum pattern name karo:
+  "Here I'm using Strategy Pattern because pricing algo can change without affecting core logic"
+  "This is Singleton because there's only one ParkingLot instance"
+
+STEP 5 — CORE METHOD IMPLEMENT (5 min):
+  Most important methods ka code likho.
+  Thread safety agar relevant ho toh synchronized/Lock mention karo.
+
+STEP 6 — EDGE CASES (2 min):
+  "What if capacity = 0?"
+  "What if same key put twice?"
+  "What if two threads simultaneously?"
+
+================================================================================
+PATTERNS QUICK RECALL — BOLNE WALI LINES
+================================================================================
+
+LRU Cache:
+  "HashMap gives O(1) lookup, Doubly Linked List maintains access order.
+   Combined: O(1) get AND O(1) eviction. That's why this combo is industry standard."
+
+Parking Lot:
+  "I used Strategy Pattern for pricing so we can add new pricing models
+   without touching ParkingLot class — follows Open-Closed Principle."
+
+Rate Limiter:
+  "Token Bucket allows burst traffic unlike Fixed Window.
+   ReentrantLock per bucket — not global — means different users don't block each other."
+
+BookMyShow:
+  "Redis SETNX is atomic — no two threads can win simultaneously.
+   TTL handles automatic cleanup — no manual GC needed for expired locks."
+
+Elevator:
+  "LOOK algorithm reverses when no requests remain in current direction —
+   more efficient than SCAN which goes to extreme floors unnecessarily."
+
+================================================================================
+END — INTERVIEW GUIDE ADDED TO LLD_ANSWERS.txt
+================================================================================

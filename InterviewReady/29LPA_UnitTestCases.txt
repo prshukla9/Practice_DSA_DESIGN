@@ -1,0 +1,43 @@
+
+SECTION 1: UNIT TESTING FUNDAMENTALS
+Unit testing kya hota hai aur kyun important hai?
+Unit test vs Integration test difference?
+Good unit test ke characteristics kya hote hain?
+Test pyramid kya hota hai?
+TDD (Test Driven Development) kya hai?
+
+SECTION 2: JUNIT DEEP DIVE
+JUnit 4 vs JUnit 5 difference?
+Common annotations (@Test, @BeforeEach, @AfterEach)?
+Assertions ka use (assertEquals, assertThrows etc.)?
+Parameterized tests kya hote hain?
+Test lifecycle kaise kaam karta hai?
+
+SECTION 3: MOCKITO CORE
+Mock vs Spy difference?
+@Mock vs @InjectMocks?
+when() vs doReturn() difference?
+verify() ka use?
+ArgumentMatchers kya hote hain?
+
+SECTION 4: ADVANCED MOCKING
+Void methods ko kaise mock karte ho?
+Exception throwing kaise mock karte ho?
+Private methods ko test kaise karte ho?
+Static methods mocking kaise hoti hai?
+Final classes mocking possible hai? kaise?
+
+SECTION 5: REAL-WORLD TESTING SCENARIOS
+Service layer ko kaise test karte ho (with repo mock)?
+Controller test kaise likhte ho Spring Boot me?
+External API calls ko kaise mock karte ho?
+Database dependency ko kaise avoid karte ho unit test me?
+Slow tests ko fast kaise banate ho?
+
+SECTION 6: BEST PRACTICES (Very Important)
+Test naming convention kya hona chahiye?
+AAA pattern (Arrange-Act-Assert) kya hota hai?
+Over-mocking kya hota hai?
+Flaky tests kya hote hain? kaise fix karte ho?
+Code coverage kitna hona chahiye aur kya enough hai?
+Kafka consumer unit test â€” idempotency + outbox

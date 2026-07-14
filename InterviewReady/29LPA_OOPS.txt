@@ -1,0 +1,115 @@
+
+SECTION 1: CORE OOP CONCEPTS
+OOP ke 4 pillars explain karo (Encapsulation, Inheritance, Polymorphism, Abstraction)
+Encapsulation ka real-world use case kya hai?
+Abstraction vs Encapsulation difference?
+Inheritance ke drawbacks kya hote hain?
+Composition vs Inheritance â€” kab kya use karoge?
+Polymorphism ke types + runtime polymorphism kaise kaam karta hai?
+
+SECTION 2: JAVA OOP DEEP DIVE
+Method overloading vs overriding?
+equals() vs hashCode() contract?
+final, finally, finalize difference?
+Immutable class kaise banate ho?
+Java pass-by-value explain karo?
+Interface vs Abstract class (real scenario)?
+Java 8 me interfaces me kya changes aaye?
+How many ways to make an object?
+Shallow vs Deep Copy?
+
+SECTION 3: DESIGN PRINCIPLES (SOLID + Clean Code)
+SOLID principles explain karo?
+Dependency Injection kya hai (Spring context)?
+Loose coupling kaise achieve karte ho?
+High cohesion kya hota hai?
+Code smells kya hote hain?
+
+SECTION 4: DESIGN PATTERNS
+Factory Pattern
+Singleton Pattern (pitfalls + thread-safe)
+Strategy Pattern
+Builder Pattern
+Observer Pattern â†’ Kafka events
+Adapter Pattern
+Decorator vs Proxy
+Template Method vs Strategy
+DRY AND KISS
+
+SECTION 5: SCENARIO-BASED (MOST IMPORTANT)
+God class ko kaise refactor karoge?
+Payment system design (multiple methods) â†’ Consent scopes (EPAM analogy)
+Tightly coupled code ko kaise improve karoge?
+Extensible / Future feature-ready code?
+Backward compatibility kaise maintain karte ho?
+
+SECTION 6: ADVANCED JAVA CONCEPTS
+Covariant return type kya hota hai?
+Static vs Dynamic binding explain karo
+ClassLoader kya hota hai?
+
+SECTION 7: MEMORY & JVM
+Object lifecycle explain karo
+Garbage Collection kaise kaam karta hai?
+Reference types (Strong, Soft, Weak, Phantom)?
+Memory leak Spring Boot me kaise hota hai?
+String pool kya hota hai?
+
+SECTION 8: EDGE CASES & TRICKY
+Constructor override possible hai?
+Private method override possible hai?
+Static method polymorphism hota hai?
+Functional Interface kya hota hai?
+Marker interface kya hota hai?
+
+SECTION 9: EXPERT-LEVEL DESIGN THINKING
+LSP violation example?
+OCP real project example?
+Circular dependency Spring me kaise solve?
+Plugin architecture kaise design karte ho?
+
+SECTION 10: OOP + CONCURRENCY
+Thread safety OOP design me kaise ensure karte ho?
+Immutable objects concurrency me kyun useful?
+
+SECTION 11: COLLECTIONS + OOP DESIGN
+HashMap internal working?
+ConcurrentHashMap vs HashMap?
+ArrayList vs LinkedList?
+Comparable vs Comparator?
+Fail-fast vs Fail-safe iterators?
+
+SECTION 12: EXCEPTION HANDLING DESIGN
+Checked vs Unchecked exceptions?
+Custom exceptions kaise design karte ho?
+Finally block kab nahi chalta?
+Try-with-resources kya hota hai?
+
+SECTION 13: REAL ARCHITECTURE THINKING
+Monolith vs Microservices OOP impact?
+Service vs Repository layer?
+DTO vs Entity difference?
+Idempotency OOP design me kaise?
+
+SECTION 14: SPRING + OOP (Highly Asked)
+IOC Spring me OOP se kaise relate?
+Bean lifecycle explain karo
+Singleton vs Prototype scope?
+AOP kya hota hai?
+@Transactional kaise kaam karta hai?
+Circular dependency kaise resolve?
+
+SECTION 15: REAL-WORLD DEBUGGING
+Memory issue kaise debug karte ho?
+High CPU threads kaise debug?
+Deadlock production me kaise detect?
+Slow API kaise debug karte ho?
+Legacy code kaise refactor karte ho?
+
+SECTION 16: ULTRA-TRICKY (Senior Level)
+Multiple inheritance Java me?
+Static blocks execution order?
+Interface me constructor possible?
+Reflection kya hota hai?
+Serialization vs Externalizable?
+transient keyword kya karta hai?

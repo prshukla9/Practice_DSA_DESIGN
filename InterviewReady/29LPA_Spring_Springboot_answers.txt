@@ -1,0 +1,3988 @@
+
+================================================================================
+  SPRING & SPRING BOOT — COMPLETE INTERVIEW PREPARATION (6 YRS EXPERIENCE)
+  Hinglish mein - Simple + Code + Real Interview Answers
+================================================================================
+
+> 9 Sections | ~33 Questions + Missing Topics
+> Har answer: Concept → Analogy → Code → Interview Tip
+
+================================================================================
+SECTION 1: CORE SPRING CONCEPTS
+================================================================================
+
+------------------------------------------------------------------------
+Q1. IOC (Inversion of Control) kya hota hai?
+------------------------------------------------------------------------
+
+CONCEPT:
+Normal programming mein TUM object create karte ho:
+  UserService service = new UserService(new UserRepository());
+
+IOC mein Spring khud objects create karta hai aur tumhe de deta hai.
+Control tumhare haath se Spring ke haath mein aa jaata hai — isliye "Inversion"
+
+ANALOGY:
+- Bina IOC: Tum khud restaurant jaate ho, order karte ho, khana laate ho
+- IOC ke saath: Zomato (Spring) sab handle karta hai — tumhe sirf batana hai kya chahiye
+
+// WITHOUT IOC — tightly coupled, hard to test
+public class OrderService {
+    // OrderService khud UserRepository create kar raha hai — BAD!
+    private UserRepository repo = new UserRepository(); // direct dependency
+
+    public void placeOrder(Order order) {
+        User user = repo.findById(order.getUserId());
+    }
+}
+
+// WITH IOC — Spring manages the dependency
+@Service
+public class OrderService {
+    private final UserRepository repo; // Interface type — loosely coupled
+
+    // Spring isko inject karega — tum mat banao
+    @Autowired
+    public OrderService(UserRepository repo) {
+        this.repo = repo;
+    }
+}
+
+INTERVIEW TIP: "IOC ek principle hai, Dependency Injection uska implementation hai. Spring IoC container (ApplicationContext) beans create, configure aur manage karta hai."
+
+------------------------------------------------------------------------
+Q2. Dependency Injection ke types: Constructor vs Setter vs Field
+------------------------------------------------------------------------
+
+// TYPE 1: CONSTRUCTOR INJECTION (RECOMMENDED — BEST PRACTICE)
+@Service
+public class PaymentService {
+    private final PaymentGateway gateway; // final — immutable after construction
+    private final AuditService audit;
+
+    // Spring constructor call karega aur dependencies inject karega
+    // @Autowired optional hai Spring 4.3+ mein agar single constructor ho
+    @Autowired
+    public PaymentService(PaymentGateway gateway, AuditService audit) {
+        this.gateway = gateway;
+        this.audit = audit;
+    }
+}
+
+// WHY CONSTRUCTOR INJECTION BEST HAI:
+// 1. final fields — immutable, thread-safe
+// 2. Circular dependency early catch hoti hai (runtime nahi — startup pe)
+// 3. Testing easy — new PaymentService(mockGateway, mockAudit) seedha karo
+// 4. Required dependencies clearly visible hain
+================================================================================================================ 
+Scenario
+
+Maan lo do services hain:
+
+@Service
+public class OrderService {
+
+    private final PaymentService paymentService;
+
+    public OrderService(PaymentService paymentService) {
+        this.paymentService = paymentService;
+    }
+}
+@Service
+public class PaymentService {
+
+    private final OrderService orderService;
+
+    public PaymentService(OrderService orderService) {
+        this.orderService = orderService;
+    }
+}
+
+Ab dependency dekho:
+
+OrderService
+      ↓
+PaymentService
+      ↓
+OrderService
+
+Ye circular dependency hai.
+
+Spring startup pe kya karta hai?
+
+Spring pehle OrderService banana chahega.
+
+Create OrderService
+
+Usko constructor me chahiye
+
+PaymentService
+
+To Spring bolega:
+
+Pehle PaymentService banao.
+
+Ab PaymentService banane lagega.
+
+Lekin uske constructor me chahiye
+
+OrderService
+
+Problem!
+
+OrderService abhi bana hi nahi.
+
+To Spring bolta hai:
+
+BeanCurrentlyInCreationException
+
+Aur application startup pe hi fail ho jayegi.
+
+Isliye bolte hain
+
+Constructor Injection catches circular dependencies at application startup before any request is served.
+
+
+================================================================================================================ 
+================================================================================================================ 
+@Service
+public class OrderService {
+
+    @Autowired
+    private PaymentService paymentService;
+}
+@Service
+public class PaymentService {
+
+    @Autowired
+    private OrderService orderService;
+}
+
+Field injection me Spring pehle object bana leta hai.
+
+OrderService()
+
+Object create ho gaya.
+
+Fir
+
+PaymentService()
+
+Ye bhi create ho gaya.
+
+Ab baad me fields inject karta hai.
+
+OrderService.paymentService = PaymentService
+PaymentService.orderService = OrderService
+
+Historically, Spring kuch cases me aise circular references ko early singleton exposure ke through resolve kar leta tha (especially field/setter injection ke saath),
+ jiski wajah se circular dependency kabhi-kabhi hide ho jaati thi. Isi behavior ki wajah se aaj circular references ko discourage kiya jata hai.
+  Constructor injection me ye shortcut possible nahi hota, isliye issue turant saamne aa jata hai.
+================================================================================================================ 
+// TYPE 2: SETTER INJECTION (optional dependencies ke liye)
+@Service
+public class NotificationService {
+    private EmailClient emailClient; // optional — ho sakta hai configure na ho
+
+    @Autowired(required = false) // Optional dependency
+    public void setEmailClient(EmailClient emailClient) {
+        this.emailClient = emailClient;
+    }
+}
+
+// TYPE 3: FIELD INJECTION (@Autowired directly on field) — AVOID IN PRODUCTION
+@Service
+public class UserService {
+    @Autowired // ❌ Bad practice — final nahi kar sakte, testing mushkil
+    private UserRepository userRepository;
+
+    // Testing mein: reflection chahiye ya Spring context chahiye
+    // "I avoid field injection because it hides dependencies and makes testing harder"
+}
+
+COMPARISON:
+| Feature            | Constructor      | Setter          | Field          |
+|--------------------|------------------|-----------------|----------------|
+| Immutability       | Yes (final)      | No              | No             |
+| Circular dependency| Fails fast       | Allowed (risky) | Allowed (risky)|
+| Testing            | Easy (new())     | Medium          | Hard           |
+| Recommended        | YES              | Optional deps   | NO             |
+
+------------------------------------------------------------------------
+Q3. Bean Lifecycle explain karo?
+------------------------------------------------------------------------
+
+LIFECYCLE (Step by step):
+
+Bean = Ek Employee
+
+Socho Spring ek company hai.
+
+Jab application start hoti hai to Spring employees (Beans) hire karta hai.
+
+Bean lifecycle = Employee ki joining se exit tak ki story.
+
+Create
+   ↓
+Dependencies do
+   ↓
+Initialization
+   ↓
+Kaam karo
+   ↓
+Destroy
+
+Bas itni hi lifecycle hai.
+
+Step 1. Bean Create
+
+Spring pehle object banata hai.
+
+@Service
+public class PaymentService {
+
+    public PaymentService() {
+        System.out.println("Constructor");
+    }
+}
+
+Output
+
+Constructor
+
+Abhi sirf employee office me enter hua hai.
+
+Usko laptop bhi nahi mila.
+
+Step 2. Dependency Injection
+
+Ab Spring usko required cheeze deta hai.
+
+Laptop
+Email
+Access Card
+
+Programming me
+
+@Autowired
+Repository
+Other Services
+Configuration
+
+Example
+
+@Service
+class PaymentService {
+
+    @Autowired
+    OrderRepository repo;
+}
+
+Ab repo inject ho gaya.
+
+Employee ko laptop mil gaya.
+
+Step 3. Initialization
+
+Ab employee ready hai.
+
+Ab usko bolte hain
+
+System check kar lo.
+Database connect kar lo.
+Cache load kar lo.
+
+Yahi hota hai
+
+@PostConstruct
+public void init() {
+    System.out.println("Initialization");
+}
+
+Ya
+
+afterPropertiesSet()
+
+Ya
+
+init-method
+
+Sabka purpose same hai.
+
+Bean fully ready.
+
+Step 4. Bean Use
+
+Ab employee poora din kaam karta hai.
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Repository
+
+↓
+
+Database
+
+Ye lifecycle ka longest phase hai.
+
+Application Running...
+Step 5. Destroy
+
+Application band.
+
+Employee office chhod raha hai.
+
+Spring bolta hai
+
+Database connection close
+File close
+Cache clear
+Socket close
+
+Programming me
+
+@PreDestroy
+public void destroy() {
+    System.out.println("Cleanup");
+}
+
+Ya
+
+destroy-method
+========================================================================================================================
+STEP 1 — Spring ko pata chalta hai kaun-kaun beans hain
+@Component
+@Service
+@Repository
+@Configuration
+@Bean
+
+Spring scan karta hai.
+
+Result:
+
+PaymentService
+OrderService
+UserRepository
+
+Ye sirf metadata hai.
+
+Isko kehte hain
+
+Bean Definition Load
+
+Abhi object nahi bana.
+
+STEP 2 — Object Create
+
+Spring bolta hai
+
+PaymentService banao.
+
+Constructor call
+
+new PaymentService(...)
+
+Ye hai
+
+Bean Instantiation
+
+STEP 3 — Dependencies Inject
+
+Constructor parameters
+
+ya
+
+@Autowired
+
+ya
+
+Setter
+
+sab inject hote hain.
+
+PaymentService
+
+Repository ✔
+
+EmailService ✔
+
+Cache ✔
+
+Ab bean almost ready hai.
+
+STEP 4 — Spring bolta hai "Kuch aur karna hai?"
+
+Yahi confusing part hota hai.
+
+Isko flow me dekho.
+
+Aware Interfaces
+        ↓
+BeanPostProcessor Before
+        ↓
+@PostConstruct
+        ↓
+afterPropertiesSet()
+        ↓
+init-method
+        ↓
+BeanPostProcessor After
+
+Ab ek-ek samajho.
+
+BeanNameAware
+
+Spring bolta hai
+
+Hi Bean,
+
+Ye tumhara naam hai.
+setBeanName("paymentService")
+BeanFactoryAware
+
+Spring bolta hai
+
+Ye lo BeanFactory.
+
+Agar bean ko BeanFactory chahiye.
+
+ApplicationContextAware
+
+Ye bhi isi stage pe aata hai.
+
+Spring bolta hai
+
+Ye lo ApplicationContext.
+
+Interview me kabhi poochte hain.
+
+BeanPostProcessor Before
+
+Spring ke internal plugins.
+
+Example
+
+Validation
+
+Logging
+
+Custom processing
+@PostConstruct
+
+Ab tumhara code.
+
+@PostConstruct
+void init() {
+    loadCache();
+}
+
+Yahan database connect kar sakte ho.
+
+Cache load.
+
+Warmup.
+
+etc.
+
+afterPropertiesSet()
+
+Same purpose.
+
+Bas interface implement karte ho.
+
+implements InitializingBean
+
+Normally use nahi karte.
+
+init-method
+
+XML wale zamane ka.
+
+Almost kabhi use nahi hota.
+
+BeanPostProcessor After
+
+Ye bahut important hai.
+
+Yahin pe Spring AOP proxy bana sakta hai.
+
+@Transactional
+
+@Async
+
+@Cacheable
+
+sab isi phase ke baad kaam karte hain.
+
+STEP 5
+
+Ab bean ready.
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Repository
+
+Application chal rahi hai.
+
+STEP 6 Shutdown
+
+Application band.
+
+@PreDestroy
+
+↓
+
+destroy()
+
+↓
+
+destroy-method
+
+Resources release.
+
+Actual Lifecycle
+Bean Definition Load
+        │
+        ▼
+Instantiation
+        │
+        ▼
+Dependency Injection
+        │
+        ▼
+Aware Interfaces
+        │
+        ▼
+BeanPostProcessor Before
+        │
+        ▼
+@PostConstruct
+        │
+        ▼
+afterPropertiesSet()
+        │
+        ▼
+init-method
+        │
+        ▼
+BeanPostProcessor After
+        │
+        ▼
+READY
+        │
+        ▼
+Application Running
+        │
+        ▼
+@PreDestroy
+        │
+        ▼
+destroy()
+        │
+        ▼
+destroy-method
+========================================================================================================================
+
+1. Bean Definition Load — XML/annotation se bean definitions read hoti hain
+2. Bean Instantiation — Constructor call hota hai
+3. Dependency Injection — Properties/dependencies set hoti hain
+4. BeanNameAware, BeanFactoryAware — Spring internal interfaces
+5. BeanPostProcessor.postProcessBeforeInitialization()
+6. @PostConstruct method — CUSTOM INIT LOGIC YAHAN
+7. InitializingBean.afterPropertiesSet()
+8. init-method (XML/Bean annotation)
+9. BeanPostProcessor.postProcessAfterInitialization()
+10. Bean READY TO USE
+... Application chalta hai ...
+11. @PreDestroy — CUSTOM CLEANUP YAHAN
+12. DisposableBean.destroy()
+13. destroy-method
+
+// PRACTICAL EXAMPLE — hooks ka use
+@Component
+public class DatabaseConnectionPool {
+    private Connection[] connections;
+
+    // Called after all dependencies injected — initialization yahan karo
+    @PostConstruct
+    public void initialize() {
+        System.out.println("Initializing connection pool...");
+        connections = createConnections(10); // DB connections setup
+    }
+
+    // Called before bean destroyed — cleanup yahan karo
+    @PreDestroy
+    public void cleanup() {
+        System.out.println("Closing connection pool...");
+        for (Connection conn : connections) {
+            conn.close(); // Connections properly close karo
+        }
+    }
+}
+
+// @Bean annotation ke saath
+@Configuration
+public class AppConfig {
+    @Bean(initMethod = "start", destroyMethod = "stop")
+    public CacheManager cacheManager() {
+        return new RedisCacheManager();
+    }
+}
+
+INTERVIEW TIP: "@PostConstruct vs constructor: Constructor injection se pehle dependencies available nahi hoti.
+ @PostConstruct mein sari dependencies inject ho chuki hoti hain — isliye DB/resource init ke liye @PostConstruct use karo."
+
+------------------------------------------------------------------------
+Q4. ApplicationContext vs BeanFactory?
+------------------------------------------------------------------------
+BeanFactory
+
+Sirf bean banana jaanta hai.
+
+Mujhe bean chahiye.
+
+↓
+
+Lo bean.
+
+Bas.
+
+Isliye lightweight.
+
+Mostly lazy loading.
+
+ApplicationContext
+
+BeanFactory +
+
+bahut saari facilities.
+
+BeanFactory
+
++
+
+AOP
+
++
+
+Events
+
++
+
+Internationalization
+
++
+
+Environment
+
++
+
+Profiles
+
++
+
+@Component scanning
+
++
+
+Auto wiring
+
++
+
+Web support
+
+Matlab
+
+ApplicationContext
+
+=
+
+BeanFactory++
+
+
+BeanFactory is the basic IoC container responsible only for creating and managing beans,
+ and it usually creates beans lazily. ApplicationContext extends BeanFactory and provides enterprise features
+  such as automatic bean wiring, component scanning, AOP support, event publishing, internationalization,
+   environment and profile support, and web integration.
+ That's why almost all modern Spring Boot applications internally use ApplicationContext rather than BeanFactory.
+
+| Feature                | BeanFactory              | ApplicationContext          |
+|------------------------|--------------------------|-----------------------------|
+| Bean creation          | Lazy (jab maango tab)    | Eager (startup pe hi sab)   |
+| Annotations support    | Basic                    | Full (@Autowired etc.)      |
+| AOP support            | No                       | Yes                         |
+| i18n (messages)        | No                       | Yes (MessageSource)         |
+| Events                 | No                       | Yes (ApplicationEvents)     |
+| Web support            | No                       | Yes (WebApplicationContext) |
+| Use in production      | Rarely                   | ALWAYS                      |
+
+// ApplicationContext implementations:
+// AnnotationConfigApplicationContext — Java config
+// ClassPathXmlApplicationContext — XML config
+// WebApplicationContext — Web apps
+
+// PROGRAMMATIC ACCESS (rare but asked in interviews)
+@Component
+public class SomeBean implements ApplicationContextAware {
+    private ApplicationContext context;
+
+    @Override
+    public void setApplicationContext(ApplicationContext context) {
+        this.context = context;
+    }
+
+    public void doWork() {
+        // Dynamic bean retrieval
+        UserService service = context.getBean(UserService.class);
+    }
+}
+
+INTERVIEW TIP: "BeanFactory memory-sensitive embedded systems ke liye use hota tha. 
+Modern Spring apps mein hamesha ApplicationContext use karo."
+BeanFactory is the basic IoC container responsible only for creating and managing beans, and it usually creates beans lazily. 
+ApplicationContext extends BeanFactory and provides enterprise features such as
+automatic bean wiring, component scanning, AOP support, event publishing, internationalization, 
+environment and profile support, and web integration. 
+That's why almost all modern Spring Boot applications internally use ApplicationContext rather than BeanFactory.
+
+------------------------------------------------------------------------
+Q5. Spring Container ka role?
+------------------------------------------------------------------------
+
+Spring Container = ApplicationContext = IoC Container
+
+RESPONSIBILITIES:
+1. Bean definitions read karna (annotations, XML, Java config)
+2. Beans instantiate karna (lifecycle manage karna)
+3. Dependencies inject karna (wiring)
+4. AOP proxies create karna
+5. Event publishing
+6. Resource management
+
+================================================================================
+SECTION 2: BEAN & SCOPE DEEP DIVE
+================================================================================
+
+------------------------------------------------------------------------
+Q6. Bean Scopes kya hote hain?
+------------------------------------------------------------------------
+
+// SCOPE 1: SINGLETON (DEFAULT) — Ek bean instance for entire application
+@Component
+@Scope("singleton") // Default — ye likhna zaroori nahi
+public class ConfigService {
+    // Ek hi instance — sabhi requests same object use karte hain
+    // STATE MAT RAKHO! Thread-safety issue hogi
+}
+
+// SCOPE 2: PROTOTYPE — Har baar naya instance
+@Component
+@Scope("prototype") // Ya @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
+public class OrderProcessor {
+    private List<Item> items = new ArrayList<>(); // State rakho — har request ka alag object
+}
+
+// SCOPE 3: REQUEST — Ek HTTP request = ek instance (Web only)
+@Component
+@Scope(value = "request", proxyMode = ScopedProxyMode.TARGET_CLASS)
+public class RequestContext {
+    private String requestId = UUID.randomUUID().toString();
+}
+
+// SCOPE 4: SESSION — Ek HTTP session = ek instance (Web only)
+@Component
+@Scope(value = "session", proxyMode = ScopedProxyMode.TARGET_CLASS)
+public class UserSession {
+    private String userId;
+    private List<String> cart = new ArrayList<>();
+}
+
+// SCOPE 5: APPLICATION — ServletContext = ek instance (rarely used)
+// SCOPE 6: WEBSOCKET — WebSocket session scope
+
+INTERVIEW TIP: "proxyMode = TARGET_CLASS SCOPED_PROXY kyun chahiye?
+ Kyunki singleton bean mein prototype/request/session bean inject karo toh scope mismatch hota hai.
+  Proxy yeh solve karta hai — singleton proxy ko call karo, proxy naya instance return karta hai."
+
+------------------------------------------------------------------------
+Q7. Singleton Bean Thread-safe hota hai ya nahi?
+------------------------------------------------------------------------
+
+SHORT ANSWER: NO! Singleton bean thread-safe NAHI hota by default.
+
+// PROBLEM: Singleton bean with MUTABLE STATE
+@Service
+public class CounterService {
+    private int count = 0; // SHARED STATE — DANGER!
+
+    // Multiple threads simultaneously yahan aayenge
+    public int increment() {
+        return ++count; // RACE CONDITION! Not atomic!
+    }
+}
+
+// SOLUTION 1: Stateless banao (BEST)
+@Service
+public class OrderService {
+    // Koi instance variables nahi — stateless — automatically thread-safe!
+    public Order processOrder(Order order) {
+        // Local variables use karo — each thread ka apna stack
+        Order processed = applyDiscount(order);
+        return processed;
+    }
+}
+
+// SOLUTION 2: AtomicInteger use karo
+@Service
+public class SafeCounterService {
+    private AtomicInteger count = new AtomicInteger(0); // Thread-safe
+
+    public int increment() {
+        return count.incrementAndGet(); // Atomic operation
+    }
+}
+
+// SOLUTION 3: Synchronized (performance cost)
+@Service
+public class SyncService {
+    private int count = 0;
+
+    public synchronized int increment() {
+        return ++count;
+    }
+}
+
+
+Sabse pehle samajh: Singleton Bean
+
+Spring me by default:
+
+@Service
+public class OrderService {
+}
+
+iska sirf ek hi object banta hai.
+
+              Spring Container
+
+            +----------------+
+            | OrderService   |   ← Only ONE object
+            +----------------+
+
+Ab maan lo 1000 users request bhejte hain.
+
+User 1  ----\
+User 2  -----\
+User 3  ------> SAME OrderService Object
+User 4  -----/
+User 5  ----/
+
+Ek hi object ko multiple threads use karte hain.
+
+Yahin se thread safety ka concept shuru hota hai.
+
+Case 1 — Stateful Bean ❌
+@Service
+public class OrderService {
+
+    private Order currentOrder;
+
+    public void process(Order order) {
+        currentOrder = order;
+
+        // processing
+
+        save(currentOrder);
+    }
+}
+
+Ab dekho.
+
+Thread-1
+currentOrder = Order A
+
+Usi time
+
+Thread-2
+currentOrder = Order B
+
+Ab Thread-1 jab save karega
+
+save(currentOrder)
+
+to
+
+Order B save hoga !!
+
+Order A gayab.
+
+Race Condition.
+
+Visualization
+
+Thread-1
+
+currentOrder = A
+
+               ↓
+
+Thread-2
+
+currentOrder = B
+
+               ↓
+
+Thread-1 save()
+
+B save ho gaya
+
+Problem kyun hui?
+
+Kyunki
+
+private Order currentOrder;
+
+Ye shared variable hai.
+
+Sab threads isi ko use kar rahe hain.
+
+Stateful ka matlab kya?
+
+Simple definition.
+
+Bean ke andar data store karna.
+
+Example
+
+private Order order;
+private User user;
+private int counter;
+private String username;
+
+Ye sab instance variables hain.
+
+Inko object ke saath memory milti hai.
+
+Aur singleton me object sirf ek hai.
+
+To variable bhi ek hi hai.
+
+Stateless Bean ✅
+
+Ab ye dekho.
+
+@Service
+public class OrderService {
+
+    public Order process(Order order) {
+
+        Order processed = applyDiscount(order);
+
+        return processed;
+    }
+}
+
+Notice
+
+private Order currentOrder;
+
+Nahi hai.
+
+Koi instance variable hi nahi.
+
+Sab local variables.
+
+Har thread ke paas
+
+Order processed
+
+alag hoga.
+
+Example
+
+Thread-1
+processed = Order A
+Thread-2
+processed = Order B
+
+Kabhi clash nahi.
+
+Visualization
+
+Thread-1 Stack
+
+process()
+
+processed = A
+
+Aur
+
+Thread-2 Stack
+
+process()
+
+processed = B
+
+Ye alag stacks hain.
+
+Kabhi mix nahi honge.
+
+Local Variable thread-safe kaise?
+
+Har thread ka apna stack hota hai.
+
+CPU
+
+      Thread-1
+
+      Stack
+      ----------
+      processed=A
+      total=100
+      discount=20
+
+
+      Thread-2
+
+      Stack
+      ----------
+      processed=B
+      total=500
+      discount=80
+
+Thread-1
+
+Thread-2
+
+Ek dusre ka stack dekh hi nahi sakte.
+
+Isi liye
+
+Local variables
+
+↓
+
+Automatically Thread Safe.
+
+Instance Variable kaha rehta hai?
+private Order currentOrder;
+
+Ye stack me nahi.
+
+Ye object ke andar.
+
+Object heap me.
+
+Heap
+
+OrderService
+
+currentOrder
+
+Aur
+
+1000 threads
+
+isi object ko dekh rahe hain.
+
+Problem.
+
+Isliye Spring bolta hai
+
+Beans ko
+
+Stateless rakho.
+
+Matlab
+
+✔ No instance variables
+
+✔ No mutable state
+
+✔ Sirf methods
+
+✔ Local variables
+
+ThreadLocal kya hota hai?
+
+Ab maan lo tumhe instance variable jaisa feel chahiye.
+
+Lekin har thread ke liye alag value.
+
+Tab
+
+ThreadLocal<User>
+
+use karte hain.
+
+Example
+
+private ThreadLocal<String> currentUser =
+        new ThreadLocal<>();
+
+Thread-1
+
+currentUser.set("Prashant");
+
+Thread-2
+
+currentUser.set("Rahul");
+
+Dono same variable use kar rahe hain.
+
+Lekin internally
+
+Thread-1
+
+currentUser
+
+↓
+
+Prashant
+
+Aur
+
+Thread-2
+
+currentUser
+
+↓
+
+Rahul
+
+Spring/JVM internally mapping maintain karta hai:
+
+Thread-1  →  "Prashant"
+
+Thread-2  →  "Rahul"
+
+Thread-3  →  "Amit"
+
+Isliye naam same hai
+
+currentUser
+
+Lekin value alag.
+
+Spring me kaha use hota hai?
+
+Spring khud bahut jagah ThreadLocal use karta hai.
+
+Example:
+
+SecurityContextHolder → current logged-in user
+Transaction management (@Transactional) → current transaction
+Logging correlation IDs (MDC) → current request logging context
+Request context (RequestContextHolder) → current HTTP request
+
+Har request apna data dekhti hai, doosri request ka nahi.
+
+Interview me agar pooche:
+
+What is a stateless bean?
+
+Tum confidently bolna:
+
+A stateless bean does not store request-specific or mutable data in instance variables. 
+It only works on method parameters and local variables. Since Spring singleton beans are shared across multiple threads, 
+keeping them stateless makes them naturally thread-safe because
+ local variables are stored in each thread's own stack, while instance variables are shared through the singleton object in the heap.
+// SOLUTION 4: ThreadLocal (per-thread state)
+@Service
+public class RequestScopedService {
+    private ThreadLocal<String> currentUser = new ThreadLocal<>();
+
+    public void setUser(String user) { currentUser.set(user); }
+    public String getUser() { return currentUser.get(); }
+    public void clear() { currentUser.remove(); } // Memory leak avoid!
+}
+
+INTERVIEW TIP: "6 yrs exp se expect hai: Singleton beans stateless hone chahiye. Agar state chahiye — prototype scope, request scope, ya ThreadLocal use karo."
+
+------------------------------------------------------------------------
+Q8. Prototype Bean ka lifecycle kaise manage hota hai?
+------------------------------------------------------------------------
+
+IMPORTANT GOTCHA: Spring prototype bean ka @PreDestroy CALL NAHI KARTA!
+Spring sirf creation manage karta hai, destruction nahi.
+
+@Component
+@Scope("prototype")
+public class ReportGenerator {
+    private File tempFile;
+
+    @PostConstruct
+    public void init() {
+        tempFile = createTempFile(); // Creation — Spring karta hai
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        // ⚠️ WARNING: Yeh method prototype scope mein CALL NAHI HOGA!
+        // Tumhe manually cleanup karna hoga
+        tempFile.delete();
+    }
+}
+
+// MANUAL CLEANUP: BeanPostProcessor ya DisposableBean implement karo
+// Ya simply manually destroy karo:
+@Service
+public class ReportService {
+    @Autowired
+    private ApplicationContext context;
+
+    public void generateReport() {
+        ReportGenerator generator =
+            context.getBean(ReportGenerator.class); // Naya instance har baar
+        try {
+            generator.generate();
+        } finally {
+            // Manual cleanup
+            ((DisposableBean) generator).destroy();
+        }
+    }
+}
+
+------------------------------------------------------------------------
+Q9. Lazy Initialization kya hota hai?
+------------------------------------------------------------------------
+
+// DEFAULT: Spring sari beans startup pe create karta hai (eager)
+// LAZY: Bean tabhi create ho jab pehli baar use ho
+
+// METHOD 1: @Lazy on bean
+@Component
+@Lazy // Pehli baar inject hone ya getBean() call hone pe create hoga
+public class HeavyReportingService {
+    public HeavyReportingService() {
+        // Expensive initialization — DB load, ML model load etc.
+        System.out.println("HeavyReportingService created!");
+    }
+}
+
+// METHOD 2: @Lazy on injection point
+@Service
+public class DashboardService {
+    @Autowired
+    @Lazy // Sirf yahan inject hone pe create hoga
+    private HeavyReportingService reportingService;
+}
+
+// METHOD 3: Global lazy init (Spring Boot 2.2+)
+// application.properties:
+// spring.main.lazy-initialization=true
+// Saari beans lazy ho jaayengi — startup time fast but first request slow
+
+WHEN TO USE:
+- Optional features jo rarely use hoti hain
+- Heavy beans (ML models, large caches)
+- Faster application startup chahiye
+
+WHEN TO AVOID:
+- Critical beans jo startup pe hi validate hone chahiye
+- Circular dependencies — lazy se temporarily solve hota hai but wrong approach
+
+------------------------------------------------------------------------
+Q10. Bean Initialization Hooks (@PostConstruct etc.)
+------------------------------------------------------------------------
+
+// Already covered in Q3 — additional points:
+
+// @PostConstruct ORDER when inheritance:
+// Parent @PostConstruct pehle, then Child @PostConstruct
+
+// MULTIPLE @PostConstruct — ONLY ONE allowed per class (JSR-250)
+
+// BeanFactoryPostProcessor — bean definitions modify karo (bean create hone se pehle)
+@Component
+public class CustomBeanFactoryPostProcessor implements BeanFactoryPostProcessor {
+    @Override
+    public void postProcessBeanFactory(ConfigurableListableBeanFactory factory) {
+        // Bean definitions modify karo — rare but powerful
+        BeanDefinition def = factory.getBeanDefinition("userService");
+        def.setScope("prototype"); // Programmatically scope change karo
+    }
+}
+
+// BeanPostProcessor — har bean ke creation pe hook
+@Component
+public class LoggingBeanPostProcessor implements BeanPostProcessor {
+    @Override
+    public Object postProcessAfterInitialization(Object bean, String beanName) {
+        System.out.println("Bean created: " + beanName);
+        return bean; // Return bean as-is (ya wrapped proxy)
+    }
+}
+
+================================================================================
+SECTION 3: SPRING BOOT CORE
+================================================================================
+
+------------------------------------------------------------------------
+Q11. Spring Boot kya problem solve karta hai?
+------------------------------------------------------------------------
+
+PROBLEMS BEFORE SPRING BOOT:
+1. Boilerplate XML configuration bahut zyada
+2. Dependency version conflicts (Maven hell)
+3. Server deployment alag — WAR file bana ke Tomcat mein deploy karo
+4. Testing setup complex
+
+SPRING BOOT SOLUTIONS:
+1. Auto-configuration — sensible defaults, zero XML
+2. Starter dependencies — spring-boot-starter-web ek mein sab aa jaata hai
+3. Embedded server — JAR run karo, Tomcat andar hai
+4. Production-ready — Actuator, Health checks, Metrics built-in
+
+// BEFORE Spring Boot (Spring MVC):
+// web.xml mein DispatcherServlet configure karo
+// applicationContext.xml mein DataSource, TransactionManager configure karo
+// pom.xml mein exact versions manually manage karo
+// WAR banao, Tomcat mein deploy karo
+
+// WITH Spring Boot:
+@SpringBootApplication
+public class App {
+    public static void main(String[] args) {
+        SpringApplication.run(App.class, args); // DONE! Sab configure ho gaya
+    }
+}
+// application.properties mein DB URL daalo — DataSource auto-configure ho jaata hai
+
+------------------------------------------------------------------------
+Q12. Auto-configuration kaise kaam karta hai internally?
+------------------------------------------------------------------------
+
+MECHANISM (Step by step):
+
+1. @SpringBootApplication → @EnableAutoConfiguration include karta hai
+2. @EnableAutoConfiguration → AutoConfigurationImportSelector trigger hota hai
+3. AutoConfigurationImportSelector → classpath mein
+   META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports file padhta hai
+   (Spring Boot 2.7 se pehle: spring.factories)
+4. Us file mein ~140+ AutoConfiguration classes listed hain
+5. Har class @ConditionalOn... annotations se guarded hai
+6. Conditions check hoti hain — class available? bean absent? property set?
+7. Jo conditions pass karein, woh configurations apply hoti hain
+
+// EXAMPLE: DataSourceAutoConfiguration
+// Agar classpath mein H2/MySQL driver hai AND DataSource bean absent hai
+// TABHI Spring auto DataSource create karta hai
+
+// @Conditional annotations:
+@ConditionalOnClass(DataSource.class)      // Sirf tabhi agar class classpath mein ho
+@ConditionalOnMissingBean(DataSource.class) // Sirf tabhi agar tumne DataSource nahi banaya
+@ConditionalOnProperty("spring.datasource.url") // Sirf tabhi agar property set ho
+
+// APNI AUTO-CONFIGURATION LIKHNA:
+@Configuration
+@ConditionalOnClass(KafkaTemplate.class) // Kafka available ho tabhi
+@ConditionalOnMissingBean(KafkaProducer.class) // Already nahi banaya ho
+public class MyKafkaAutoConfiguration {
+    @Bean
+    public KafkaProducer<String, String> kafkaProducer() {
+        return new KafkaProducer<>(defaultConfig());
+    }
+}
+// META-INF/spring/...AutoConfiguration.imports mein add karo
+
+INTERVIEW TIP: "Auto-configuration ko debug karne ke liye --debug flag lagao ya
+ConditionEvaluationReport dekho. Actuator ka /actuator/conditions endpoint bhi helpful hai."
+
+==================================================================================================================================
+IMPLEMENTATION
+SPRING BOOT MASTER NOTES
+
+PART 1 - ApplicationContext (Spring ka Brain)
+
+Definition
+
+ApplicationContext is the Spring IoC Container.
+
+Simple words: ApplicationContext ek manager hai jo application ke saare
+beans ko create, manage, connect aur destroy karta hai.
+
+Movie Analogy
+
+Actors: - UserService - OrderService - PaymentService - Repository -
+Controller
+
+Manager: ApplicationContext
+
+Actors ek dusre ko directly nahi dhoondte. Manager bolta hai: - Ye lo
+UserRepository - Ye lo PaymentService - Ye lo DataSource
+
+Ye manager hi ApplicationContext hai.
+
+Startup Flow
+
+main() | v SpringApplication.run() | v ApplicationContext Create | +–>
+Component Scan +–> Auto Configuration +–> Bean Creation +–> Dependency
+Injection +–> Bean Lifecycle +–> AOP Proxy Creation | v Application
+Ready
+
+ApplicationContext Responsibilities
+
+1.  Create Beans
+2.  Inject Dependencies
+3.  Manage Bean Lifecycle
+4.  Create AOP Proxies
+5.  Register Auto-configured Beans
+6.  Return Beans using context.getBean()
+
+BeanFactory vs ApplicationContext
+
+BeanFactory: - Only creates and returns beans. - Lightweight. - Mostly
+lazy initialization.
+
+ApplicationContext: - BeanFactory + - Dependency Injection - AOP -
+Events - Profiles - Environment - Internationalization - Auto
+Configuration
+
+Interview Answer
+
+ApplicationContext is Spring’s central IoC container. During
+SpringApplication.run(), Spring creates the ApplicationContext, scans
+components, performs auto-configuration, creates beans, injects
+dependencies, manages the bean lifecycle, creates AOP proxies when
+required and stores all managed beans.
+
+==================================================================
+
+PART 2 - @SpringBootApplication
+
+@SpringBootApplication is a shortcut for:
+
+@SpringBootConfiguration @EnableAutoConfiguration @ComponentScan
+
+Meaning
+
+@SpringBootConfiguration - Marks the main configuration class. -
+Basically @Configuration.
+
+@ComponentScan - Scans current package and sub-packages. - Finds:
+@Component @Service @Repository @Controller
+
+@EnableAutoConfiguration - Looks at project dependencies and
+properties. - Automatically creates missing infrastructure beans.
+
+Example
+
+Dependency: mysql-connector-j
+
+Property: spring.datasource.url=…
+
+Spring automatically creates: - DataSource - JdbcTemplate -
+TransactionManager
+
+Internal Flow
+
+SpringApplication.run() | v Create ApplicationContext | v Read
+@SpringBootApplication | +–> @SpringBootConfiguration | +–>
+@ComponentScan | +–> @EnableAutoConfiguration | v
+AutoConfigurationImportSelector | v Read AutoConfiguration.imports | v
+Check @Conditional annotations | v Create required beans | v Application
+Ready
+
+Interview Answer
+
+@SpringBootApplication combines @SpringBootConfiguration, @ComponentScan
+and @EnableAutoConfiguration. During startup Spring scans components,
+loads configuration and automatically creates infrastructure beans such
+as DataSource, DispatcherServlet and ObjectMapper based on classpath
+dependencies and configuration properties.
+
+==================================================================
+
+PART 3 - AOP (Aspect Oriented Programming)
+
+Problem
+
+Every service contains:
+
+Logging Security Transaction
+
+These are repeated in every method.
+
+Business Logic
+
+-   Transfer Money
+-   Create User
+-   Delete Order
+
+Cross Cutting Concerns
+
+-   Logging
+-   Security
+-   Transactions
+-   Caching
+-   Auditing
+-   Performance Monitoring
+
+Spring’s Solution
+
+Developer writes only business logic. Spring handles cross-cutting
+concerns automatically.
+
+How?
+
+Using PROXY.
+
+Flow
+
+Client | v Proxy | +–> Logging +–> Security +–> Transaction Begin | v
+Real Method | +–> Commit | v Return
+
+If exception: Rollback
+
+Example
+
+@Transactional public void transferMoney() { // Business logic only }
+
+Spring Proxy internally performs:
+
+Begin Transaction | Real Method | Commit / Rollback
+
+Main Terms
+
+Aspect - Logging - Security - Transaction
+
+Join Point - Method execution
+
+Advice - Before - After - Around - AfterThrowing
+
+Pointcut - Which methods should receive advice
+
+Proxy - Object created by Spring which intercepts method calls.
+
+Interview Answer
+
+Aspect Oriented Programming separates cross-cutting concerns such as
+logging, transactions, security and caching from business logic. Spring
+creates a proxy around the target bean. Whenever a method is invoked,
+the proxy executes additional behavior before and/or after delegating
+the call to the real business method.
+
+==================================================================
+
+MEMORY TRICK
+
+ApplicationContext = Office Manager
+
+Beans = Employees
+
+Dependency Injection = Manager assigning employees
+
+Auto Configuration = HR automatically arranging infrastructure
+
+AOP = Security Guard standing before every employee
+
+Bean Lifecycle = Joining -> Working -> Retirement
+
+==================================================================================================================================
+
+------------------------------------------------------------------------
+Q13. @SpringBootApplication mein kya hota hai internally?
+------------------------------------------------------------------------
+
+// @SpringBootApplication = 3 annotations ka shortcut
+@SpringBootApplication
+// ↑ Yeh teen annotations ka combination hai:
+
+@SpringBootConfiguration // @Configuration ka alias — Spring Boot config class
+@EnableAutoConfiguration // Auto-configuration trigger karo
+@ComponentScan            // Current package aur sub-packages mein components dhundo
+
+// EQUIVALENT (explicitly likhna ho toh):
+@SpringBootConfiguration
+@EnableAutoConfiguration
+@ComponentScan(basePackages = "com.myapp")
+public class App {
+    public static void main(String[] args) {
+        SpringApplication.run(App.class, args);
+    }
+}
+
+// CUSTOMIZATION:
+@SpringBootApplication(
+    exclude = {DataSourceAutoConfiguration.class}, // Specific auto-config exclude karo
+    scanBasePackages = {"com.myapp.api", "com.myapp.service"} // Specific packages scan
+)
+
+------------------------------------------------------------------------
+Q14. Embedded Server kaise run hota hai (Tomcat)?
+------------------------------------------------------------------------
+
+// spring-boot-starter-web mein embedded Tomcat included hai
+// JAR format — Tomcat classes bhi JAR ke andar hain
+
+// STARTUP PROCESS:
+// 1. SpringApplication.run() call hota hai
+// 2. EmbeddedWebApplicationContext create hota hai
+// 3. TomcatServletWebServerFactory bean auto-configure hoti hai
+// 4. Tomcat.start() call hota hai — Tomcat programmatically start
+// 5. DispatcherServlet register hota hai
+// 6. Port 8080 listen karna start
+
+// SERVER CHANGE KARNA:
+// pom.xml mein Tomcat exclude karo, Jetty add karo:
+// <exclusions><exclusion>spring-boot-starter-tomcat</exclusion></exclusions>
+// <dependency>spring-boot-starter-jetty</dependency>
+
+// SERVER CONFIG:
+// application.properties:
+// server.port=9090
+// server.tomcat.threads.max=200
+// server.tomcat.accept-count=100
+// server.tomcat.connection-timeout=20000
+
+------------------------------------------------------------------------
+Q15. application.properties vs application.yml
+------------------------------------------------------------------------
+
+// application.properties (flat key-value):
+server.port=8080
+spring.datasource.url=jdbc:mysql://localhost:3306/mydb
+spring.datasource.username=root
+spring.datasource.password=secret
+spring.jpa.hibernate.ddl-auto=update
+logging.level.com.myapp=DEBUG
+
+// application.yml (hierarchical — readable for complex configs):
+server:
+  port: 8080
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/mydb
+    username: root
+    password: secret
+  jpa:
+    hibernate:
+      ddl-auto: update
+logging:
+  level:
+    com.myapp: DEBUG
+
+// PREFER YML WHEN:
+// - Nested configuration complex ho (e.g., list of objects)
+// - Multiple environments same file mein (--- separator)
+
+# Multiple profiles in single YML:
+# spring:
+#   profiles:
+#     active: dev
+# ---
+# spring:
+#   config:
+#     activate:
+#       on-profile: dev
+# server:
+#   port: 8080
+# ---
+# spring:
+#   config:
+#     activate:
+#       on-profile: prod
+# server:
+#   port: 80
+
+================================================================================
+SECTION 4: ANNOTATIONS (IMPORTANT)
+================================================================================
+
+------------------------------------------------------------------------
+Q16. @Component vs @Service vs @Repository?
+------------------------------------------------------------------------
+
+// Teeno @Component ke specialized versions hain — component scan ke liye
+
+@Component   // Generic Spring-managed bean
+@Service     // Business logic layer — semantic marker
+@Repository  // Data access layer — ADDITIONAL: DataAccessException translation
+@Controller  // MVC layer — request handling
+
+// FUNCTIONAL DIFFERENCE: @Repository mein ek EXTRA feature hai:
+// PersistenceExceptionTranslationPostProcessor
+// Database-specific exceptions (SQLException etc.) ko
+// Spring's DataAccessException hierarchy mein translate karta hai
+
+@Repository
+public class UserRepositoryImpl implements UserRepository {
+    // JPA exceptions automatically DataAccessException mein convert ho jaati hain
+    // @Service mein yeh nahi hoga
+    public User findById(Long id) {
+        return entityManager.find(User.class, id); // JPA exception → DataAccessException
+    }
+}
+
+INTERVIEW TIP: "@Service aur @Component functionally same hain, but @Service:
+1. Code readability better — samajh aata hai yeh business layer hai
+2. Future mein AOP aspects specifically service layer pe apply kar sakte ho
+3. Team communication clearer hoti hai"
+
+------------------------------------------------------------------------
+Q17. @Autowired vs @Inject vs @Resource?
+------------------------------------------------------------------------
+
+| Feature          | @Autowired (Spring) | @Inject (JSR-330) | @Resource (JSR-250) |
+|------------------|---------------------|-------------------|---------------------|
+| Source           | Spring              | Java Standard     | Java Standard       |
+| By type default  | Yes                 | Yes               | No (by name)        |
+| required attr    | @Autowired(required=false) | No       | No                  |
+| @Qualifier needed| Yes (ambiguity pe)  | Yes               | name attribute      |
+| Recommended      | In Spring apps      | Framework-agnostic| Legacy              |
+
+// @Autowired — by TYPE inject karta hai
+@Autowired
+private PaymentGateway gateway; // Type = PaymentGateway
+
+// @Resource — by NAME inject karta hai
+@Resource(name = "stripeGateway") // Bean name se dhundta hai pehle
+private PaymentGateway gateway;
+
+// @Inject — @Autowired jaisa, but required attribute nahi
+@Inject
+private PaymentGateway gateway;
+
+INTERVIEW TIP: "Production mein @Autowired use karo constructor injection ke saath.
+@Inject portability ke liye (Spring ke bahar bhi kaam kare).
+@Resource legacy code mein milta hai."
+
+------------------------------------------------------------------------
+Q18. @Qualifier ka use?
+------------------------------------------------------------------------
+
+// PROBLEM: Multiple implementations of same interface
+@Component("stripeGateway")
+public class StripeGateway implements PaymentGateway { }
+
+@Component("paypalGateway")
+public class PaypalGateway implements PaymentGateway { }
+
+// SOLUTION: @Qualifier se specify karo kaunsa chahiye
+@Service
+public class CheckoutService {
+    @Autowired
+    @Qualifier("stripeGateway") // Explicitly Stripe use karo
+    private PaymentGateway gateway;
+}
+
+// Custom @Qualifier annotation bana sakte ho:
+@Target({ElementType.FIELD, ElementType.PARAMETER})
+@Retention(RetentionPolicy.RUNTIME)
+@Qualifier
+public @interface Stripe { }
+
+@Component
+@Stripe
+public class StripeGateway implements PaymentGateway { }
+
+@Service
+public class CheckoutService {
+    @Autowired
+    @Stripe // Clean! String typos nahi
+    private PaymentGateway gateway;
+}
+
+------------------------------------------------------------------------
+Q19. @Primary kya karta hai?
+------------------------------------------------------------------------
+
+// PROBLEM: Multiple beans, default kaunsa ho?
+// @Primary wala bean default choice banta hai
+
+@Component
+@Primary // Jab @Qualifier specify na karo toh yeh use hoga
+public class StripeGateway implements PaymentGateway { }
+
+@Component
+public class PaypalGateway implements PaymentGateway { }
+
+@Service
+public class CheckoutService {
+    @Autowired
+    private PaymentGateway gateway; // Automatically StripeGateway inject hoga
+
+    @Autowired
+    @Qualifier("paypalGateway") // Explicitly override karo — PayPal milega
+    private PaymentGateway alternateGateway;
+}
+
+INTERVIEW TIP: "@Primary vs @Qualifier — @Primary global default set karta hai, 
+@Qualifier specific injection point pe override karta hai. Dono saath use ho sakte hain."
+
+------------------------------------------------------------------------
+Q20. @Value annotation ka use?
+------------------------------------------------------------------------
+
+// application.properties:
+// app.name=MyApp
+// app.timeout=5000
+// app.features=search,export,analytics
+
+@Component
+public class AppConfig {
+
+    // Simple property inject
+    @Value("${app.name}")
+    private String appName;
+
+    // Default value (property missing ho toh)
+    @Value("${app.timeout:3000}") // default = 3000 if not set
+    private int timeout;
+
+    // SpEL (Spring Expression Language)
+    @Value("#{systemProperties['os.name']}")
+    private String osName;
+
+    // List inject
+    @Value("${app.features}")
+    private List<String> features; // ["search", "export", "analytics"]
+
+    // Environment variable
+    @Value("${DATABASE_URL}") // OS environment variable
+    private String dbUrl;
+}
+
+// @ConfigurationProperties (BETTER for complex configs):
+@ConfigurationProperties(prefix = "app")
+@Component
+public class AppProperties {
+    private String name;
+    private int timeout;
+    private List<String> features;
+    // Getters/Setters — Spring auto-binds
+
+    // VALIDATION bhi possible:
+    @NotNull @Min(1000)
+    private int timeout;
+}
+
+INTERVIEW TIP: "@Value simple ke liye theek hai. Complex/nested config ke liye
+ @ConfigurationProperties better — type-safe, IDE support, validation support."
+
+================================================================================
+SECTION 5: SPRING MVC & REST
+================================================================================
+
+------------------------------------------------------------------------
+Q21. @RestController vs @Controller?
+------------------------------------------------------------------------
+
+// @Controller — traditional MVC, View return karta hai
+@Controller
+public class WebController {
+    @GetMapping("/home")
+    public String home(Model model) {
+        model.addAttribute("user", "Prashant");
+        return "home"; // "home.html" template ka naam — ViewResolver use karta hai
+    }
+}
+
+// @RestController — REST API, Object return karta hai (JSON/XML)
+@RestController // = @Controller + @ResponseBody
+public class ApiController {
+    @GetMapping("/api/users/{id}")
+    public User getUser(@PathVariable Long id) {
+        return userService.findById(id); // Automatically JSON mein convert ho jaata hai
+    }
+    // @ResponseBody automatically har method pe apply hota hai
+}
+
+// Mixed use karna ho toh @ResponseBody method pe:
+@Controller
+public class MixedController {
+    @GetMapping("/page") // HTML view
+    public String page() { return "page"; }
+
+    @GetMapping("/api/data")
+    @ResponseBody // Yeh method JSON return karta hai
+    public Data getData() { return new Data(); }
+}
+
+------------------------------------------------------------------------
+Q22. @RequestMapping vs @GetMapping etc.?
+------------------------------------------------------------------------
+
+// @RequestMapping — generic, all HTTP methods handle kar sakta hai
+@RequestMapping(value = "/users", method = RequestMethod.GET)
+public List<User> getUsers() { ... }
+
+// SHORTCUT ANNOTATIONS (Spring 4.3+) — PREFERRED:
+@GetMapping("/users")           // GET
+@PostMapping("/users")          // POST
+@PutMapping("/users/{id}")      // PUT
+@DeleteMapping("/users/{id}")   // DELETE
+@PatchMapping("/users/{id}")    // PATCH
+
+// CLASS LEVEL + METHOD LEVEL combination:
+@RestController
+@RequestMapping("/api/v1/users") // Base path
+public class UserController {
+
+    @GetMapping           // GET /api/v1/users
+    public List<User> getAll() { ... }
+
+    @GetMapping("/{id}")  // GET /api/v1/users/{id}
+    public User getById(@PathVariable Long id) { ... }
+
+    @PostMapping          // POST /api/v1/users
+    public User create(@RequestBody @Valid User user) { ... }
+
+    @PutMapping("/{id}")  // PUT /api/v1/users/{id}
+    public User update(@PathVariable Long id, @RequestBody User user) { ... }
+
+    @DeleteMapping("/{id}") // DELETE /api/v1/users/{id}
+    public void delete(@PathVariable Long id) { ... }
+}
+
+------------------------------------------------------------------------
+Q23. @PathVariable vs @RequestParam?
+------------------------------------------------------------------------
+
+// @PathVariable — URL path ka part
+// GET /users/123
+@GetMapping("/users/{id}")
+public User getUser(@PathVariable Long id) { ... } // id = 123
+
+// Multiple path variables:
+// GET /users/123/orders/456
+@GetMapping("/users/{userId}/orders/{orderId}")
+public Order getOrder(@PathVariable Long userId, @PathVariable Long orderId) { ... }
+
+// @RequestParam — URL query string
+// GET /users?page=2&size=10&sort=name
+@GetMapping("/users")
+public Page<User> getUsers(
+    @RequestParam(defaultValue = "0") int page,    // default = 0 if missing
+    @RequestParam(defaultValue = "10") int size,
+    @RequestParam(required = false) String sort    // Optional
+) { ... }
+
+// @RequestBody — POST/PUT body (JSON)
+@PostMapping("/users")
+public User createUser(@RequestBody @Valid CreateUserRequest request) { ... }
+
+// @RequestHeader — HTTP header
+@GetMapping("/secure")
+public Data getSecure(@RequestHeader("Authorization") String token) { ... }
+
+// @CookieValue — Cookie
+@GetMapping("/profile")
+public Profile getProfile(@CookieValue("sessionId") String sessionId) { ... }
+
+------------------------------------------------------------------------
+Q24. Exception Handling using @ControllerAdvice?
+------------------------------------------------------------------------
+
+// GLOBAL EXCEPTION HANDLER — ek jagah se saari controllers ki exceptions handle karo
+@RestControllerAdvice // = @ControllerAdvice + @ResponseBody
+public class GlobalExceptionHandler {
+
+Internally kya hota hai?
+
+Request aayi.
+
+Client
+
+↓
+
+DispatcherServlet
+
+Fir
+
+Controller
+
+Fir
+
+Service
+
+Fir
+
+Exception Throw
+
+Example
+
+throw new UserNotFoundException();
+
+Ab normally application crash honi chahiye.
+
+Lekin nahi.
+
+DispatcherServlet exception ko pakad leta hai.
+
+Actual Flow
+Client
+
+↓
+
+DispatcherServlet
+
+↓
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Exception
+
+↓
+
+DispatcherServlet
+
+↓
+
+@RestControllerAdvice
+
+↓
+
+JSON Response
+
+DispatcherServlet exception ko ExceptionResolvers ke through resolve karta hai. Agar kisi @RestControllerAdvice me matching @ExceptionHandler mil jaye, to wahi method call hota hai.
+
+Tumhara code
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(UserNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleUserNotFound(
+            UserNotFoundException ex) {
+
+        return new ErrorResponse(
+                "USER_NOT_FOUND",
+                ex.getMessage(),
+                LocalDateTime.now()
+        );
+    }
+
+}
+
+Spring internally bolta hai
+
+Kya UserNotFoundException hua?
+
+↓
+
+YES
+
+↓
+
+handleUserNotFound() call karo.
+
+
+@RestControllerAdvice = ?
+
+Ye actually shortcut hai.
+
+@RestControllerAdvice
+
+=
+
+@ControllerAdvice
+@ResponseBody
+
+Exactly waise hi
+
+Jaise
+
+@RestController
+
+=
+
+@Controller
+@ResponseBody
+@ExceptionHandler
+
+Ye bolta hai
+
+@ExceptionHandler(UserNotFoundException.class)
+
+Meaning
+
+Agar ye exception aaye, to ye method call karo.
+
+@ResponseStatus
+@ResponseStatus(HttpStatus.NOT_FOUND)
+
+Meaning
+
+HTTP Response
+
+404
+
+bhejo.
+
+Agar nahi lagate
+
+to default
+
+500
+
+aa sakta tha.
+
+
+    // Specific exception handle karo
+    @ExceptionHandler(UserNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND) // 404
+    public ErrorResponse handleUserNotFound(UserNotFoundException ex) {
+        return new ErrorResponse(
+            "USER_NOT_FOUND",
+            ex.getMessage(),
+            LocalDateTime.now()
+        );
+    }
+
+    // Validation errors (Bean Validation)
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST) // 400
+    public ErrorResponse handleValidation(MethodArgumentNotValidException ex) {
+        List<String> errors = ex.getBindingResult()
+            .getFieldErrors()
+            .stream()
+            .map(FieldError::getDefaultMessage)
+            .collect(Collectors.toList());
+
+        return new ErrorResponse("VALIDATION_FAILED", errors.toString(), LocalDateTime.now());
+    }
+
+    // Generic fallback
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR) // 500
+    public ErrorResponse handleGeneric(Exception ex) {
+        log.error("Unexpected error", ex);
+        return new ErrorResponse("INTERNAL_ERROR", "Something went wrong", LocalDateTime.now());
+    }
+}
+
+// Error response DTO
+@Data
+@AllArgsConstructor
+public class ErrorResponse {
+    private String code;
+    private String message;
+    private LocalDateTime timestamp;
+}
+
+// Custom exception:
+public class UserNotFoundException extends RuntimeException {
+    public UserNotFoundException(Long id) {
+        super("User not found with id: " + id);
+    }
+}
+
+------------------------------------------------------------------------
+Q25. ResponseEntity ka use?
+------------------------------------------------------------------------
+
+// ResponseEntity = Response body + HTTP Status + Headers control karo
+
+@RestController
+public class UserController {
+
+    // Simple return — status 200 by default
+    @GetMapping("/{id}")
+    public ResponseEntity<User> getUser(@PathVariable Long id) {
+        User user = userService.findById(id);
+
+        if (user == null) {
+            return ResponseEntity.notFound().build(); // 404, no body
+        }
+
+        return ResponseEntity.ok(user); // 200 + user as JSON
+    }
+
+    // POST — 201 Created with Location header
+    @PostMapping
+    public ResponseEntity<User> createUser(@RequestBody User user) {
+        User created = userService.save(user);
+
+        URI location = ServletUriComponentsBuilder
+            .fromCurrentRequest()
+            .path("/{id}")
+            .buildAndExpand(created.getId())
+            .toUri();
+
+        return ResponseEntity
+            .created(location) // 201 + Location: /users/123
+            .body(created);
+    }
+
+    // Custom status + headers
+    @GetMapping("/download")
+    public ResponseEntity<byte[]> download() {
+        byte[] data = fileService.getFile();
+
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .header("Content-Disposition", "attachment; filename=report.pdf")
+            .body(data);
+    }
+}
+
+================================================================================
+SECTION 6: SPRING DATA JPA
+================================================================================
+
+------------------------------------------------------------------------
+Q26. JPA vs Hibernate difference?
+------------------------------------------------------------------------
+
+JPA = Specification (interface/contract) — javax.persistence.*
+Hibernate = JPA ka ek Implementation
+
+ANALOGY: JPA = JDBC interface, Hibernate = MySQL Driver
+
+// JPA interface (specification):
+@Entity
+@Table(name = "users")
+public class User {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String name;
+}
+
+// Spring Data JPA = JPA ke upar aur abstraction + Repository pattern
+// Hibernate internally use hota hai by default
+
+// DEPENDENCY CHAIN:
+// Your code → Spring Data JPA → JPA API → Hibernate → JDBC → DB
+
+------------------------------------------------------------------------
+Q27. CrudRepository vs JpaRepository?
+------------------------------------------------------------------------
+
+// CrudRepository — basic CRUD operations
+public interface UserRepository extends CrudRepository<User, Long> {
+    // save(), findById(), findAll(), delete(), count(), existsById()
+}
+
+// JpaRepository — CrudRepository + PagingAndSortingRepository + JPA-specific methods
+public interface UserRepository extends JpaRepository<User, Long> {
+    // EXTRA: flush(), saveAndFlush(), deleteInBatch(), findAll(Pageable), findAll(Sort)
+
+    // CUSTOM QUERIES — method name se automatically:
+    List<User> findByNameAndEmail(String name, String email);
+    List<User> findByAgeGreaterThan(int age);
+    Optional<User> findByEmail(String email);
+    List<User> findByNameContainingIgnoreCase(String keyword);
+
+    // Pagination:
+    Page<User> findByActive(boolean active, Pageable pageable);
+
+    // @Query — JPQL
+    @Query("SELECT u FROM User u WHERE u.createdAt > :date")
+    List<User> findRecentUsers(@Param("date") LocalDate date);
+
+    // Native SQL
+    @Query(value = "SELECT * FROM users WHERE email = ?1", nativeQuery = true)
+    User findByEmailNative(String email);
+
+    // Modifying queries
+    @Modifying
+    @Transactional
+    @Query("UPDATE User u SET u.active = false WHERE u.lastLogin < :date")
+    int deactivateOldUsers(@Param("date") LocalDate date);
+}
+
+INTERVIEW TIP: "JpaRepository use karo — superset hai CrudRepository ka.
+ Pagination built-in hai — Pageable pass karo, Page<T> return aata hai."
+
+------------------------------------------------------------------------
+Q28. Lazy vs Eager Loading?
+------------------------------------------------------------------------
+
+// EAGER — Related entities turant load ho jaati hain (join query)
+@Entity
+public class Order {
+    @ManyToOne(fetch = FetchType.EAGER) // Default for @ManyToOne, @OneToOne
+    private User user; // Order fetch karte hi User bhi load ho jaata hai
+}
+
+// LAZY — Related entities tabhi load hoti hain jab access karo
+@Entity
+public class User {
+    @OneToMany(fetch = FetchType.LAZY) // Default for @OneToMany, @ManyToMany
+    private List<Order> orders; // Jab user.getOrders() call karo TABHI load
+}
+
+// LAZY LOADING PROBLEM: LazyInitializationException
+@Service
+public class UserService {
+    @Transactional // Transaction yahan khatam ho jaati hai
+    public User getUser(Long id) {
+        return userRepository.findById(id).orElseThrow();
+    }
+}
+
+// Controller mein:
+User user = userService.getUser(1L);
+user.getOrders(); // ❌ LazyInitializationException! Transaction khatam ho gayi
+
+// SOLUTIONS:
+// 1. @Transactional controller/service mein extend karo
+// 2. @EntityGraph — specific fetch strategy
+@EntityGraph(attributePaths = {"orders", "orders.items"}) // Join fetch
+@Query("SELECT u FROM User u WHERE u.id = :id")
+Optional<User> findByIdWithOrders(@Param("id") Long id);
+
+// 3. DTO projection — sirf jo chahiye woh lo
+@Query("SELECT new com.app.dto.UserSummary(u.id, u.name, COUNT(o)) FROM User u LEFT JOIN u.orders o GROUP BY u.id, u.name")
+List<UserSummary> findUserSummaries();
+
+------------------------------------------------------------------------
+Q29. N+1 Problem kya hota hai?
+------------------------------------------------------------------------
+
+// PROBLEM: 1 query to fetch N users, then N queries to fetch each user's orders
+// 1 + N queries = N+1 problem
+
+// BAD CODE:
+List<User> users = userRepository.findAll(); // 1 query: SELECT * FROM users
+for (User user : users) {
+    List<Order> orders = user.getOrders(); // N queries: SELECT * FROM orders WHERE user_id=?
+    // 100 users = 101 queries! Performance killer!
+}
+
+// SOLUTION 1: JOIN FETCH in JPQL
+@Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.orders")
+List<User> findAllWithOrders();
+// 1 query with JOIN — sab ek saath load
+
+// SOLUTION 2: @EntityGraph
+@EntityGraph(attributePaths = "orders")
+List<User> findAll();
+
+// SOLUTION 3: Batch fetching (Hibernate)
+@OneToMany(fetch = FetchType.LAZY)
+@BatchSize(size = 30) // 30-30 orders ek saath load
+private List<Order> orders;
+
+// SOLUTION 4: DTO projection — sirf zaruri data
+@Query("SELECT new UserOrderCount(u.name, COUNT(o)) FROM User u JOIN u.orders o GROUP BY u.name")
+List<UserOrderCount> getUserOrderCounts();
+
+// DETECT N+1: Hibernate statistics enable karo:
+// spring.jpa.properties.hibernate.generate_statistics=true
+// p6spy ya Hibernate logging se queries count karo
+
+------------------------------------------------------------------------
+Q30. @Transactional kaise kaam karta hai?
+------------------------------------------------------------------------
+
+// @Transactional = AOP proxy ke through kaam karta hai
+// Method call intercept hoti hai, transaction start/commit/rollback hota hai
+
+@Service
+public class OrderService {
+
+    // DEFAULT BEHAVIOR:
+    // propagation = REQUIRED (existing transaction join, nahin to naya create)
+    // isolation = DEFAULT (DB ka default)
+    // rollbackFor = RuntimeException, Error (checked exceptions pe ROLLBACK NAHI)
+    // readOnly = false
+    @Transactional
+    public void placeOrder(Order order) {
+        orderRepository.save(order);           // 1
+        inventoryService.deduct(order.getItems()); // 2 — exception here
+        paymentService.charge(order);           // 3 — rollback hoga, 1 bhi undo
+    }
+
+    // CHECKED EXCEPTION pe rollback:
+    @Transactional(rollbackFor = Exception.class)
+    public void processPayment(Payment payment) throws PaymentException {
+        // Ab PaymentException (checked) pe bhi rollback hoga
+    }
+
+    // READ-ONLY transaction (faster — no dirty checking)
+    @Transactional(readOnly = true)
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
+
+    // REQUIRES_NEW — new transaction, existing suspend
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void auditLog(String action) {
+        // Yeh HAMESHA commit hoga, chahe outer transaction rollback ho
+        auditRepository.save(new AuditLog(action));
+    }
+}
+
+// IMPORTANT GOTCHA: Same class ke andar method call → @Transactional KAAM NAHI KARTA
+@Service
+public class UserService {
+    public void updateUser(User user) {
+        this.updateProfile(user);  // ❌ AOP proxy bypass! Transaction nahi lagega
+    }
+
+    @Transactional
+    public void updateProfile(User user) { ... }
+}
+
+// FIX: Self-injection ya alag class mein move karo
+@Service
+public class UserService {
+    @Autowired
+    private UserService self; // Self-injection (Spring proxy inject hoti hai)
+
+    public void updateUser(User user) {
+        self.updateProfile(user); // ✅ Proxy ke through — transaction lagega
+    }
+}
+
+=============================================================================================================================
+Sabse pehle ye samajho
+
+Tum likhte ho sirf
+
+@Transactional
+public void placeOrder(Order order) {
+
+}
+
+Question:
+
+Transaction start kisne ki?
+
+Commit kisne ki?
+
+Rollback kisne ki?
+
+Tumne to kahin likha hi nahi.
+
+Answer:
+
+Spring AOP Proxy
+Internally kya hota hai?
+
+Tumhare paas
+
+@Service
+public class OrderService {
+
+    @Transactional
+    public void placeOrder() {
+
+    }
+
+}
+
+Spring actual object nahi deta.
+
+Ye deta hai
+
+Client
+
+     │
+
+     ▼
+
+Transaction Proxy
+
+     │
+
+     ▼
+
+Real OrderService
+Jab method call hoti hai
+
+Suppose
+
+orderService.placeOrder();
+
+Tum soch rahe ho
+
+Client
+
+↓
+
+OrderService
+
+Reality
+
+Client
+
+↓
+
+Proxy
+
+↓
+
+OrderService
+
+Proxy beech me baitha hai.
+
+Proxy kya karta hai?
+Client
+
+↓
+
+Proxy
+
+↓
+
+BEGIN TRANSACTION
+
+↓
+
+Real Method
+
+↓
+
+COMMIT
+
+↓
+
+Return
+
+Agar exception
+
+Client
+
+↓
+
+Proxy
+
+↓
+
+BEGIN
+
+↓
+
+Real Method
+
+↓
+
+Exception
+
+↓
+
+ROLLBACK
+
+Bas.
+
+Ye hi poora @Transactional.
+
+Ab tumhara example
+@Transactional
+public void placeOrder(Order order) {
+
+    orderRepository.save(order);
+
+    inventoryService.deduct(order.getItems());
+
+    paymentService.charge(order);
+
+}
+
+Suppose
+
+orderRepository.save()
+
+success.
+
+Fir
+
+inventoryService.deduct()
+
+Exception.
+
+Ab kya hoga?
+
+Proxy bolega
+
+ROLLBACK
+
+Result
+
+save()
+
+UNDO
+
+deduct()
+
+UNDO
+
+payment()
+
+Never executed
+
+Database me kuch bhi save nahi hoga.
+
+Real Flow
+Proxy
+
+↓
+
+BEGIN TRANSACTION
+
+↓
+
+save()
+
+↓
+
+deduct()
+
+↓
+
+EXCEPTION
+
+↓
+
+ROLLBACK
+Default Behavior
+@Transactional
+
+actually internally
+
+@Transactional(
+
+propagation = REQUIRED,
+
+isolation = DEFAULT,
+
+rollbackFor = RuntimeException.class,
+
+readOnly = false
+
+)
+propagation = REQUIRED
+
+Ye sabse important hai.
+
+Example
+
+Controller
+
+↓
+
+OrderService
+
+↓
+
+PaymentService
+
+OrderService already transaction me hai.
+
+Ab PaymentService pe bhi
+
+@Transactional
+
+hai.
+
+Question
+
+New transaction banega?
+
+Nahi.
+
+Existing join karega.
+
+Transaction-1
+
+↓
+
+OrderService
+
+↓
+
+PaymentService
+
+↓
+
+InventoryService
+
+Sab same transaction.
+
+Isi ko
+
+REQUIRED
+
+bolte hain.
+
+REQUIRES_NEW
+
+Ye interview favorite hai.
+
+Suppose
+
+OrderService
+
+↓
+
+Payment
+
+↓
+
+Audit Log
+
+Audit log
+
+@Transactional(
+propagation = REQUIRES_NEW)
+
+Ab
+
+Transaction-1
+
+↓
+
+OrderService
+
+↓
+
+Suspend
+
+Spring bolta hai
+
+Naya transaction banao.
+Transaction-2
+
+↓
+
+Audit Log
+
+↓
+
+COMMIT
+
+Fir
+
+Transaction-1
+
+Resume
+
+Agar baad me
+
+Order rollback
+
+Ho gaya
+
+Audit
+
+Already commit.
+
+Isliye audit safe.
+
+Visualization
+
+TX-1
+
+↓
+
+Place Order
+
+↓
+
+Suspend
+
+      TX-2
+
+      ↓
+
+      Audit
+
+      ↓
+
+      Commit
+
+↓
+
+Resume TX-1
+
+↓
+
+Rollback
+
+Audit fir bhi DB me rahega.
+
+readOnly=true
+
+Normally Hibernate
+
+har entity pe nazar rakhta hai.
+
+Dirty Checking
+
+Har object compare karta hai.
+
+Kahin update hua?
+
+Nahi?
+
+Theek.
+
+Ye overhead hai.
+
+Agar
+
+@Transactional(readOnly=true)
+
+Spring bolta hai
+
+Ye sirf read karega.
+
+Tracking ki zarurat nahi.
+
+Performance improve.
+
+rollbackFor
+
+Default
+
+RuntimeException
+
+↓
+
+Rollback
+
+Lekin
+
+IOException
+
+ya
+
+Exception
+
+Checked exception.
+
+Rollback nahi.
+
+Agar chahiye
+
+@Transactional(
+rollbackFor = Exception.class
+)
+
+Ab checked pe bhi rollback.
+
+Ab sabse dangerous question
+Self Invocation
+
+Ye almost har senior interview me poochte hain.
+
+Tumne likha
+
+@Service
+class UserService {
+
+    public void updateUser() {
+
+        updateProfile();
+
+    }
+
+    @Transactional
+    public void updateProfile() {
+
+    }
+
+}
+
+Question
+
+Transaction lagega?
+
+Answer
+
+❌ NO.
+
+Kyun?
+
+Yaad hai
+
+Client
+
+↓
+
+Proxy
+
+↓
+
+Real Object
+
+Transaction tab lagta hai
+
+jab
+
+Client
+
+Proxy ko call kare.
+
+Lekin yahan
+
+updateUser()
+
+↓
+
+updateProfile()
+
+same object ke andar direct call hai.
+
+Proxy bypass.
+
+Visualization
+
+Client
+
+↓
+
+Proxy
+
+↓
+
+updateUser()
+
+↓
+
+this.updateProfile()
+
+↓
+
+Real Method
+
+Proxy use hi nahi hua.
+
+Isliye
+
+@Transactional
+
+Ignored
+Fix
+
+Tumne jo likha
+
+@Autowired
+private UserService self;
+
+Ye actually
+
+self
+
+real object nahi.
+
+Proxy hai.
+
+Ab
+
+self.updateProfile();
+
+Flow
+
+Client
+
+↓
+
+Proxy
+
+↓
+
+updateUser()
+
+↓
+
+Proxy
+
+↓
+
+updateProfile()
+
+↓
+
+Transaction
+
+Ab transaction lagega.
+
+Better Fix (Industry)
+
+Self injection avoid karte hain.
+
+Instead
+
+UserService
+
+↓
+
+ProfileService
+
+Banate hain.
+
+UserService
+
+↓
+
+ProfileService Proxy
+
+↓
+
+updateProfile()
+
+Ye cleaner design hai.
+
+⭐ 6+ Years Interview Answer
+
+"@Transactional works through Spring AOP proxies. 
+When a transactional method is invoked through the proxy, Spring begins a transaction before calling the target method.
+ If the method completes successfully, the proxy commits the transaction; if a configured exception occurs,
+  it rolls the transaction back. By default, only unchecked exceptions (RuntimeException and Error) trigger rollback.
+   Internal self-invocation bypasses the proxy,
+ so transactional behavior is not applied unless the call goes through another Spring-managed proxy."
+
+==============================================================================================================================
+PROPAGATION TYPES:
+| Propagation    | Existing transaction | No existing transaction |
+|----------------|----------------------|-------------------------|
+| REQUIRED       | Join karo            | Naya banao              |
+| REQUIRES_NEW   | Suspend, naya banao  | Naya banao              |
+| MANDATORY      | Join karo            | Exception throw          |
+| NEVER          | Exception throw      | No transaction          |
+| SUPPORTS       | Join karo            | No transaction          |
+| NOT_SUPPORTED  | Suspend, no txn      | No transaction          |
+| NESTED         | Savepoint banao      | Naya banao              |
+
+================================================================================
+SECTION 7: SPRING SECURITY
+================================================================================
+
+------------------------------------------------------------------------
+Q31. Authentication vs Authorization?
+------------------------------------------------------------------------
+
+AUTHENTICATION = "Tum kaun ho?" — Identity verify karo
+AUTHORIZATION  = "Tumhe kya access hai?" — Permissions check karo
+
+// Authentication pehle, Authorization baad mein
+
+// EXAMPLE:
+// Authentication: Username/password verify karo → "Haan, yeh Prashant hai"
+// Authorization: "Prashant ko /admin endpoint access hai ya nahi?"
+
+SPRING SECURITY FLOW:
+Request → SecurityFilterChain → AuthenticationManager → UserDetailsService
+         → Authentication successful → SecurityContextHolder mein store
+         → AccessDecisionManager → Authorization check
+         → Controller
+
+------------------------------------------------------------------------
+Q32. JWT kya hota hai aur kaise use hota hai?
+------------------------------------------------------------------------
+
+JWT (JSON Web Token) = Stateless authentication token
+Structure: header.payload.signature (dot separated, Base64 encoded)
+
+HEADER:  {"alg": "HS256", "typ": "JWT"}
+PAYLOAD: {"sub": "user123", "roles": ["ADMIN"], "exp": 1234567890}
+SIGNATURE: HMACSHA256(base64(header) + "." + base64(payload), secret)
+
+FLOW:
+1. User login kare (POST /auth/login)
+2. Server credentials verify kare
+3. JWT token generate karke return kare
+4. Client har request mein token bheje (Authorization: Bearer <token>)
+5. Server token verify kare — NO DB CALL (stateless!)
+6. Expiry check kare
+
+// SPRING BOOT JWT IMPLEMENTATION:
+// pom.xml: io.jsonwebtoken:jjwt-api, jjwt-impl, jjwt-jackson
+
+@Component
+public class JwtUtil {
+    @Value("${jwt.secret}")
+    private String secret; // application.properties se
+
+    @Value("${jwt.expiration:86400000}") // 24 hours default
+    private long expiration;
+
+    // Token generate karo
+    public String generateToken(UserDetails userDetails) {
+        return Jwts.builder()
+            .setSubject(userDetails.getUsername())
+            .claim("roles", userDetails.getAuthorities()) // Custom claims
+            .setIssuedAt(new Date())
+            .setExpiration(new Date(System.currentTimeMillis() + expiration))
+            .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+            .compact();
+    }
+
+    // Token se username nikalo
+    public String extractUsername(String token) {
+        return extractClaim(token, Claims::getSubject);
+    }
+
+    // Token valid hai?
+    public boolean validateToken(String token, UserDetails userDetails) {
+        String username = extractUsername(token);
+        return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+    }
+
+    private boolean isTokenExpired(String token) {
+        return extractClaim(token, Claims::getExpiration).before(new Date());
+    }
+
+    private <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        Claims claims = Jwts.parserBuilder()
+            .setSigningKey(getSigningKey())
+            .build()
+            .parseClaimsJws(token)
+            .getBody();
+        return claimsResolver.apply(claims);
+    }
+
+    private Key getSigningKey() {
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    }
+}
+
+// JWT Filter — har request pe token check karo
+@Component
+public class JwtAuthFilter extends OncePerRequestFilter {
+    @Autowired private JwtUtil jwtUtil;
+    @Autowired private UserDetailsService userDetailsService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain chain) throws ServletException, IOException {
+        // Header se token nikalo
+        String header = request.getHeader("Authorization");
+        String token = null;
+        String username = null;
+
+        if (header != null && header.startsWith("Bearer ")) {
+            token = header.substring(7); // "Bearer " remove karo
+            try {
+                username = jwtUtil.extractUsername(token);
+            } catch (JwtException e) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid token");
+                return;
+            }
+        }
+
+        // SecurityContext mein set karo (agar not already authenticated)
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            if (jwtUtil.validateToken(token, userDetails)) {
+                UsernamePasswordAuthenticationToken auth =
+                    new UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities());
+                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            }
+        }
+        chain.doFilter(request, response);
+    }
+}
+
+------------------------------------------------------------------------
+Q33. Spring Security Filter Chain kya hota hai?
+------------------------------------------------------------------------
+
+// Request → Chain of Filters → Controller
+// Default filters (order matters!):
+// SecurityContextPersistenceFilter
+// UsernamePasswordAuthenticationFilter
+// BasicAuthenticationFilter
+// ExceptionTranslationFilter
+// FilterSecurityInterceptor
+
+// CUSTOM SECURITY CONFIG (Spring Boot 3.x):
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable()) // REST API ke liye CSRF disable
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // JWT = stateless
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/auth/**").permitAll()  // Login/register — no auth
+                .requestMatchers("/admin/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/public/**").permitAll()
+                .anyRequest().authenticated()
+            )
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(); // Password hashing
+    }
+}
+
+------------------------------------------------------------------------
+Q34. Password Encoding kaise hota hai?
+------------------------------------------------------------------------
+
+// NEVER plain text store karo — ALWAYS hash karo
+
+@Service
+public class AuthService {
+    @Autowired
+    private PasswordEncoder passwordEncoder; // BCryptPasswordEncoder inject hoga
+
+    public void register(RegisterRequest request) {
+        String hashedPassword = passwordEncoder.encode(request.getPassword());
+        // BCrypt: $2a$10$randomSalt + hash — har baar alag hash even same password
+        user.setPassword(hashedPassword);
+        userRepository.save(user);
+    }
+
+    public boolean verifyPassword(String rawPassword, String storedHash) {
+        // BCrypt internally salt extract karta hai aur compare karta hai
+        return passwordEncoder.matches(rawPassword, storedHash);
+    }
+}
+
+// WHY BCRYPT:
+// 1. Slow by design (adaptive cost factor) — brute force mushkil
+// 2. Built-in salt — same password → alag hash
+// 3. Industry standard
+
+================================================================================
+SECTION 8: ADVANCED / INTERNAL WORKING
+================================================================================
+
+------------------------------------------------------------------------
+Q35. AOP (Aspect-Oriented Programming)?
+------------------------------------------------------------------------
+
+CONCEPT: Cross-cutting concerns (logging, security, transactions) ko business logic se alag karo
+
+// WITHOUT AOP — REPEATED CODE EVERYWHERE:
+public void createUser(User user) {
+    log.info("Creating user: {}", user.getName()); // Logging — repeated
+    startTimer();                                    // Metrics — repeated
+    checkPermission("CREATE_USER");                 // Security — repeated
+    userRepository.save(user);                      // ACTUAL BUSINESS LOGIC
+    stopTimer();
+    log.info("User created successfully");
+}
+
+// WITH AOP — Clean business logic:
+@Service
+public class UserService {
+    public void createUser(User user) {
+        userRepository.save(user); // ONLY business logic!
+    }
+}
+
+// Aspect — cross-cutting concern yahan:
+@Aspect
+@Component
+public class LoggingAspect {
+    private static final Logger log = LoggerFactory.getLogger(LoggingAspect.class);
+
+    // POINTCUT — kaunse methods pe apply karna hai
+    @Around("execution(* com.myapp.service.*.*(..))") // Saari service methods
+    public Object logAround(ProceedingJoinPoint joinPoint) throws Throwable {
+        String method = joinPoint.getSignature().getName();
+        Object[] args = joinPoint.getArgs();
+
+        log.info("Method {} called with args: {}", method, Arrays.toString(args));
+        long start = System.currentTimeMillis();
+
+        try {
+            Object result = joinPoint.proceed(); // Actual method call karo
+            long time = System.currentTimeMillis() - start;
+            log.info("Method {} completed in {}ms", method, time);
+            return result;
+        } catch (Exception ex) {
+            log.error("Method {} failed: {}", method, ex.getMessage());
+            throw ex;
+        }
+    }
+
+    // @Before — method se pehle
+    @Before("@annotation(com.myapp.annotation.RequiresAuth)")
+    public void checkAuth(JoinPoint jp) {
+        // Authentication check
+    }
+
+    // @AfterReturning — successful return ke baad
+    @AfterReturning(pointcut = "execution(* saveUser(..))", returning = "result")
+    public void afterSave(Object result) {
+        // Audit log
+    }
+
+    // @AfterThrowing — exception ke baad
+    @AfterThrowing(pointcut = "execution(* processPayment(..))", throwing = "ex")
+    public void onPaymentFailure(Exception ex) {
+        // Alert system
+    }
+}
+
+// Custom annotation example:
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface Timed { }
+
+@Around("@annotation(Timed)")
+public Object time(ProceedingJoinPoint pjp) throws Throwable {
+    long start = System.currentTimeMillis();
+    Object result = pjp.proceed();
+    System.out.println("Time: " + (System.currentTimeMillis() - start) + "ms");
+    return result;
+}
+
+INTERVIEW TIP: "AOP Spring mein proxy ke through kaam karta hai. @Transactional, @Cacheable, @Async — yeh sab AOP-based hain."
+
+------------------------------------------------------------------------
+Q36. Proxy kaise kaam karta hai Spring mein?
+------------------------------------------------------------------------
+
+Spring 2 types ke proxies use karta hai:
+
+1. JDK DYNAMIC PROXY (interface hai tabhi):
+   - java.lang.reflect.Proxy use karta hai
+   - Interface implement karta hai, delegate karta hai target ko
+
+2. CGLIB PROXY (no interface, class directly):
+   - Subclass banata hai target class ki
+   - Method override karta hai — super.method() call karta hai
+
+// CGLIB LIMITATION: final class/method proxy nahi ho sakta
+// Spring Boot 2.x+ mein CGLIB default hai (spring.aop.proxy-target-class=true)
+
+// PROXY BYPASS PROBLEM:
+@Service
+public class OrderService {
+    @Transactional
+    public void placeOrder(Order order) {
+        this.validateOrder(order); // ← this = actual object, proxy nahi
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void validateOrder(Order order) {
+        // Transaction NAHI lagegi — proxy bypass!
+    }
+}
+
+// Proxy kaise dekho:
+System.out.println(userService.getClass().getName());
+// Output: com.myapp.UserService$$SpringCGLIB$$0
+
+------------------------------------------------------------------------
+Q37. Circular Dependency kaise resolve hoti hai?
+------------------------------------------------------------------------
+
+// CIRCULAR DEPENDENCY: A → B → A (A needs B, B needs A)
+
+@Service
+public class ServiceA {
+    @Autowired private ServiceB b; // A needs B
+}
+@Service
+public class ServiceB {
+    @Autowired private ServiceA a; // B needs A
+}
+
+// Constructor injection mein: BeanCurrentlyInCreationException — STARTUP FAIL!
+// Field/setter injection mein: Spring 2.6 se pehle — silently handled (3-step resolution)
+
+// SOLUTIONS:
+// 1. Refactor — circular dependency = design problem! Extract common logic to ServiceC
+
+// 2. @Lazy on one side
+@Service
+public class ServiceA {
+    @Autowired @Lazy // ServiceB late initialize hoga — circular resolve
+    private ServiceB b;
+}
+
+// 3. Setter injection (one side)
+@Service
+public class ServiceA {
+    private ServiceB b;
+    @Autowired
+    public void setServiceB(ServiceB b) { this.b = b; }
+}
+
+// 4. ApplicationContext se getBean() (runtime)
+
+INTERVIEW TIP: "Circular dependency design ka signal hai ki responsibilities overlap ho rahi hain. Pehle refactor karne ki koshish karo — @Lazy ek workaround hai, fix nahi."
+
+------------------------------------------------------------------------
+Q38. Bean Overriding + Profiles?
+------------------------------------------------------------------------
+
+// PROFILES — environment-specific beans
+@Configuration
+@Profile("dev") // Sirf dev profile mein
+public class DevConfig {
+    @Bean
+    public DataSource dataSource() {
+        return new H2DataSource(); // In-memory DB for dev
+    }
+}
+
+@Configuration
+@Profile("prod") // Sirf prod profile mein
+public class ProdConfig {
+    @Bean
+    public DataSource dataSource() {
+        return new HikariDataSource(prodConfig()); // Real DB for prod
+    }
+}
+
+// application.properties:
+// spring.profiles.active=dev
+
+// MULTIPLE PROFILES:
+@Component
+@Profile({"dev", "test"}) // dev ya test profile mein
+
+// @Profile on individual beans:
+@Bean
+@Profile("!prod") // Production CHHOD KAR sabhi mein
+public MockEmailService mockEmail() { ... }
+
+// BEAN OVERRIDING (Spring Boot 2.1+):
+// spring.main.allow-bean-definition-overriding=true
+// Same name ka bean define karo — override ho jaata hai
+
+@SpringBootTest
+public class TestConfig {
+    @Bean
+    @Primary
+    public PaymentGateway mockPaymentGateway() {
+        return new MockPaymentGateway(); // Test mein real gateway override karo
+    }
+}
+
+================================================================================
+SECTION 9: REAL-WORLD SCENARIO QUESTIONS
+================================================================================
+
+------------------------------------------------------------------------
+Q39. Application slow ho jaaye — kaise debug?
+------------------------------------------------------------------------
+
+STEP 1: Identify (kahan slow hai?)
+- Actuator /actuator/metrics — response time dekho
+- /actuator/httptrace — recent requests
+- APM tools: Datadog/NewRelic traces
+
+STEP 2: Common causes + fixes:
+
+// SLOW DB QUERIES:
+// spring.jpa.show-sql=true
+// spring.jpa.properties.hibernate.generate_statistics=true
+// → N+1 problem dekho → JOIN FETCH use karo
+// → Missing index → EXPLAIN ANALYZE run karo
+// → Connection pool exhausted → HikariCP config tune karo:
+// spring.datasource.hikari.maximum-pool-size=20
+// spring.datasource.hikari.connection-timeout=30000
+
+// MISSING CACHE:
+@Cacheable(value = "users", key = "#id") // Result cache karo
+public User getUser(Long id) {
+    return userRepository.findById(id).orElseThrow(); // Sirf pehli baar DB hit
+}
+// application.properties: spring.cache.type=redis
+
+// SYNCHRONOUS BLOCKING:
+// Async tasks ko @Async se move karo (email, notifications)
+// Parallel calls ko CompletableFuture se combine karo
+
+// THREAD POOL SATURATION:
+// /actuator/metrics/executor.pool.size
+// /actuator/metrics/executor.queue.size
+// → Pool size badhao ya tasks optimize karo
+
+------------------------------------------------------------------------
+Q40. High Memory Spring Boot App fix?
+------------------------------------------------------------------------
+
+// DIAGNOSIS:
+// jmap -heap <pid>        — heap usage
+// jstack <pid>            — thread dump
+// Actuator /actuator/metrics/jvm.memory.used
+
+// COMMON CAUSES:
+// 1. Memory leak — ThreadLocal not cleaned
+// 2. Cache unlimited grow — Eviction policy nahi
+// 3. Static collections grow — unbound lists
+// 4. Connection/stream not closed
+
+// FIXES:
+// 1. ThreadLocal cleanup
+// In filter/interceptor: threadLocal.remove() in finally
+
+// 2. Cache eviction:
+@Cacheable(value = "products")
+@CacheEvict(value = "products", allEntries = true, condition = "...", beforeInvocation = true)
+// Or TTL-based: Redis cache with TTL
+
+// 3. Heap tuning:
+// JAVA_OPTS="-Xms512m -Xmx2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+
+// 4. GC monitoring:
+// -verbose:gc -XX:+PrintGCDetails
+
+------------------------------------------------------------------------
+Q41. Multi-env Configuration manage?
+------------------------------------------------------------------------
+
+// application.properties (common)
+app.name=MyApp
+
+// application-dev.properties
+spring.datasource.url=jdbc:h2:mem:devdb
+logging.level.com.myapp=DEBUG
+
+// application-prod.properties
+spring.datasource.url=${DATABASE_URL} // Environment variable se
+logging.level.com.myapp=WARN
+spring.jpa.show-sql=false
+
+// ACTIVATE:
+// java -jar app.jar --spring.profiles.active=prod
+// Ya SPRING_PROFILES_ACTIVE=prod env variable set karo
+
+// SECRETS: application.properties mein hardcode mat karo!
+// AWS Secrets Manager / HashiCorp Vault / Kubernetes Secrets use karo
+// Spring Cloud Config Server — centralized config for microservices
+
+------------------------------------------------------------------------
+Q42. Microservices Communication design?
+------------------------------------------------------------------------
+
+// SYNCHRONOUS (REST/gRPC):
+// @FeignClient (Spring Cloud OpenFeign) — declarative REST client
+@FeignClient(name = "order-service", url = "${order.service.url}",
+             fallback = OrderServiceFallback.class) // Resilience4j circuit breaker
+public interface OrderServiceClient {
+    @GetMapping("/orders/{userId}")
+    List<Order> getOrdersByUser(@PathVariable Long userId);
+}
+
+// ASYNCHRONOUS (Kafka/RabbitMQ):
+// Producer:
+@Service
+public class OrderEventPublisher {
+    @Autowired private KafkaTemplate<String, OrderEvent> kafkaTemplate;
+
+    public void publishOrderCreated(Order order) {
+        kafkaTemplate.send("order-created", order.getId().toString(),
+            new OrderEvent(order.getId(), "CREATED"));
+    }
+}
+
+// Consumer:
+@Service
+public class NotificationConsumer {
+    @KafkaListener(topics = "order-created", groupId = "notification-service")
+    public void handleOrderCreated(OrderEvent event) {
+        notificationService.sendOrderConfirmation(event.getOrderId());
+    }
+}
+
+// CIRCUIT BREAKER (Resilience4j):
+@CircuitBreaker(name = "orderService", fallbackMethod = "defaultOrders")
+public List<Order> getOrders(Long userId) {
+    return orderClient.getOrdersByUser(userId);
+}
+
+public List<Order> defaultOrders(Long userId, Exception ex) {
+    log.warn("Order service unavailable, returning empty list");
+    return Collections.emptyList();
+}
+
+===================================================================
+Spring Microservices Communication Master Notes
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Spring Microservices Communication - Detailed Interview Notes
+1. OpenFeign (Synchronous Communication)
+Concept:
+OpenFeign is a declarative HTTP client. You only define an interface, and Spring generates a proxy implementation. 
+When your code calls the interface method, it is actually calling a Spring-generated proxy. 
+The proxy converts the Java method into an HTTP request, sends it to the target microservice, waits for the response,
+ converts JSON back into Java objects using Jackson, and returns the result.
+
+
+Internal Flow:
+Client
+ ↓
+Controller
+ ↓
+Service
+ ↓
+Feign Proxy (generated by Spring)
+ ↓
+HTTP Request
+ ↓
+Order Service
+ ↓
+HTTP Response (JSON)
+ ↓
+Jackson converts JSON -> Java Objects
+ ↓
+Feign Proxy returns object
+ ↓
+Service -> Controller -> Client
+Why use it?
+- No RestTemplate boilerplate
+- Interface-based coding
+- Integrates with Eureka, LoadBalancer and Circuit Breaker.
+Important Properties:
+•	order.service.url=http://localhost:8082
+•	spring.cloud.openfeign.client.config.default.connect-timeout=3000
+•	spring.cloud.openfeign.client.config.default.read-timeout=5000
+•	spring.cloud.openfeign.client.config.default.logger-level=basic
+Interview Answer:
+Feign is synchronous. The caller blocks until the remote service responds. Internally Spring creates a proxy for the interface and the proxy performs HTTP communication.
+2. Kafka (Asynchronous Communication)
+Concept:
+Kafka follows publish-subscribe messaging. The producer publishes an event to a topic and immediately continues processing. It does not wait for consumers. Consumers independently read events from the topic using their consumer group offsets.
+Internal Flow:
+Order Service
+ ↓
+KafkaTemplate.send()
+ ↓
+Producer Serializes Event -> JSON
+ ↓
+Kafka Broker
+ ↓
+Topic: order-created
+ ↓
+Consumer Group
+ ↓
+Notification Service
+Inventory Service
+Analytics Service
+ ↓
+@KafkaListener invoked automatically
+Why use Kafka?
+Loose coupling, retries, multiple consumers, high throughput, event-driven architecture.
+Important Properties:
+•	spring.kafka.bootstrap-servers=localhost:9092
+•	spring.kafka.consumer.group-id=notification-service
+•	spring.kafka.consumer.auto-offset-reset=earliest
+•	spring.kafka.producer.key-serializer=StringSerializer
+•	spring.kafka.producer.value-serializer=JsonSerializer
+•	spring.kafka.consumer.value-deserializer=JsonDeserializer
+Interview Point:
+Producer never knows who consumes the message. Multiple services can subscribe to the same topic independently.
+3. Circuit Breaker (Resilience4j)
+Concept:
+A Circuit Breaker protects your application from repeatedly calling an unhealthy downstream service. It works through Spring AOP. Instead of calling the real service directly, requests first pass through a proxy that tracks failures.
+Internal Flow:
+Client
+ ↓
+Circuit Breaker Proxy
+ ↓
+Remote Service
+
+If failures exceed threshold:
+Circuit -> OPEN
+ ↓
+Remote call skipped
+ ↓
+Fallback Method
+
+After wait duration:
+HALF_OPEN
+ ↓
+Few trial requests
+ ↓
+Success -> CLOSED
+Failure -> OPEN
+Configuration:
+•	resilience4j.circuitbreaker.instances.orderService.failure-rate-threshold=50
+•	resilience4j.circuitbreaker.instances.orderService.sliding-window-size=10
+•	resilience4j.circuitbreaker.instances.orderService.wait-duration-in-open-state=10s
+•	resilience4j.circuitbreaker.instances.orderService.permitted-number-of-calls-in-half-open-state=3
+Interview Explanation:
+Closed = normal traffic. Open = fail fast and execute fallback. Half-Open = limited requests to test recovery.
+Comparison
+Feature	Feign	Kafka	Circuit Breaker
+Communication	Sync	Async	Protection Pattern
+Waits?	Yes	No	Depends
+Transport	HTTP	Message Broker	AOP Proxy
+Use Case	Immediate Response	Events	Fault Tolerance
+
+==============================================================================================================================
+Spring Microservices Communication - Detailed Interview Notes
+1. OpenFeign (Synchronous Communication)
+Concept:
+OpenFeign is a declarative HTTP client. You only define an interface, and Spring generates a proxy implementation. When your code calls the interface method, it is actually calling a Spring-generated proxy. The proxy converts the Java method into an HTTP request, sends it to the target microservice, waits for the response, converts JSON back into Java objects using Jackson, and returns the result.
+
+
+Internal Flow:
+Client
+ ↓
+Controller
+ ↓
+Service
+ ↓
+Feign Proxy (generated by Spring)
+ ↓
+HTTP Request
+ ↓
+Order Service
+ ↓
+HTTP Response (JSON)
+ ↓
+Jackson converts JSON -> Java Objects
+ ↓
+Feign Proxy returns object
+ ↓
+Service -> Controller -> Client
+Why use it?
+- No RestTemplate boilerplate
+- Interface-based coding
+- Integrates with Eureka, LoadBalancer and Circuit Breaker.
+Important Properties:
+•	order.service.url=http://localhost:8082
+•	spring.cloud.openfeign.client.config.default.connect-timeout=3000
+•	spring.cloud.openfeign.client.config.default.read-timeout=5000
+•	spring.cloud.openfeign.client.config.default.logger-level=basic
+Interview Answer:
+Feign is synchronous. The caller blocks until the remote service responds. Internally Spring creates a proxy for the interface and the proxy performs HTTP communication.
+2. Kafka (Asynchronous Communication)
+Concept:
+Kafka follows publish-subscribe messaging. The producer publishes an event to a topic and immediately continues processing. It does not wait for consumers. Consumers independently read events from the topic using their consumer group offsets.
+Internal Flow:
+Order Service
+ ↓
+KafkaTemplate.send()
+ ↓
+Producer Serializes Event -> JSON
+ ↓
+Kafka Broker
+ ↓
+Topic: order-created
+ ↓
+Consumer Group
+ ↓
+Notification Service
+Inventory Service
+Analytics Service
+ ↓
+@KafkaListener invoked automatically
+Why use Kafka?
+Loose coupling, retries, multiple consumers, high throughput, event-driven architecture.
+Important Properties:
+•	spring.kafka.bootstrap-servers=localhost:9092
+•	spring.kafka.consumer.group-id=notification-service
+•	spring.kafka.consumer.auto-offset-reset=earliest
+•	spring.kafka.producer.key-serializer=StringSerializer
+•	spring.kafka.producer.value-serializer=JsonSerializer
+•	spring.kafka.consumer.value-deserializer=JsonDeserializer
+Interview Point:
+Producer never knows who consumes the message. Multiple services can subscribe to the same topic independently.
+3. Circuit Breaker (Resilience4j)
+Concept:
+A Circuit Breaker protects your application from repeatedly calling an unhealthy downstream service. It works through Spring AOP. Instead of calling the real service directly, requests first pass through a proxy that tracks failures.
+Internal Flow:
+Client
+ ↓
+Circuit Breaker Proxy
+ ↓
+Remote Service
+
+If failures exceed threshold:
+Circuit -> OPEN
+ ↓
+Remote call skipped
+ ↓
+Fallback Method
+
+After wait duration:
+HALF_OPEN
+ ↓
+Few trial requests
+ ↓
+Success -> CLOSED
+Failure -> OPEN
+Configuration:
+•	resilience4j.circuitbreaker.instances.orderService.failure-rate-threshold=50
+•	resilience4j.circuitbreaker.instances.orderService.sliding-window-size=10
+•	resilience4j.circuitbreaker.instances.orderService.wait-duration-in-open-state=10s
+•	resilience4j.circuitbreaker.instances.orderService.permitted-number-of-calls-in-half-open-state=3
+Interview Explanation:
+Closed = normal traffic. Open = fail fast and execute fallback. Half-Open = limited requests to test recovery.
+
+------------------------------------------------------------------------
+Q43. Logging + Monitoring?
+------------------------------------------------------------------------
+
+// LOGGING (SLF4J + Logback):
+@Service
+public class PaymentService {
+    private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
+
+    public void processPayment(Payment payment) {
+        // STRUCTURED LOGGING — JSON format better for ELK/Splunk
+        log.info("Processing payment: paymentId={}, amount={}, userId={}",
+            payment.getId(), payment.getAmount(), payment.getUserId());
+        try {
+            gateway.charge(payment);
+            log.info("Payment successful: paymentId={}", payment.getId());
+        } catch (Exception e) {
+            log.error("Payment failed: paymentId={}", payment.getId(), e); // Exception bhi log karo
+            throw e;
+        }
+    }
+}
+
+// application.properties:
+// logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n
+// logging.file.name=/var/log/myapp/app.log
+// logging.level.root=INFO
+// logging.level.com.myapp=DEBUG
+
+// MONITORING (Spring Boot Actuator + Micrometer + Prometheus):
+// pom: spring-boot-starter-actuator, micrometer-registry-prometheus
+// management.endpoints.web.exposure.include=health,metrics,prometheus,info
+// management.endpoint.health.show-details=always
+
+// CUSTOM METRICS:
+@Service
+public class OrderService {
+    private final Counter orderCounter;
+    private final Timer orderProcessingTimer;
+
+    public OrderService(MeterRegistry registry) {
+        this.orderCounter = registry.counter("orders.created.total");
+        this.orderProcessingTimer = registry.timer("orders.processing.time");
+    }
+
+    public Order placeOrder(Order order) {
+        return orderProcessingTimer.recordCallable(() -> {
+            Order result = processOrder(order);
+            orderCounter.increment();
+            return result;
+        });
+    }
+}
+
+// Prometheus scrapes /actuator/prometheus
+// Grafana dashboards pe visualize karo
+
+================================================================================
+WHAT'S MISSING — 6 YRS SPRING EXP KE LIYE
+================================================================================
+
+1. SPRING CACHE ABSTRACTION
+   @Cacheable, @CacheEvict, @CachePut
+   Redis vs Caffeine vs EhCache
+   Cache warming strategies
+
+2. SPRING EVENTS
+   ApplicationEvent, @EventListener, @TransactionalEventListener
+   Async events (@Async + @EventListener)
+
+3. SPRING BATCH (if relevant)
+   Job, Step, ItemReader, ItemProcessor, ItemWriter
+
+4. SPRING CLOUD (Microservices)
+   Eureka (Service Discovery)
+   Spring Cloud Config
+   Spring Cloud Gateway
+   Resilience4j (Circuit Breaker, Retry, Rate Limiter)
+
+5. SPRING BOOT ACTUATOR DEEP DIVE
+   Custom health indicators
+   Custom endpoints
+   Shutdown endpoint
+
+6. HIKARICP TUNING
+   maximumPoolSize, minimumIdle, connectionTimeout
+   How to size a connection pool
+
+7. FEIGN CLIENT + RETRY
+   @FeignClient with error decoder
+   Retry configuration
+
+8. @SCHEDULED
+   @EnableScheduling
+   @Scheduled(cron = "0 0 * * * *")
+   Distributed scheduling (ShedLock)
+
+EXAMPLE — @Scheduled:
+@Component
+@EnableScheduling
+public class CleanupJob {
+
+    // Har din raat 2 baje run karo
+    @Scheduled(cron = "0 0 2 * * *")
+    public void cleanOldData() {
+        dataRepository.deleteOlderThan(LocalDate.now().minusDays(90));
+    }
+
+    // Har 30 second mein
+    @Scheduled(fixedDelay = 30000) // Previous execution end se 30 sec baad
+    public void syncCache() { cacheService.refresh(); }
+}
+
+EXAMPLE — @TransactionalEventListener:
+@Service
+public class OrderService {
+    @Autowired ApplicationEventPublisher publisher;
+
+    @Transactional
+    public void placeOrder(Order order) {
+        orderRepository.save(order);
+        // Transaction commit ke BAAD event fire hoga (AFTER_COMMIT)
+        // Agar exception aayi → event fire nahi hoga → consistent!
+        publisher.publishEvent(new OrderCreatedEvent(order));
+    }
+}
+
+@Component
+public class OrderEventHandler {
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleOrderCreated(OrderCreatedEvent event) {
+        // Kafka mein publish karo — transaction committed hai confirm
+        kafkaTemplate.send("orders", event.getOrder());
+    }
+}
+
+================================================================================
+QUICK CHEAT SHEET — SPRING INTERVIEW
+================================================================================
+
+TOPIC                       → ANSWER KEYWORD
+--------------------------    -----------------------------------------------
+IOC kya hai                 → Container manages object creation + wiring
+DI types                    → Constructor (best), Setter (optional), Field (avoid)
+Bean lifecycle              → Instantiate → Inject → @PostConstruct → Use → @PreDestroy
+Singleton thread-safe?      → NO — stateless banao
+@Transactional kaam         → AOP proxy intercept → begin/commit/rollback
+Same class @Transactional   → KAAM NAHI — proxy bypass
+N+1 problem                 → JOIN FETCH / @EntityGraph
+Lazy loading exception      → LazyInitializationException → @Transactional extend ya DTO
+Auto-config kaise           → @ConditionalOn... + spring.factories
+JWT flow                    → Login → token → Bearer header → filter → SecurityContext
+AOP proxy types             → JDK (interface) / CGLIB (class)
+Circular dependency         → Design problem → refactor / @Lazy workaround
+@Primary vs @Qualifier      → Primary = global default, Qualifier = specific override
+
+================================================================================
+END OF DOCUMENT
+Written for: 6 Years Java Backend Developer — Spring & Spring Boot
+================================================================================

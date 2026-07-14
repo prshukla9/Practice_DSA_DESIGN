@@ -1,0 +1,1097 @@
+================================================================================
+  DEVOPS — COMPLETE INTERVIEW PREP (6 YRS JAVA BACKEND)
+  Docker · Kubernetes · Jenkins · AWS — Healthcare Microservices Context
+  Hinglish + Stories + Actual Config Files + Scenario Questions
+================================================================================
+
+> Yeh file specifically tumhare EPAM healthcare project ke DevOps pe based hai.
+> Har concept: Why → What → How → Config file → Scenario question
+
+================================================================================
+SECTION 1: DOCKER — CONTAINERS KYON? KYA? KAISE?
+================================================================================
+
+Q1. Docker kya hai? Virtual Machine se kaise alag?
+
+STORY: Delivery analogy
+PEHLE (Without Docker):
+  Dev: "Meri machine pe kaam karta hai!"
+  Ops: "Production pe crash ho raha hai!"
+  REASON: Different Java version, different OS, different env vars
+
+DOCKER SOLUTION:
+  "Application + uski dependencies + configuration = EK package (container)"
+  Jaise courier box — andar sab kuch packed, kahin bhi deliver karo
+
+DOCKER vs VIRTUAL MACHINE:
+  VM:        [App] [OS] | [App] [OS]  →  Hypervisor  →  Host OS
+             Heavy, slow start (mins), GBs of size
+  Container: [App] [App] [App]        →  Docker Engine  →  Host OS
+             Light, fast start (seconds), MBs of size
+
+KEY DOCKER CONCEPTS:
+  Image     = Blueprint (like Java .class file — bana ke rakh do)
+  Container = Running instance (like JVM pe running Java process)
+  Dockerfile = Instructions to build image
+  Registry  = Docker Hub / ECR — images store karo
+  Volume    = Persistent storage (container restart pe data survive)
+  Network   = Containers ke beech communication
+
+================================================================================
+SECTION 2: DOCKERFILE — HEALTHCARE SPRING BOOT
+================================================================================
+
+// ============================================================
+// SINGLE-STAGE DOCKERFILE (Basic — interviews mein pucha jaata)
+// ============================================================
+
+# Dockerfile (single stage — simple but inefficient)
+FROM eclipse-temurin:21-jdk-alpine
+
+# Working directory container ke andar
+WORKDIR /app
+
+# JAR copy karo
+COPY target/healthcare-service-1.0.0.jar app.jar
+
+# Port expose karo (documentation only — actual mapping docker run pe)
+EXPOSE 8080
+
+# Container start hone pe yeh command chalao
+ENTRYPOINT ["java", "-jar", "app.jar"]
+
+// ============================================================
+// MULTI-STAGE DOCKERFILE (Production — yeh discuss karo interview mein)
+// ============================================================
+
+# Stage 1: BUILD — Maven compile + package
+# Full JDK needed — source code compile karna hai
+FROM maven:3.9.4-eclipse-temurin-21 AS builder
+
+WORKDIR /build
+
+# TRICK: pehle dependencies download karo (layer cache!)
+# Dependencies kam change hoti hain — yeh layer cache mein rehta hai
+COPY pom.xml .
+RUN mvn dependency:go-offline -q
+
+# Ab source code copy karo (frequently changes)
+COPY src ./src
+
+# Build — skip tests (CI mein already run ho chuke)
+RUN mvn clean package -DskipTests
+
+# --------------------------------------------------------
+# Stage 2: RUNTIME — Sirf JRE, no Maven, no source code
+# Final image mein JDK nahi chahiye → smaller + secure
+FROM eclipse-temurin:21-jre-alpine AS runtime
+
+# Security best practice: root mat chalaao
+RUN addgroup -S healthcare && adduser -S appuser -G healthcare
+USER appuser
+
+WORKDIR /app
+
+# ONLY the JAR from builder stage — baki sab throw away
+COPY --from=builder /build/target/healthcare-service-*.jar app.jar
+
+# Health check — Docker ko pata chale app alive hai
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+
+EXPOSE 8080
+
+# JVM tuning for containers:
+# -XX:+UseContainerSupport  = Docker memory limits respect karo (Java 10+)
+# -XX:MaxRAMPercentage=75   = Container RAM ka 75% use karo
+# -XX:+ExitOnOutOfMemoryError = OOM pe crash (Kubernetes restart karega)
+ENTRYPOINT ["java", \
+  "-XX:+UseContainerSupport", \
+  "-XX:MaxRAMPercentage=75.0", \
+  "-XX:+ExitOnOutOfMemoryError", \
+  "-Djava.security.egd=file:/dev/./urandom", \
+  "-jar", "app.jar"]
+
+BENEFIT OF MULTI-STAGE:
+  Single stage:  ~500MB image (JDK + Maven + source + JAR)
+  Multi-stage:   ~80MB image  (JRE + JAR only)
+  Less attack surface → More secure → Faster pull in Kubernetes
+
+SCENARIO QUESTION: "Kya docker image size matter karta hai?"
+"Haan! 80MB vs 500MB:
+ - CI/CD: Har deployment pe pull time → faster
+ - K8s: Node pe image cache → startup time kam
+ - Security: Choti image = kam vulnerabilities"
+
+================================================================================
+SECTION 3: DOCKER COMPOSE — LOCAL HEALTHCARE STACK
+================================================================================
+
+// ============================================================
+// docker-compose.yml — Full healthcare microservices locally
+// ============================================================
+
+version: '3.8'
+
+services:
+
+  # ---- DATABASES ----
+  postgres:
+    image: pgvector/pgvector:pg16   # pgvector pre-installed!
+    container_name: healthcare-postgres
+    environment:
+      POSTGRES_DB: healthcare_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secret123
+    ports:
+      - "5432:5432"         # host:container
+    volumes:
+      - postgres_data:/var/lib/postgresql/data   # Data persist karo
+      - ./db/init:/docker-entrypoint-initdb.d    # Init SQL scripts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: healthcare-redis
+    command: redis-server --requirepass redis123  # Password set karo
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # ---- KAFKA ----
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: healthcare-kafka
+    depends_on: [zookeeper]
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+
+  # ---- MICROSERVICES ----
+  patient-service:
+    build:
+      context: ./patient-service
+      dockerfile: Dockerfile
+    container_name: patient-service
+    ports:
+      - "8081:8080"
+    environment:
+      # spring.datasource.url = override via env var
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/healthcare_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: secret123
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PASSWORD: redis123
+      OPENAI_API_KEY: ${OPENAI_API_KEY}  # .env file se aata hai
+    depends_on:
+      postgres:
+        condition: service_healthy  # Postgres ready hone ka wait karo
+    restart: on-failure
+
+  ai-query-service:
+    build:
+      context: ./ai-query-service
+    container_name: ai-query-service
+    ports:
+      - "8082:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/healthcare_db
+      SPRING_REDIS_HOST: redis
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on: [postgres, redis]
+
+volumes:
+  postgres_data:  # Named volume — docker ke andar persist
+  redis_data:
+
+# .env file (docker-compose auto-read karta hai):
+# OPENAI_API_KEY=sk-...your-key...
+
+# COMMANDS:
+# docker compose up -d           -- Background mein start karo
+# docker compose logs -f patient-service  -- Live logs
+# docker compose down -v         -- Stop + volumes delete
+
+SCENARIO QUESTION: "docker-compose vs Kubernetes kab kya?"
+"Local development = docker-compose (simple, fast setup)
+ Production = Kubernetes (scaling, self-healing, rolling updates)"
+
+================================================================================
+SECTION 4: KUBERNETES — PRODUCTION ORCHESTRATION
+================================================================================
+
+Q2. Kubernetes kya karta hai? Aur kyon Docker Compose nahi?
+
+STORY: Restaurant analogy
+  Docker = Chef (ek dish banana jaanta hai)
+  Kubernetes = Restaurant Manager:
+    - "Table 5 ke liye 3 chefs chahiye" → Auto-scaling
+    - "Chef 2 beemar hai" → Self-healing (restart)
+    - "New menu item add karo, purana dhire dhire hata do" → Rolling updates
+
+KUBERNETES COMPONENTS:
+  Pod        = Smallest unit — ek ya adhik containers
+  Deployment = "Hamesha N pods chalao, aur aise update karo" — replicas, strategy
+  Service    = Stable DNS name + Load balancer for pods
+  ConfigMap  = Non-secret config (DB URL, feature flags)
+  Secret     = Sensitive data (passwords, API keys) — base64 encoded
+  Ingress    = HTTP routing (path-based, host-based) — single entry point
+  HPA        = Horizontal Pod Autoscaler — CPU/memory pe scale
+
+================================================================================
+SECTION 5: KUBERNETES CONFIGS — HEALTHCARE MICROSERVICE
+================================================================================
+
+// ============================================================
+// 1. ConfigMap — Non-sensitive config
+// ============================================================
+
+# k8s/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: patient-service-config
+  namespace: healthcare
+data:
+  # Ye values Spring ke application.properties override karte hain
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres-service:5432/healthcare_db"
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka-service:9092"
+  SPRING_REDIS_HOST: "redis-service"
+  JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75"
+  LOG_LEVEL: "INFO"
+
+// ============================================================
+// 2. Secret — Sensitive values (base64 encoded)
+// ============================================================
+
+# k8s/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: patient-service-secrets
+  namespace: healthcare
+type: Opaque
+data:
+  # echo -n 'secret123' | base64
+  DB_PASSWORD: c2VjcmV0MTIz
+  REDIS_PASSWORD: cmVkaXMxMjM=
+  OPENAI_API_KEY: c2stLi4uZW5jb2RlZA==
+
+# PRODUCTION: Secrets ne directly check in mat karo Git mein!
+# Use: AWS Secrets Manager + External Secrets Operator
+# Ya: Vault + Vault Injector
+
+// ============================================================
+// 3. Deployment — Application pods manage karo
+// ============================================================
+
+# k8s/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patient-service
+  namespace: healthcare
+  labels:
+    app: patient-service
+spec:
+  replicas: 3                    # 3 pods run karo hamesha
+
+  selector:
+    matchLabels:
+      app: patient-service
+
+  strategy:
+    type: RollingUpdate          # Zero-downtime deployment
+    rollingUpdate:
+      maxSurge: 1                # Ek extra pod bana sakte ho deploy ke time
+      maxUnavailable: 0          # Koi pod down nahi hoga (zero-downtime)
+
+  template:
+    metadata:
+      labels:
+        app: patient-service
+
+    spec:
+      containers:
+      - name: patient-service
+        image: 123456789.dkr.ecr.us-east-1.amazonaws.com/patient-service:v1.2.3
+        imagePullPolicy: Always  # Hamesha registry se pull karo
+
+        ports:
+        - containerPort: 8080
+
+        # ENV from ConfigMap
+        envFrom:
+        - configMapRef:
+            name: patient-service-config
+
+        # ENV from Secret
+        env:
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: patient-service-secrets
+              key: DB_PASSWORD
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: patient-service-secrets
+              key: OPENAI_API_KEY
+
+        # Resource limits — CRITICAL for K8s scheduling
+        resources:
+          requests:              # "Mujhe itna chahiye" — scheduling ke liye
+            memory: "512Mi"
+            cpu: "250m"          # 250 millicores = 0.25 CPU
+          limits:                # "Itne se zyada nahi lunga" — OOM prevention
+            memory: "1Gi"
+            cpu: "1000m"         # 1 full CPU
+
+        # Liveness probe — "Is app alive? Agar nahi → restart"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 60   # App startup time do
+          periodSeconds: 30
+          failureThreshold: 3
+
+        # Readiness probe — "Is app ready for traffic?"
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 3
+
+// ============================================================
+// 4. Service — Stable endpoint for pods
+// ============================================================
+
+# k8s/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: patient-service
+  namespace: healthcare
+spec:
+  selector:
+    app: patient-service          # Yeh label ke pods route karo traffic
+  ports:
+  - protocol: TCP
+    port: 80                      # Service ka port
+    targetPort: 8080              # Pod ka actual port
+  type: ClusterIP                 # Internal only (Ingress se expose)
+
+// ============================================================
+// 5. Ingress — HTTP routing
+// ============================================================
+
+# k8s/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: healthcare-ingress
+  namespace: healthcare
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"     # HTTP → HTTPS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"   # TLS certificate auto
+spec:
+  rules:
+  - host: api.healthcare-app.com
+    http:
+      paths:
+      - path: /api/patients
+        pathType: Prefix
+        backend:
+          service:
+            name: patient-service
+            port:
+              number: 80
+
+      - path: /api/ai
+        pathType: Prefix
+        backend:
+          service:
+            name: ai-query-service
+            port:
+              number: 80
+
+  tls:
+  - hosts:
+    - api.healthcare-app.com
+    secretName: healthcare-tls     # cert-manager isse manage karta hai
+
+// ============================================================
+// 6. HPA — Horizontal Pod Autoscaler
+// ============================================================
+
+# k8s/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: patient-service-hpa
+  namespace: healthcare
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: patient-service
+
+  minReplicas: 2         # Hospital hours ke baad bhi 2 available
+  maxReplicas: 10        # Hospital rush hour peak
+
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70    # CPU 70% pe scale out
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80    # Memory 80% pe scale
+
+// USEFUL KUBECTL COMMANDS:
+// kubectl apply -f k8s/                    -- Apply all YAML files
+// kubectl get pods -n healthcare           -- Pod status
+// kubectl logs patient-service-abc123 -f  -- Live logs
+// kubectl describe pod patient-service-abc123  -- Debug events
+// kubectl exec -it patient-service-abc123 -- /bin/sh  -- Shell access
+// kubectl rollout status deployment/patient-service   -- Deploy status
+// kubectl rollout undo deployment/patient-service     -- ROLLBACK!
+
+SCENARIO QUESTION: "Production mein pod crash ho raha hai — kaise debug?"
+"1. kubectl get pods — CrashLoopBackOff dikha
+ 2. kubectl describe pod <name> — Events section mein cause dekho
+ 3. kubectl logs <pod> --previous — Pichle crash ke logs
+ 4. Resources check karo — OOMKilled? → limits badhao
+ 5. Liveness probe timing check — startup time zyada?"
+
+================================================================================
+SECTION 6: JENKINS — CI/CD PIPELINE
+================================================================================
+
+Q3. Jenkins Pipeline kya hota hai? Healthcare project mein kaise use kiya?
+
+STORY: Assembly line analogy
+  Code commit → Auto build → Auto test → Auto deploy → Auto notify
+  Jaise car factory: Each station kaam karta hai, problem → line rok do
+
+// ============================================================
+// Jenkinsfile — Declarative Pipeline
+// ============================================================
+
+pipeline {
+    // Kahan run karo — Docker container mein (clean environment)
+    agent {
+        docker {
+            image 'maven:3.9.4-eclipse-temurin-21'
+            args '-v /root/.m2:/root/.m2'   // Maven cache mount
+        }
+    }
+
+    // Trigger: Git push pe auto-run
+    triggers {
+        githubPush()    // GitHub webhook se trigger
+    }
+
+    environment {
+        // Jenkins credentials store se securely fetch karo
+        DOCKER_REGISTRY = "123456789.dkr.ecr.us-east-1.amazonaws.com"
+        IMAGE_NAME      = "patient-service"
+        IMAGE_TAG       = "${GIT_COMMIT[0..7]}"   // Short git hash = unique tag
+        SONAR_TOKEN     = credentials('sonar-token')
+        AWS_CREDS       = credentials('aws-ecr-credentials')
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm    // Git se latest code fetch
+                echo "Building commit: ${env.GIT_COMMIT}"
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                sh 'mvn test -pl patient-service'
+            }
+            post {
+                always {
+                    // Test results publish — Jenkins UI mein dikhe
+                    junit 'patient-service/target/surefire-reports/*.xml'
+                    // JaCoCo coverage report
+                    jacoco(
+                        execPattern: '**/target/*.exec',
+                        minimumLineCoverage: '80'   // 80% se kam → FAIL
+                    )
+                }
+            }
+        }
+
+        stage('Code Quality') {
+            steps {
+                // SonarQube analysis — code smells, vulnerabilities
+                sh """
+                    mvn sonar:sonar \
+                    -Dsonar.projectKey=healthcare-patient-service \
+                    -Dsonar.host.url=http://sonarqube:9000 \
+                    -Dsonar.login=${SONAR_TOKEN}
+                """
+            }
+        }
+
+        stage('Build & Package') {
+            steps {
+                sh 'mvn clean package -DskipTests -pl patient-service'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                script {
+                    // Docker image build karo
+                    sh "docker build -t ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ./patient-service"
+                    sh "docker tag ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${IMAGE_NAME}:latest"
+                }
+            }
+        }
+
+        stage('Security Scan') {
+            steps {
+                // Trivy — Docker image vulnerability scan
+                sh """
+                    trivy image \
+                    --exit-code 1 \
+                    --severity HIGH,CRITICAL \
+                    ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                """
+                // HIGH/CRITICAL vulnerability pe build fail karo
+                // Healthcare compliance ke liye CRITICAL!
+            }
+        }
+
+        stage('Push to ECR') {
+            steps {
+                script {
+                    // AWS ECR login (Amazon's Docker registry)
+                    sh "aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${DOCKER_REGISTRY}"
+                    sh "docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                    sh "docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:latest"
+                }
+            }
+        }
+
+        stage('Deploy to Staging') {
+            steps {
+                // kubectl image update karo — rolling deployment
+                sh """
+                    kubectl set image deployment/patient-service \
+                    patient-service=${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
+                    -n healthcare-staging
+                """
+                // Deploy complete hone ka wait karo
+                sh "kubectl rollout status deployment/patient-service -n healthcare-staging --timeout=5m"
+            }
+        }
+
+        stage('Integration Tests') {
+            steps {
+                // Staging pe run karo
+                sh "mvn verify -Pintegration-tests -Dbase.url=https://staging-api.healthcare.com"
+            }
+        }
+
+        stage('Deploy to Production') {
+            // MANUAL APPROVAL for Production!
+            input {
+                message "Deploy to PRODUCTION?"
+                ok "Yes, deploy!"
+                submitter "team-lead,devops-admin"   // Only these can approve
+            }
+            steps {
+                sh """
+                    kubectl set image deployment/patient-service \
+                    patient-service=${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
+                    -n healthcare-prod
+                """
+                sh "kubectl rollout status deployment/patient-service -n healthcare-prod --timeout=10m"
+            }
+        }
+    }
+
+    post {
+        success {
+            // Slack notification success
+            slackSend(
+                channel: '#deployments',
+                color: 'good',
+                message: "✅ ${IMAGE_NAME}:${IMAGE_TAG} deployed to PROD successfully"
+            )
+        }
+        failure {
+            slackSend(
+                channel: '#deployments',
+                color: 'danger',
+                message: "❌ Pipeline FAILED for ${IMAGE_NAME} — ${BUILD_URL}"
+            )
+            // Automatic rollback!
+            sh "kubectl rollout undo deployment/patient-service -n healthcare-prod || true"
+        }
+        always {
+            // Cleanup
+            sh "docker rmi ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} || true"
+        }
+    }
+}
+
+SCENARIO QUESTION: "Deploy ke baad production mein issue aaya — kya karoge?"
+"Jenkins pipeline failure → automatic rollback (`kubectl rollout undo`)
+ Phir: kubectl rollout history deployment/patient-service (version history dekho)
+ Phir manually specific version pe rollback: kubectl rollout undo --to-revision=3"
+
+================================================================================
+SECTION 7: AWS — HEALTHCARE MICROSERVICES ARCHITECTURE
+================================================================================
+
+Q4. AWS mein healthcare stack kaise deploy hai?
+
+COMPLETE ARCHITECTURE:
+
+[Internet]
+    |
+[Route 53] — DNS (healthcare-app.com)
+    |
+[CloudFront] — CDN + DDoS protection
+    |
+[ALB — Application Load Balancer] — HTTPS termination
+    |
+[EKS — Elastic Kubernetes Service]
+    |--- patient-service pods
+    |--- ai-query-service pods
+    |--- notification-service pods
+    |
+[RDS PostgreSQL + pgvector] ←─── patient data + embeddings
+[ElastiCache Redis]          ←─── embedding cache + session
+[MSK — Managed Kafka]        ←─── events: lab-created, rx-created
+[ECR — Container Registry]   ←─── Docker images
+[S3]                         ←─── Medical documents, reports
+[CloudWatch]                 ←─── Logs, Metrics, Alerts
+[Secrets Manager]            ←─── DB password, OpenAI key
+[IAM]                        ←─── Service permissions
+
+================================================================================
+SECTION 8: AWS SERVICES — DEEP DIVE
+================================================================================
+
+// ============================================================
+// EKS — Elastic Kubernetes Service
+// ============================================================
+WHY EKS vs. Self-managed K8s:
+- Control plane AWS manage karta hai (upgrades, HA, etcd backups)
+- AWS-native: IAM for K8s RBAC, ELB auto-integration, EBS volumes
+- IRSA (IAM Roles for Service Accounts) — pod-level AWS permissions
+
+// EKS Node Groups:
+// On-demand: m5.2xlarge (8 vCPU, 32GB) — critical services
+// Spot:      m5.xlarge  (4 vCPU, 16GB) — batch jobs, AI indexing
+
+// ============================================================
+// RDS PostgreSQL + pgvector
+// ============================================================
+WHY RDS vs. EC2 PostgreSQL:
+- Managed: Automated backups (point-in-time recovery — 35 days)
+- Multi-AZ: Automatic failover (< 60 sec) — Healthcare needs this!
+- Read Replicas: Vector search heavy → separate replica for AI queries
+
+// application.yml for RDS:
+spring:
+  datasource:
+    url: jdbc:postgresql://healthcare-db.xxx.us-east-1.rds.amazonaws.com:5432/healthcare
+    username: ${DB_USERNAME}     # From Secrets Manager via External Secrets
+    password: ${DB_PASSWORD}
+  jpa:
+    properties:
+      hibernate:
+        default_schema: public
+        # Connection pool config (HikariCP)
+hikari:
+  maximum-pool-size: 20
+  minimum-idle: 5
+  connection-timeout: 30000
+  idle-timeout: 600000
+
+// pgvector on RDS: CREATE EXTENSION vector; (works on RDS PostgreSQL 15+)
+
+// ============================================================
+// ElastiCache Redis
+// ============================================================
+USE CASES in healthcare project:
+1. Embedding cache — same text → same vector (expensive API call avoid)
+2. Query result cache — same patient + question → same DB query
+3. Session store — JWT token blacklist (logout karne pe)
+4. Rate limiting — per-patient API request limits
+
+// application.yml:
+spring:
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000   # 1 hour TTL
+  redis:
+    host: ${REDIS_HOST}       # ElastiCache endpoint
+    port: 6379
+    password: ${REDIS_PASSWORD}
+    ssl: true                  # ElastiCache mein always SSL!
+    lettuce:
+      pool:
+        max-active: 20
+        max-idle: 10
+
+// ============================================================
+// MSK — Amazon Managed Streaming for Kafka
+// ============================================================
+WHY MSK vs. Self-managed Kafka:
+- Kafka infra AWS manage karta hai (broker upgrades, storage)
+- Multi-AZ by default (3 brokers, 3 AZs)
+- MSK Connect: Kafka Connect connectors as managed service
+
+// MSK topics in healthcare:
+// lab-report-created    → Triggers AI embedding indexing
+// prescription-created  → Notification service → patient alert
+// appointment-created   → Reminder service
+// audit-events          → HIPAA compliance logging → S3
+
+// application.yml for MSK:
+spring:
+  kafka:
+    bootstrap-servers: ${MSK_BOOTSTRAP_SERVERS}  # From Secrets Manager
+    properties:
+      security.protocol: SASL_SSL                # MSK ka security requirement
+      sasl.mechanism: AWS_MSK_IAM                # IAM-based auth (no password!)
+      sasl.jaas.config: software.amazon.msk.auth.iam.IAMLoginModule required;
+      sasl.client.callback.handler.class: software.amazon.msk.auth.iam.IAMClientCallbackHandler
+
+// ============================================================
+// S3 — Medical Documents Storage
+// ============================================================
+
+@Service
+public class MedicalDocumentS3Service {
+
+    private final S3Client s3;
+    private final String bucketName = "healthcare-medical-docs-prod";
+
+    /**
+     * Lab report PDF upload karo
+     * Encrypted at rest (SSE-S3 automatic), encrypted in transit (HTTPS)
+     */
+    public String uploadMedicalDocument(String patientId, byte[] pdfBytes) {
+        String key = String.format("patients/%s/reports/%s.pdf",
+            patientId, UUID.randomUUID());
+
+        // Server-side encryption mandatory for HIPAA
+        PutObjectRequest req = PutObjectRequest.builder()
+            .bucket(bucketName)
+            .key(key)
+            .serverSideEncryption(ServerSideEncryption.AES256)  // SSE-S3
+            .contentType("application/pdf")
+            .build();
+
+        s3.putObject(req, RequestBody.fromBytes(pdfBytes));
+        return key;
+    }
+
+    /**
+     * Time-limited presigned URL — Direct patient download
+     * URL 15 min mein expire ho jaata hai — security!
+     */
+    public String generatePresignedUrl(String documentKey) {
+        S3Presigner presigner = S3Presigner.create();
+
+        GetObjectPresignRequest presignReq = GetObjectPresignRequest.builder()
+            .signatureDuration(Duration.ofMinutes(15))   // 15 min only!
+            .getObjectRequest(r -> r.bucket(bucketName).key(documentKey))
+            .build();
+
+        return presigner.presignGetObject(presignReq).url().toString();
+    }
+}
+
+// ============================================================
+// CloudWatch — Monitoring + Alerting
+// ============================================================
+
+// Spring Boot Actuator → Micrometer → CloudWatch metrics
+management:
+  metrics:
+    export:
+      cloudwatch:
+        namespace: Healthcare/PatientService
+        step: 60s    # Every 60 sec push metrics
+    tags:
+      application: patient-service
+      environment: production
+
+// Custom metrics in code:
+@Component
+public class RAGMetrics {
+    private final MeterRegistry registry;
+
+    // Custom counter — RAG queries track karo
+    private final Counter ragQueryCounter;
+    private final Timer ragLatencyTimer;
+
+    public RAGMetrics(MeterRegistry registry) {
+        this.ragQueryCounter = Counter.builder("rag.queries.total")
+            .tag("service", "ai-query").register(registry);
+        this.ragLatencyTimer = Timer.builder("rag.latency")
+            .register(registry);
+    }
+
+    public void recordQuery(boolean success, long durationMs) {
+        ragQueryCounter.increment(1, Tags.of("success", String.valueOf(success)));
+        ragLatencyTimer.record(durationMs, TimeUnit.MILLISECONDS);
+    }
+}
+
+// CloudWatch Alarms (in Terraform/CDK):
+// - ai-query-service P99 latency > 5s → Alert
+// - patient-service error rate > 1% → Alert (pager duty)
+// - RDS CPU > 80% → Alert
+// - Kafka consumer lag > 10000 → Alert (indexing backed up)
+
+// ============================================================
+// IAM — Least Privilege Principle
+// ============================================================
+
+STORY: Hospital staff permissions analogy
+  Receptionist: Patient names dekh sakta hai, medical records nahi
+  Doctor: Full patient records, prescriptions
+  AI Service: S3 read only (documents), no write access
+  Backup Job: S3 write only, no delete
+
+// IRSA (IAM Role for Service Account) — pod-level permissions:
+// 1. IAM Role create karo with specific permissions
+// 2. K8s ServiceAccount create karo
+// 3. Annotate ServiceAccount with IAM Role ARN
+// 4. Pod ko ServiceAccount assign karo
+// Result: Pod AWS pe kaam kar sakta hai WITHOUT static credentials!
+
+// ai-query-service ka IAM policy:
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": ["s3:GetObject"],           // Only READ documents
+            "Resource": "arn:aws:s3:::healthcare-docs/*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": ["secretsmanager:GetSecretValue"],
+            "Resource": "arn:aws:secretsmanager:us-east-1:*:secret:healthcare/openai*"
+        }
+        // NO s3:PutObject, NO s3:DeleteObject — least privilege!
+    ]
+}
+
+// ============================================================
+// VPC — Network Isolation
+// ============================================================
+
+VPC Architecture for healthcare:
+
+Public Subnets:
+  - ALB (Application Load Balancer)
+  - NAT Gateway (private subnet outbound traffic)
+
+Private Subnets:
+  - EKS worker nodes
+  - RDS instances (NO public access — healthcare compliance!)
+  - ElastiCache
+  - MSK brokers
+
+SECURITY GROUPS (Virtual Firewall):
+  ALB Security Group:
+    Inbound:  443 from 0.0.0.0/0   (Internet HTTPS)
+    Outbound: 8080 to EKS nodes
+
+  Patient Service Security Group:
+    Inbound:  8080 from ALB SG only
+    Outbound: 5432 to RDS SG, 6379 to Redis SG, 9092 to MSK SG
+
+  RDS Security Group:
+    Inbound:  5432 from Patient Service SG ONLY
+    NO Internet access — DB directly accessible nahi
+
+================================================================================
+SECTION 9: SCENARIO BASED QUESTIONS — DEVOPS
+================================================================================
+
+SCENARIO 1: "Production database slow hai — first response kya hoga?"
+"Steps:
+ 1. CloudWatch RDS metrics check: CPU, connections, read/write latency
+ 2. Slow query log enable: pg_stat_statements se slow queries identify
+ 3. Kill long-running queries jo block kar rahe hain
+ 4. Quick wins: Missing index? EXPLAIN ANALYZE run karo
+ 5. If load: Read replica ko vector search ke liye use karo
+ 6. If still issue: Vertical scale RDS (maintenance window ke baad)"
+
+SCENARIO 2: "Docker image ECR mein push karo but size 2GB hai"
+"2GB bahut zyada hai! Debug karo:
+ docker history patient-service:latest -- Har layer ka size dekho
+ Usually: Maven dependencies layer (>1GB) skip nahi kar rahe
+ FIX: Multi-stage build use karo!
+   Builder stage: JDK + Maven + source → only JAR copy karo runtime mein
+   Runtime stage: Sirf JRE + JAR → ~80MB
+ Also: .dockerignore file add karo:
+   target/, .git/, *.md — unnecessary files mat copy karo"
+
+SCENARIO 3: "Kubernetes pod OOMKilled ho raha hai"
+"OOMKilled = container ne memory limit exceed ki, K8s ne kill kar diya
+ Steps:
+ 1. kubectl describe pod <name> -- 'OOMKilled' reason confirm karo
+ 2. Memory usage check: kubectl top pod <name>
+ 3. JVM tuning check: -XX:MaxRAMPercentage=75 laga hai?
+ 4. Heap dump leke analyze karo: -XX:+HeapDumpOnOutOfMemoryError
+ 5. Short term: limits.memory badhao (512Mi → 1Gi)
+ 6. Long term: Memory leak fix karo (heap dump analysis)"
+
+SCENARIO 4: "Jenkins deployment fail hua production mein — next steps?"
+"Automatic rollback Jenkins post { failure } block ne kar diya (kubectl rollout undo)
+ Investigate:
+ 1. Jenkins log dekho — kaunsa stage fail hua?
+ 2. kubectl logs — application error kya tha?
+ 3. kubectl describe pod -- CrashLoopBackOff? OOMKilled? ImagePullError?
+ 4. Common causes:
+    - Startup fail: Missing env var? DB connection? Kafka not reachable?
+    - ImagePullError: ECR credentials expire? Wrong tag?
+    - Crash on start: Application exception? Config error?
+ 5. Fix karo, PR raise karo, pipeline re-run karo"
+
+SCENARIO 5: "Healthcare app ka compliance audit — AWS mein kya show karte?"
+"HIPAA compliance evidence:
+ 1. Encryption at rest: RDS encryption ON, S3 SSE-S3/KMS, EBS encrypted
+ 2. Encryption in transit: All internal traffic TLS (MSK SASL_SSL, Redis SSL)
+ 3. Access control: IAM least privilege, K8s RBAC, VPC isolation
+ 4. Audit logging: CloudTrail (API calls), CloudWatch Logs (application)
+ 5. Backup: RDS automated backups 35 days, Multi-AZ, point-in-time recovery
+ 6. Monitoring: CloudWatch alarms, GuardDuty (threat detection)
+ 7. Penetration testing: Trivy image scan in CI/CD pipeline"
+
+================================================================================
+SECTION 10: MICROSERVICES PATTERNS + DEVOPS INTEGRATION
+================================================================================
+
+Q5. Healthcare microservices architecture mein DevOps kaise integrate hai?
+
+SERVICE MESH — Communication between services:
+  Patient service → AI Query service → how to communicate?
+  Option 1: Direct HTTP call (simple but tight coupling)
+  Option 2: Kafka events (loose coupling — our choice)
+  Option 3: Service mesh (Istio/Linkerd) — mTLS, circuit breaking, observability
+
+DISTRIBUTED TRACING — Request across services track karo:
+
+// application.yml (Micrometer + Zipkin/AWS X-Ray):
+management:
+  tracing:
+    sampling:
+      probability: 0.1   # 10% requests trace karo (production — 100% expensive)
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+
+// Auto-instrumented: Every HTTP call + Kafka message pe trace_id propagate
+// Patient request → patient-service → Kafka → ai-service → OpenAI
+// AWS X-Ray mein pura flow ek trace mein dikh jaata hai
+
+HEALTH CHECKS — Spring Actuator + Kubernetes integration:
+
+// application.yml:
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true          // K8s probes ke liye special endpoints
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true            // /actuator/health/liveness
+    readinessstate:
+      enabled: true            // /actuator/health/readiness
+    kafka:
+      enabled: true            // Kafka connectivity check
+    db:
+      enabled: true            // DB connectivity check
+    redis:
+      enabled: true            // Redis connectivity check
+
+// Liveness = "App alive hai?" (crash → restart)
+// Readiness = "App traffic le sakta hai?" (DB disconnect → traffic stop)
+
+================================================================================
+QUICK CHEAT SHEET — DEVOPS INTERVIEW
+================================================================================
+
+TERM                    → EXPLANATION
+----------------------    ---------------------------------------------------
+Docker Image            → Immutable blueprint (baked application)
+Docker Container        → Running image instance
+Multi-stage build       → Build stage alag, runtime stage alag → small image
+docker-compose          → Multiple containers local dev mein orchestrate
+Kubernetes Pod          → Ek ya adhik containers (K8s smallest unit)
+Deployment              → Pods manage karo (replicas, rolling update)
+Service                 → Stable DNS + load balancer for pods
+ConfigMap               → Non-secret config (DB URL)
+Secret                  → Sensitive config (passwords) — base64
+Ingress                 → HTTP routing, TLS termination
+HPA                     → CPU/memory pe auto-scale pods
+Rolling Update          → Zero-downtime: ek ek pod replace karo
+Rollback                → kubectl rollout undo (pichla version)
+Liveness Probe          → Alive? No → Restart
+Readiness Probe         → Ready for traffic? No → Remove from LB
+EKS                     → AWS managed Kubernetes
+ECR                     → AWS managed Docker registry
+RDS                     → AWS managed PostgreSQL (+ pgvector)
+ElastiCache             → AWS managed Redis
+MSK                     → AWS managed Kafka
+IRSA                    → IAM Role for K8s pods (no static credentials)
+CloudWatch              → Logs + Metrics + Alarms
+Multi-AZ                → Multiple availability zones = high availability
+Security Group          → AWS virtual firewall
+VPC                     → Private network (DB no public access)
+Trivy                   → Docker image vulnerability scanner
+SASL_SSL                → MSK ka security protocol
+
+INTERVIEW ANSWER TEMPLATE for any DevOps question:
+"Pehle explain karo WHY this tool (pain point kya tha)
+ Phir WHAT it does
+ Phir HOW we configured it in healthcare project
+ Phir SCENARIO — incident ya optimization story"
+
+================================================================================
+END — DEVOPS SECTION | EPAM Healthcare Project
+================================================================================

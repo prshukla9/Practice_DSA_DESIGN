@@ -1,0 +1,61 @@
+
+SECTION 1: CORE SPRING CONCEPTS
+IOC (Inversion of Control) kya hota hai?
+Dependency Injection ke types (Constructor vs Setter vs Field)?
+Bean lifecycle explain karo?
+ApplicationContext vs BeanFactory?
+Spring container ka role kya hai?
+
+SECTION 2: BEAN & SCOPE DEEP DIVE
+Bean scopes kya hote hain?
+Singleton bean thread-safe hota hai ya nahi?
+Prototype bean ka lifecycle kaise manage hota hai?
+Lazy initialization kya hota hai?
+Bean initialization hooks (@PostConstruct etc.)?
+
+SECTION 3: SPRING BOOT CORE
+Spring Boot kya problem solve karta hai?
+Auto-configuration kaise kaam karta hai internally?
+@SpringBootApplication me kya hota hai internally?
+Embedded server kaise run hota hai (Tomcat)?
+application.properties vs application.yml?
+
+SECTION 4: ANNOTATIONS (Important)
+@Component vs @Service vs @Repository?
+@Autowired vs @Inject vs @Resource?
+@Qualifier ka use?
+@Primary kya karta hai?
+@Value annotation ka use?
+
+SECTION 5: SPRING MVC & REST
+@RestController vs @Controller?
+@RequestMapping vs @GetMapping etc.?
+@PathVariable vs @RequestParam?
+Exception handling using @ControllerAdvice?
+ResponseEntity ka use?
+
+SECTION 6: SPRING DATA JPA
+JPA vs Hibernate difference?
+CrudRepository vs JpaRepository?
+Lazy vs Eager loading?
+N+1 problem kya hota hai?
+@Transactional kaise kaam karta hai?
+
+SECTION 7: SPRING SECURITY (Basic + Important)
+Authentication vs Authorization?
+JWT kya hota hai aur kaise use hota hai?
+Spring Security filter chain kya hota hai?
+Password encoding kaise hota hai?
+
+SECTION 8: ADVANCED / INTERNAL WORKING
+AOP (Aspect-Oriented Programming)?
+Proxy kaise kaam karta hai Spring me?
+Circular dependency kaise resolve hoti hai?
+Bean overriding + Profiles?
+
+SECTION 9: REAL-WORLD SCENARIO QUESTIONS
+Application slow ho jaye â€” kaise debug?
+High memory Spring Boot app fix?
+Multi-env configuration manage?
+Microservices communication design?
+Logging + monitoring?

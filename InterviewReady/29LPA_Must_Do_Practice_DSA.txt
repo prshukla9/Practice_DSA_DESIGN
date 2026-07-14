@@ -1,0 +1,256 @@
+DSA PRACTICE SHEET — LEVELED
+(Rakuten | Target | Publicis Sapient | Walmart)
+Last Updated: June 2026
+Total Questions: 138
+==========================================================================================
+
+1. STRINGS
+==========================================================================================
+
+
+1.  Reverse a String
+2.  Check Palindrome
+3.  Valid Anagram
+4.  First Non-Repeating Character
+5.  Character Frequency Count
+6.  Remove Duplicate Characters
+7.  Capitalize First Letter Each Word
+8.  Sum of Digits in String
+9.  Check Pangram (missing letters)
+10. Longest Common Prefix
+
+[MEDIUM]
+11. Reverse Words in a String
+12. Remove Adjacent Duplicate Characters
+13. All Permutations of a String
+14. Find Permutation in String
+15. Longest Palindrome (length)
+16. Longest Substring Without Repeating Chars
+17. Longest Substring with At Most K Distinct Chars
+18. Minimum Window Substring
+19. Find All Anagrams in String
+20. Group Anagrams
+21. Longest Repeating Character Replacement
+22. Smallest Window Containing All Chars
+23. Count Substrings with Exactly K Distinct Chars
+24. String Compression
+25. Decode String (e.g. 3[a2[bc]])
+26. Longest Consecutive Sequence
+27. Word Break
+
+
+28. Longest Palindromic Substring
+29. Longest Palindromic Subsequence
+30. Reduce String by Removing K Consecutive
+31. Rabin-Karp Algorithm
+32. KMP Algorithm
+
+==========================================================================================
+
+2. ARRAYS
+==========================================================================================
+
+
+33. Missing Number
+34. Move Zeroes
+35. Find Duplicates in Array
+36. Sort 0-1-2 (Dutch National Flag)
+37. Rotate Array K Times
+38. Majority Element (>n/2)
+39. Classic Binary Search
+40. Peak Element
+
+[MEDIUM]
+41. 2 Sum (sorted & unsorted)
+42. 3 Sum
+43. Maximum Product Subarray
+44. Merge Intervals
+45. Insert Intervals
+46. Sliding Window Maximum
+47. Frequency of Most Frequent Element
+48. Subarray Sum Equals K
+49. Kth Largest Element
+50. Non-Overlapping Intervals
+51. Jump Game I
+52. Jump Game II (min jumps)
+53. Next Permutation
+54. First & Last Occurrence (Binary Search)
+55. Search in Rotated Sorted Array
+56. Find All Unique Triplets Summing to Zero
+57. Product of Array Except Self
+
+
+58. 4 Sum
+59. Trapping Rain Water
+60. Container With Most Water
+61. Median of Two Sorted Arrays
+
+==========================================================================================
+
+3. STACK
+==========================================================================================
+
+
+62. Valid Parentheses
+63. Min Stack (getMin in O(1))
+
+[MEDIUM]
+64. Stock Span Problem
+65. Next Greater Element
+66. Next Smaller Element
+67. Evaluate Reverse Polish Notation
+
+
+68. Largest Rectangle in Histogram
+
+==========================================================================================
+
+4. HEAP / PRIORITY QUEUE
+==========================================================================================
+
+
+69. Kth Largest Element (min-heap of size k)
+70. Priority Queue Basics in Java
+
+[MEDIUM]
+71. Top K Frequent Elements
+72. Task Scheduler
+73. K Closest Points to Origin
+74. Merge K Sorted Lists
+
+
+75. Find Median from Data Stream
+
+==========================================================================================
+
+5. LINKED LIST
+==========================================================================================
+
+
+76. Create / Traverse a Linked List
+77. Reverse Linked List
+78. Detect Loop (Floyd's Cycle)
+79. Middle of Linked List
+80. Palindrome Linked List
+
+[MEDIUM]
+81. Remove Nth Node from End
+82. Merge Two Sorted Linked Lists
+83. Add Two Numbers (as LinkedList)
+84. Intersection of Two Linked Lists
+85. LRU Cache
+
+
+86. Reverse Nodes in K-Group
+
+==========================================================================================
+
+6. TREES  *** NEW ***
+==========================================================================================
+
+
+87.  Inorder / Preorder / Postorder Traversal
+88.  Level Order Traversal (BFS)
+89.  Height / Max Depth of Binary Tree
+90.  Invert Binary Tree
+91.  Same Tree / Symmetric Tree
+92.  Count Nodes in Binary Tree
+93.  Diameter of Binary Tree
+
+[MEDIUM]
+94.  BST — Insert / Search / Delete
+95.  Validate BST
+96.  Lowest Common Ancestor (LCA)
+97.  Path Sum (root to leaf)
+98.  Right Side View of Tree
+99.  Zigzag Level Order Traversal
+100. Kth Smallest in BST
+101. Construct Tree from Preorder + Inorder
+
+
+102. Binary Tree Maximum Path Sum
+103. Serialize and Deserialize Binary Tree
+
+==========================================================================================
+
+7. GRAPHS  *** NEW ***
+==========================================================================================
+
+
+104. BFS Traversal of Graph
+105. DFS Traversal of Graph
+106. Number of Islands
+107. Connected Components Count
+
+[MEDIUM]
+108. Detect Cycle in Undirected Graph
+109. Detect Cycle in Directed Graph
+110. Topological Sort (DFS + Kahn's BFS)
+111. Course Schedule (can finish?)
+112. Clone Graph
+113. Bipartite Graph Check
+114. Shortest Path in Unweighted Graph (BFS)
+
+115. Dijkstra's Shortest Path
+
+==========================================================================================
+
+8. DYNAMIC PROGRAMMING  *** NEW ***
+==========================================================================================
+
+116. Fibonacci (Memoization / Tabulation)
+117. Climbing Stairs
+118. House Robber
+119. Maximum Subarray (Kadane's)
+
+[MEDIUM]
+120. 0/1 Knapsack
+121. Coin Change (min coins)
+122. Longest Common Subsequence (LCS)
+123. Longest Increasing Subsequence (LIS)
+124. Edit Distance
+125. Partition Equal Subset Sum
+126. Unique Paths in Grid
+127. House Robber II (circular)
+
+
+128. Burst Balloons
+129. Word Break II (all solutions)
+
+==========================================================================================
+
+9. RECURSION & BACKTRACKING  *** NEW ***
+==========================================================================================
+
+
+130. Factorial / Power (recursive)
+131. Generate All Subsets / Power Set
+
+[MEDIUM]
+132. Combination Sum (with repetition)
+133. Combination Sum II (no repetition)
+134. Permutations of Array
+135. Letter Combinations of Phone Number
+136. Palindrome Partitioning
+
+
+137. N-Queens Problem
+138. Sudoku Solver
+
+==========================================================================================
+SUMMARY
+==========================================================================================
+Category                        Easy    Medium  Hard    Total
+------------------------------------------------------------------------------------------
+1. Strings                      10      17      5       32
+2. Arrays                       8       17      4       29
+3. Stack                        2       4       1       7
+4. Heap / Priority Queue        2       4       1       7
+5. Linked List                  5       5       1       11
+6. Trees (NEW)                  7       8       2       17
+7. Graphs (NEW)                 4       7       1       12
+8. Dynamic Programming (NEW)    4       8       2       14
+9. Recursion & Backtracking     2       5       2       9
+------------------------------------------------------------------------------------------
+TOTAL                           44      75      19      138
+==========================================================================================

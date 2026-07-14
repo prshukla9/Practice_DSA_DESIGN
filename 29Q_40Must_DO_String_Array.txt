@@ -1,0 +1,141 @@
+Level 1: Core Fundamentals (Must be instant ⚡)
+
+If you hesitate here, interviewer loses confidence.
+
+Reverse a string (in-place & using StringBuilder)
+Check palindrome (ignore special chars, case-insensitive)
+Valid anagram
+First non-repeating character
+Character frequency count
+Remove duplicate characters
+Check if string contains only digits
+String to integer (atoi)
+Longest common prefix
+Check rotation of string
+Reverse words in a sentence
+Capitalize first letter of each word
+🔹 Level 2: Hashing + Two Pointer + Sliding Window
+
+This is the MOST important section for your experience
+
+Longest substring without repeating characters
+Longest substring with at most K distinct characters
+Minimum window substring
+Find all anagrams in a string
+Group anagrams
+Check isomorphic strings
+Longest repeating character replacement
+Check if permutation of one string exists in another
+Smallest window containing all characters of another string
+Count substrings with exactly K distinct characters
+
+
+🔹 Level 3: String Building & Manipulation (Real-world style)
+
+Common in backend/log-processing discussions.
+
+String compression (aaabb → a3b2)
+Decode string (3[a2[c]] → accaccacc)
+Encode and decode list of strings
+Multiply two large numbers (as strings)
+Add binary strings
+Add numeric strings
+Remove K digits to form smallest number
+Compare version numbers (1.01 vs 1.001)
+
+
+🔹 Level 4: Pattern Matching (Very important for senior roles)
+
+This is where you separate from average devs.
+
+Implement strStr() (basic substring search)
+KMP algorithm (LPS array + pattern search)
+Rabin-Karp algorithm
+Z-algorithm (pattern matching)
+🔹 Level 5: Dynamic Programming on Strings (High weightage)
+
+Expect at least 1 from here.
+
+Longest palindromic substring
+Count palindromic substrings
+Longest palindromic subsequence
+Word Break problem
+Edit distance (Levenshtein distance)
+Regular expression matching (. and *)
+
+-------------------------------------------------------------------------------------------------
+
+Array
+Level 1: Core Fundamentals (Should be instant ⚡)
+Find maximum and minimum in array
+Reverse an array (in-place)
+Check if array is sorted
+Find second largest element
+Remove duplicates from sorted array
+Move all zeros to end
+Rotate array by K positions
+Find missing number (1 to n)
+Find duplicate number
+Find intersection of two arrays
+
+
+🔹 Level 2: Prefix Sum + Basic Optimization
+
+Very common in real interviews.
+
+Maximum subarray sum (Kadane’s Algorithm)
+Find equilibrium index
+Subarray sum equals K
+Count number of subarrays with given sum
+Product of array except self
+Running sum / prefix sum array
+Range sum query (immutable)
+Find pivot index
+Largest sum subarray of size K
+Maximum average subarray
+
+
+🔹 Level 3: Two Pointer + Sliding Window (🔥 MOST IMPORTANT)
+Two sum (sorted + unsorted variants)
+Three sum
+Container with most water
+Trapping rain water
+Remove duplicates allowing at most 2
+Longest subarray with sum ≤ K
+Minimum size subarray sum
+Maximum consecutive ones
+Longest subarray with equal 0s and 1s
+Sliding window maximum (deque concept)
+
+
+🔹 Level 4: Sorting + Greedy + Intervals
+Merge overlapping intervals
+Insert interval
+Meeting rooms / minimum platforms
+Sort colors (Dutch National Flag)
+Kth largest element (heap / quickselect)
+Top K frequent elements
+Majority element (Boyer-Moore)
+Gas station problem
+Candy distribution problem
+Minimum number of arrows to burst balloons
+
+🔥 What Interviewer Expects at 6 YOE
+
+Don’t just solve—talk like a senior:
+
+✅ While solving:
+Start with brute force → optimize
+Explain why sliding window works
+Mention time/space trade-offs
+Handle edge cases (empty, negatives, duplicates)
+🔥 Patterns You MUST Master
+
+If you master these, you can solve 80% of problems:
+
+Sliding Window → Q13, 19, 27, 30
+Two Pointer → Q21–24
+Prefix Sum → Q13–16
+Greedy → Q31–40
+Kadane’s Algorithm → Q11
+Heap / Quickselect → Q35–36

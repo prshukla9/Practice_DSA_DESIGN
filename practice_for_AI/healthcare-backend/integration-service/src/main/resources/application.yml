@@ -1,0 +1,21 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: integration-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+
+fhir:
+  base-url: ${FHIR_BASE_URL:https://hapi.fhir.org/baseR4}
+  token-url: ${FHIR_TOKEN_URL:https://hie.example.com/oauth/token}
+
+services:
+  consent-url: ${CONSENT_SERVICE_URL:http://localhost:8082}
+
+cache:
+  ttl-minutes: 30

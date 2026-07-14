@@ -1,0 +1,451 @@
+Software Developer | Nov 2025 - Present
+EPAM | Bengaluru
+Designing and developing scalable healthcare microservices for patient and doctor workflows, integrating FHIR-based interoperable data exchange and AI-driven capabilities for intelligent query handling and decision support.
+● Designed and developed Spring Boot-based microservices for patient management and doctor availability in a distributed architecture
+● Implemented FHIR-based interoperable data exchange to enable secure and standardized sharing of patient health records across systems
+● Developed HIPAA-compliant patient consent management workflows for secure access to sensitive healthcare data
+● Designed and implemented Kafka-based event-driven architecture for real-time updates and notifications
+● Built AI-powered assistant using OpenAI APIs to handle patient and doctor queries with natural language interaction
+● Implemented semantic search using pgvector and designed context-aware prompt pipelines to improve response accuracy and relevance
+● Optimized high-traffic APIs, reducing latency by 200ms and improving response time by 30%
+
+
+
+Software Developer | Apr 2024 – Oct 2025
+Blue Yonder | Bengaluru
+● Developed and deployed RESTful microservices using Spring Boot, ensuring modularity, scalability, and ease of maintenance across multiple components.
+● Implemented Kafka-based asynchronous communication between services to handle high-volume event-driven data processing and ensure real-time data consistency.
+● Enhanced API functionality to improve system performance and ensure seamless integration with client-facing applications. Resolved P1 production issues, improving system reliability and, and ensuring a smooth user experience.
+● Conducted JMeter and PSR load testing, optimizing server performance by identifying and resolving bottlenecks.
+● Collaborated on the materialization process, significantly improving data processing speed and efficiency.
+● Designed event-driven architecture using Kafka.
+● Handled async processing and data consistency.
+
+
+
+
+theory for AWS---------------------------------------------
+"Humne apna system microservices architecture pe design kiya jahan services Docker containers me package ki gayi.
+Unhe AWS EKS (Kubernetes) pe deploy kiya for orchestration, auto-scaling aur service discovery.
+External traffic API Gateway aur ALB ke through route hota tha.
+Inter-service communication ke liye Kafka (AWS MSK) based event-driven architecture use kiya.
+Database layer me RDS (PostgreSQL + pgvector) use kiya.
+Large FHIR documents (PDF) ke liye S3 use kiya.
+Performance improve karne ke liye Redis (ElastiCache) caching aur async processing implement ki.
+CI/CD Jenkins se automate thi, aur monitoring CloudWatch se hoti thi."
+
+---------------------------------------------------------------------------------
+Core Infra
+Amazon Web Services EC2 / ECS / EKS  ONLY AWS
+☁️ Core Cloud
+Amazon Web Services (overall infra)
+
+
+⚙️ Compute
+EKS (Kubernetes) → microservices orchestration
+(Alt: ECS agar K8s unsure ho)
+
+
+🔥 API Layer
+API Gateway → routing + auth
+Application Load Balancer (ALB) → traffic distribute
+
+🧩 Messaging
+MSK (Managed Kafka) → consent-events, document-events, fhir-sync-events
+
+🗄️ Database
+RDS (PostgreSQL + pgvector)
+
+📦 Storage
+S3 → large FHIR clinical documents (PDF, imaging)
+
+⚡ Caching
+ElastiCache (Redis) → consent cache, FHIR metadata cache
+
+📊 Monitoring
+CloudWatch
+
+🔐 Security
+IAM
+(Bonus: Secrets Manager)
+
+🤖 Optional (Smart add)
+Lambda → async AI embedding / batch indexing jobs
+
+
+
+-----------------------------------------------------------------------------------------
+
+Questions scenario based AWS on project (6 YOE)
+
+🏗️ Architecture Level
+AWS pe apna system end-to-end kaise deploy kiya?
+EKS vs ECS — tumne kya choose kiya aur kyun?
+API Gateway + ALB dono kyun use kiye?
+Microservices ka communication flow AWS me kaise hai?
+External vs internal traffic kaise handle hota hai?
+FHIR document fetch flow AWS stack pe explain karo (Gateway → EKS → RDS/S3/MSK)
+
+
+⚙️ Compute & Containers
+Docker containers AWS me kaise deploy kiye?
+Kubernetes (EKS) me service discovery kaise hoti hai?
+Auto-scaling kaise configure kiya?
+Pod crash ho jaye to system kaise recover karega?
+Rolling deployment kaise kaam karta hai?
+
+
+🔥 Kafka (MSK)
+Kafka ko AWS pe kaise manage kiya (MSK)?
+MSK vs self-managed Kafka difference
+Kaunse topics? (consent-events, document-events)
+Broker fail ho jaye to kya hota hai?
+Consumer lag kaise monitor kiya AWS me?
+Kafka scaling kaise handle ki?
+PHI Kafka payload me kaise avoid kiya?
+
+
+🗄️ Database (RDS)
+RDS vs self-hosted DB — kya choose karoge?
+PostgreSQL + pgvector extension kaise enable kiya?
+Read replica kab use karte ho?
+DB bottleneck ho jaye to kya karoge?
+Connection pooling (HikariCP) kaise manage kiya?
+Backup & recovery kaise hota hai?
+pgvector embeddings kahan store kiye? Index type?
+
+
+📦 S3 (FHIR Documents)
+Large FHIR PDF/imaging reports kahan store kiye? Kyun S3?
+Presigned URL ka use kab kiya?
+S3 encryption at rest kaise configure kiya?
+RDS me kya store kiya vs S3 me kya?
+
+
+⚡ Caching & Performance
+Redis ka use kaha kiya aur kyun?
+  (consent check cache, FHIR document metadata cache)
+Cache invalidation kaise handle kiya? (Kafka consent-revoked / document-received)
+200ms latency reduction kaise achieve ki AWS pe?
+High traffic APIs kaunsi thi? (FHIR list, consent check, AI query)
+CDN use kiya? kab karte ho?
+
+
+📊 Monitoring & Debugging
+CloudWatch ka use kaise kiya?
+Logs aur metrics kaise analyze kiye?
+Alerts kaise configure kiye? (5xx, p99 latency, MSK lag)
+Production issue ka root cause kaise find kiya?
+Distributed tracing / correlation ID kaise use kiya?
+consent-service down hone par monitoring kya dikhata hai?
+
+
+🔐 Security
+IAM roles kaise use kiye? (IRSA for EKS pods)
+Secrets ko kaise manage kiya? (Secrets Manager — DB, Kafka, OpenAI key)
+API security kaise implement ki?
+HIPAA — data encryption at rest aur in transit?
+VPC me services secure kaise rakhe?
+S3 bucket public access block?
+
+
+----------------------------------------------------------------------------------------------
+
+SECTION 1: End-to-End Architecture (MOST IMPORTANT)
+Apne project ka end-to-end architecture explain karo (client → API → services → DB → Kafka → S3)
+Microservices ko AWS pe kaise deploy kiya?
+Docker ka role kya tha tumhare project me?
+Kubernetes (EKS) ka use kyun kiya?
+External request ka flow explain karo (Client → API Gateway → ALB → fhir-sync / consent / ai-assistant)
+
+🐳 SECTION 2: Docker (Project Based — 6 YOE)
+Tumne kaunse microservices Dockerize kiye?
+  (consent-service, fhir-sync-service, ai-assistant-service, notification-service)
+Dockerfile me kya important configurations the?
+Multi-stage build use kiya? kyun?
+Container restart ho jaye to system kaise recover karta hai?
+Docker me services ek dusre se kaise communicate karti hain?
+  👉 Example: fhir-sync-service → http://consent-service:8080/api/v1/consents/check
+
+☸️ SECTION 3: Kubernetes / EKS
+Pod, Service, Deployment ka role explain karo
+Kubernetes me service discovery kaise hoti hai?
+  👉 Example: http://consent-service.healthcare.svc.cluster.local:8080
+Auto-scaling kaise implement kiya (HPA)?
+Rolling deployment kaise kaam karta hai?
+Pod crash ho jaye to kaise debug karte ho?
+ConfigMap vs Secret — tumhare project me kya store kiya?
+Liveness vs Readiness probe — endpoints?
+
+⚙️ SECTION 4: CI/CD (Jenkins)
+Jenkins pipeline ka flow explain karo
+Code commit hone ke baad kya process hota hai?
+Build → Test → Docker → ECR → EKS deploy automation kaise kiya?
+Deployment fail ho jaye to rollback kaise hota hai?
+Zero downtime deployment kaise achieve kiya?
+
+☁️ SECTION 5: AWS Services (Project Mapping)
+AWS pe kaun kaun si services use ki aur kyun?
+EKS vs ECS — tumne kya choose kiya aur kyun?
+RDS (PostgreSQL + pgvector) ka use kaise kiya?
+S3 ka use FHIR large documents ke liye kaise kiya?
+Apache Kafka ko AWS pe kaise manage kiya (MSK)?
+CloudWatch ka use monitoring aur debugging me kaise kiya?
+
+🌐 SECTION 6: Networking (VPC + Communication)
+VPC kya hota hai aur tumhare project me kaise use hua?
+Public vs private subnet ka use kaha kiya?
+Microservices internal communication kaise hoti hai?
+API Gateway ka role kya tha system me?
+Security groups kaise configure kiye service communication ke liye?
+
+⚡ SECTION 7: Performance & Scaling
+Agar 10x traffic aajaye to system kaise scale karega?
+Auto-scaling triggers kaise decide kiye?
+High latency issue kaise debug kiya cloud me?
+Redis caching kaise implement ki aur kaha use ki?
+Cost optimization kaise kiya AWS environment me?
+
+💣 SECTION 8: Real Scenario / Killer Questions
+
+👉 "Agar Kubernetes cluster down ho jaye to system ka kya hoga?"
+👉 "Deployment ke baad bug aaye to rollback kaise karoge?"
+👉 "Kafka delay ho jaye — consent-revoked delayed — security impact kya?"
+👉 "consent-service accessible nahi hai — FHIR access ka kya hoga?"
+👉 "Agar service accessible nahi hai to debugging kaise karoge?"
+👉 "50MB FHIR PDF — RDS me store kyun nahi kiya?"
+
+
+Devops + Docker + Kubernetes (Theory — 6 YOE)
+
+Docker (Core + Practical)
+Docker kya hai aur VM se kaise different hai?
+Docker image vs container
+Dockerfile kya hota hai?
+Multi-stage build kya hota hai?
+Containerization ka benefit kya hai microservices me?
+Docker me services communicate kaise krti hai?
+Microservices aur Kafka based service Docker/K8s me kaise communicate krti hai?
+
+☸️ Kubernetes (Must Know for 6 YOE)
+Kubernetes kya hai?
+Pod kya hota hai?
+Deployment vs StatefulSet
+Service kya hota hai (ClusterIP, NodePort, LoadBalancer)?
+Auto-scaling kaise hoti hai (HPA)?
+
+⚙️ K8s Advanced
+ConfigMap vs Secret
+Liveness vs Readiness probe
+Rolling deployment kya hota hai?
+Blue-green deployment kaise karte ho?
+Pod crash ho raha hai — kaise debug karoge?
+
+🔥 CI/CD (Jenkins Focus)
+Jenkins kya hai?
+CI/CD pipeline kya hoti hai?
+Pipeline stages kya hote hain?
+Jenkinsfile kya hota hai?
+Automated deployment ka flow kya hota hai?
+
+⚡ Real DevOps Scenarios
+Code deploy hone ke baad app crash ho gaya — kya karoge?
+Rollback kaise karte ho?
+Zero downtime deployment kaise achieve karte ho?
+Environment configs kaise manage karte ho?
+Secrets (OpenAI API key, DB creds) kaise secure karte ho?
+
+🏗️ AWS + DevOps Integration
+EKS vs ECS difference
+Docker containers AWS pe kaise deploy karte ho?
+Logs kaise monitor karte ho (CloudWatch)?
+Scaling kaise handle karte ho?
+Production debugging kaise karte ho?
+
+💣 Interviewer Killer Questions
+
+👉 "Agar deployment fail ho jaye to kya karoge?"
+👉 "Rollback strategy kya hai?"
+👉 "Kubernetes me memory leak kaise detect karte ho?"
+
+
+Communication (with project examples)
+
+SECTION 1: Docker Communication
+Docker containers ek dusre se kaise communicate karte hain?
+👉 Example: fhir-sync-service → http://consent-service:8080
+Agar container restart ho jaye to communication break hoga? kaise handle karoge?
+Docker me service discovery kaise hoti hai?
+Bridge network vs host network difference kya hai?
+Docker Compose me multi-service communication kaise hota hai?
+
+☸️ SECTION 2: Kubernetes Communication
+Kubernetes me service discovery kaise hoti hai?
+👉 Example: http://fhir-sync-service.healthcare.svc.cluster.local:8080
+Pod vs Service ka role communication me kya hai?
+ClusterIP vs NodePort vs LoadBalancer difference
+Agar ek pod crash ho jaye to request ka kya hoga?
+Load balancing kaise hoti hai K8s me?
+Inter-service security kaise implement karte ho?
+
+☁️ SECTION 3: AWS Communication
+VPC ke andar microservices kaise communicate karte hain?
+👉 Example: fhir-sync-service → internal ALB / ClusterIP → consent-service
+API Gateway ka use kab karte ho?
+👉 Example: Client → API Gateway → ALB → fhir-sync-service
+Security groups communication ko kaise control karte hain?
+Agar service accessible nahi hai to debugging kaise karoge?
+
+🔥 SECTION 4: Kafka + Async Communication
+Direct call vs Kafka communication difference
+👉 Sync REST → consent check before FHIR fetch
+👉 Async Kafka → document-received → AI indexing + notification
+Kafka me producer aur consumer ka flow explain karo
+Message delay ho raha hai — kaise debug karoge?
+Real example:
+"FHIR document fetch complete → Kafka document-events → ai-assistant indexing → notification alert"
+
+
+Advance topics (Optional — 6 YOE+)
+
+⚙️ Terraform (IaC)
+Terraform kya hai aur kyun use karte hain?
+plan vs apply difference
+Terraform vs CloudFormation
+
+🔥 Blue-Green / Canary Deployment
+Blue-green deployment kya hota hai?
+Canary deployment kya hota hai?
+Zero downtime deployment kaise achieve karte ho?
+Rollback kaise karte ho agar deploy fail ho jaye?
+
+📊 Monitoring (Prometheus + Grafana)
+Prometheus kya karta hai?
+Metrics vs logs vs tracing difference
+Custom metrics kaise expose karte ho (Spring Boot Actuator)?
+
+🌐 VPC (Networking Basics)
+Public vs Private subnet difference
+Security Group vs NACL
+NAT Gateway ka use kya hai?
+
+🔐 Secrets Management
+Secrets Manager vs Parameter Store
+Kubernetes me secrets kaise store karte ho?
+
+
+------------------------------------------------------------------------------------
+PRACTICAL — PROJECT MAPPED (Theory + Short Answers)
+EPAM Healthcare + Blue Yonder | 6 YOE Java Spring Boot
+------------------------------------------------------------------------------------
+
+🐳 PRACTICAL SECTION 1: Docker (Project Based)
+Tumne kaunse microservices Dockerize kiye?
+  (consent-service, fhir-sync-service, ai-assistant-service, notification-service)
+Dockerfile me base image? (eclipse-temurin:17-jre-alpine)
+Multi-stage build structure? (maven build → slim JRE runtime)
+Health check? (HEALTHCHECK /actuator/health)
+docker-compose local dev? (app + postgres + kafka + redis)
+Service-to-service call? (http://consent-service:8080)
+Secrets? (Secrets Manager / K8s Secret — NOT committed env file)
+👉 Killer: "Docker container start nahi ho raha — step-by-step debug?"
+
+
+☸️ PRACTICAL SECTION 2: Kubernetes / EKS (Project Based)
+EKS pe kaunse services deploy? (consent, fhir-sync, ai-assistant, notification)
+Namespaces? (dev / staging / prod)
+Replicas? (3 default, HPA scale to 10 for ai-assistant)
+Service discovery URL? (http://consent-service.healthcare.svc.cluster.local:8080)
+HPA triggers? (CPU > 70%)
+Rolling deploy? (maxSurge: 1, maxUnavailable: 0)
+ConfigMap? (feature flags, Kafka topic names)
+Secret? (DB password, MSK creds, OpenAI API key)
+👉 Killer: "Deployment ke baad pods Running nahi — debug steps?"
+👉 Killer: "10x traffic — EKS auto-scale flow?"
+
+
+☁️ PRACTICAL SECTION 3: AWS EKS + Infra
+End-to-end: Client → Route53 → ALB → API Gateway → EKS → RDS/MSK/Redis/S3
+API Gateway + ALB dono kyun?
+Jenkins → ECR → EKS CI/CD flow?
+CloudWatch alarms? (5xx, p99 > 500ms, MSK lag > 5 min, pod restarts)
+Multi-AZ deployment?
+👉 Killer: "EKS cluster down — DR plan?"
+👉 Killer: "AWS bill 2x — investigate kaise?"
+
+
+🗄️ PRACTICAL SECTION 4: RDS — PostgreSQL + pgvector
+Databases? (consent_db, fhir_db, ai_db)
+Indexes for performance? (patient_id, document_type, date DESC on document_metadata)
+pgvector table? (document_embeddings, vector(1536), IVFFlat index)
+HikariCP settings? (maxPoolSize=20)
+200ms latency — kaunse query pe?
+👉 Killer: "RDS CPU 100% peak hours — immediate steps?"
+
+
+⚡ PRACTICAL SECTION 5: Redis — ElastiCache
+Redis kahan? (consent check cache, FHIR metadata list cache)
+Cache keys? (consent:active:{patientId}:{granteeId}, fhir:docs:{patientId})
+TTL? (consent 60s, FHIR metadata 10 min)
+Invalidation? (Kafka consent-revoked / document-received events)
+Redis down? (fallback to DB — graceful degradation)
+👉 Killer: "Stale consent cache after revoke — fix?"
+
+
+🔥 PRACTICAL SECTION 6: MSK — Managed Kafka
+Topics? (consent-events, document-events, fhir-sync-events, *-dlq)
+Partitions? (consent 6, document 12, key=patientId)
+Producer? (acks=all, idempotence=true)
+Consumer groups? (fhir-sync-group, ai-assistant-group, notification-group)
+PHI in payload? (reference IDs only — NO clinical data in Kafka)
+Outbox pattern? (consent DB update + event same TX)
+BY topics? (order-created, inventory-updated, materialization-trigger)
+👉 Killer: "Consumer 2 hours lag — fix steps?"
+👉 Killer: "Same consent-revoked 3x — root cause + fix?"
+
+
+🔗 PRACTICAL SECTION 7: End-to-End Flow (Cloud Stack)
+Real flow: FHIR Document Fetch
+  → API Gateway (JWT auth)
+  → ALB → fhir-sync-service pod
+  → consent-service.check() SYNC
+  → External FHIR fetch → S3 (large PDF) + RDS metadata
+  → MSK document-events publish
+  → ai-assistant pod: pgvector indexing (async)
+  → notification pod: alert user (async)
+  → Redis: invalidate fhir:docs:{patientId}
+
+Real flow: AI Query
+  → API Gateway → ai-assistant pod
+  → consent check (AI_QUERY_ACCESS)
+  → OpenAI embedding → RDS pgvector search → OpenAI chat → response
+
+Har step failure? (consent down=503 fail-closed, FHIR timeout=retry, OpenAI down=fallback)
+Correlation ID? (X-Request-Id across services → CloudWatch Logs Insights)
+👉 Killer: "FHIR fetch slow — end-to-end debug CloudWatch se?"
+
+
+💡 PRACTICAL ANSWER TEMPLATES (Memorize & Customize)
+
+Docker:
+"Har Spring Boot microservice multi-stage Dockerfile — Maven compile, slim JRE alpine runtime.
+ ECR push, EKS deploy. K8s DNS: http://consent-service:8080. Health check /actuator/health."
+
+EKS:
+"3 replicas per service, HPA CPU 70%. Rolling maxUnavailable:0. Secrets Manager for DB/Kafka/OpenAI."
+
+RDS:
+"PostgreSQL + pgvector for AI embeddings. Index on (patient_id, document_type, date) —
+ FHIR list API ~200ms faster. HikariCP maxPoolSize=20."
+
+Redis:
+"Consent check cache 60s TTL — 85ms to 12ms. FHIR metadata cache 10 min.
+ Kafka consent-revoked se instant invalidate."
+
+MSK:
+"consent-events + document-events, replication 3, idempotent consumers, lag alarm > 5 min,
+ PHI never in payload — reference IDs only."
+
+S3:
+"50MB+ FHIR PDFs encrypted S3 bucket. RDS metadata + s3 key. Presigned URL for download."
+","path":"d:\RR_OPenToRelocate\LoveInThings\Practice_DSA_DESIGN\InterviewReady\29Q_Cloud_OnProject.txt

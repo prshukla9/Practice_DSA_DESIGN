@@ -314,4 +314,23 @@ public class StreamsPractice {
                 employeeStreamClasses.stream().collect(Collectors.groupingBy(e -> e.department))
         );
     }
+
+
+
+    //    date -> 18/06/2026  5-7 questions of streams
+
+
+//    date -> 19/06/2026  5-7 questions of streams
+
+
+//    date -> 18/06/2026  5-7 questions of streams
+
+//    date -> 19/06/2026  5-7 questions of streams
+
+//    date -> 20/06/2026  5-7 questions of streams
+
+//    date -> 21/06/2026  5-7 questions of streams
+
+//    date -> 22/06/2026  5-7 questions of streams
 }
+

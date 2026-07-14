@@ -1,0 +1,1404 @@
+﻿Software Developer | Nov 2025 - Present
+EPAM | Bengaluru
+Designing and developing scalable healthcare microservices for patient and doctor workflows, integrating FHIR-based interoperable data exchange and AI-driven capabilities for intelligent query handling and decision support.
+â— Designed and developed Spring Boot-based microservices for patient management and doctor availability in a distributed architecture
+â— Implemented FHIR-based interoperable data exchange to enable secure and standardized sharing of patient health records across systems
+â— Developed HIPAA-compliant patient consent management workflows for secure access to sensitive healthcare data
+â— Designed and implemented Kafka-based event-driven architecture for real-time updates and notifications
+â— Built AI-powered assistant using OpenAI APIs to handle patient and doctor queries with natural language interaction
+â— Implemented semantic search using pgvector and designed context-aware prompt pipelines to improve response accuracy and relevance
+â— Optimized high-traffic APIs, reducing latency by 200ms and improving response time by 30%
+
+
+
+Software Developer | Apr 2024 â€“ Oct 2025
+Blue Yonder | Bengaluru
+â— Developed and deployed RESTful microservices using Spring Boot, ensuring modularity, scalability, and ease of maintenance across multiple components.
+â— Implemented Kafka-based asynchronous communication between services to handle high-volume event-driven data processing and ensure real-time data consistency.
+â— Enhanced API functionality to improve system performance and ensure seamless integration with client-facing applications. Resolved P1 production issues, improving system reliability and, and ensuring a smooth user experience.
+â— Conducted JMeter and PSR load testing, optimizing server performance by identifying and resolving bottlenecks.
+â— Collaborated on the materialization process, significantly improving data processing speed and efficiency.
+â— Designed event-driven architecture using Kafka.
+â— Handled async processing and data consistency.
+
+
+================================================================================
+MASTER INTERVIEW SHEET â€” 6 YOE Java Backend + AI + Cloud Developer
+================================================================================
+Format: Glossary â†’ Architecture â†’ Question â†’ Detailed Answer â†’ Annotated Code â†’ Interview Line
+
+EPAM 3 Core Pillars (resume mapped â€” yahi bolna):
+  1. FHIR Document Exchange  â€” health records share/receive (interoperability)
+  2. Consent Management      â€” HIPAA access control (kaun kya dekh sakta hai)
+  3. AI Search & Query       â€” OpenAI + pgvector semantic search + intelligent Q&A
+
+Supporting: Kafka (async), Spring Boot microservices, AWS (EKS/MSK/RDS/S3/Redis), JMeter
+
+âŒ Mat bolo interview me: appointment booking, doctor slots, patient CRUD as main feature
+âœ… "Patient/doctor workflows" = users of system; core engineering = FHIR + consent + AI
+
+
+================================================================================
+MASTER GLOSSARY â€” Saari terms ek jagah
+================================================================================
+
+â”€â”€ HEALTHCARE / FHIR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+FHIR (Fast Healthcare Interoperability Resources):
+  â†’ HL7 ka global standard â€” healthcare data JSON/XML me exchange karne ka format.
+  â†’ Jaise web me HTML, healthcare me FHIR. Hospitals alag systems use karte hain â€” FHIR bridge.
+
+PHI (Protected Health Information):
+  â†’ HIPAA protected data â€” patient name, lab results, diagnoses, MRN, etc.
+  â†’ System me har PHI access consent + audit se gated.
+
+DocumentReference (FHIR Resource):
+  â†’ Document ka "catalog card" â€” metadata: kiska, kis type, kab, kahan stored.
+  â†’ Actual file nahi â€” pointer to Binary resource ya external URL.
+
+Binary (FHIR Resource):
+  â†’ Actual file content â€” PDF, image. Base64 encoded ya separate URL.
+
+Bundle (FHIR Resource):
+  â†’ Multiple resources ek HTTP call me â€” bulk transfer (hospital transfer scenario).
+
+HAPI FHIR:
+  â†’ Java library â€” FHIR R4 parse, validate, create, REST client. Spring Boot me use kiya.
+
+HIPAA:
+  â†’ US healthcare privacy law. Access control, audit, encryption, minimum necessary.
+
+Consent Scope:
+  â†’ Granular permission â€” VIEW_LAB_RESULTS, AI_QUERY_ACCESS, SHARE_WITH_PROVIDER, etc.
+
+â”€â”€ MICROSERVICES / SPRING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+DDD (Domain-Driven Design):
+  â†’ Business capability se service boundaries â€” "consent diya" = consent-service.
+
+Database per Service:
+  â†’ Har service apni DB own karti hai. Doosri service direct table access NAHI.
+
+Feign Client / RestTemplate / WebClient:
+  â†’ Spring me inter-service SYNC HTTP calls. consent check = Feign to consent-service.
+
+ClusterIP (K8s):
+  â†’ Internal service DNS â€” http://consent-service:8080 â€” traffic cluster ke andar.
+
+Outbox Pattern:
+  â†’ DB update + event same transaction me save â†’ worker Kafka publish karta hai.
+  â†’ Guarantees: DB committed = event eventually published (no security hole).
+
+Circuit Breaker (Resilience4j):
+  â†’ External FHIR slow/down â†’ fail fast, fallback â€” cascade failure prevent.
+
+â”€â”€ KAFKA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Topic / Partition / Offset:
+  â†’ Topic = event category (consent-events). Partition = parallel lanes. Offset = message position.
+
+Consumer Group:
+  â†’ Same group ke consumers partitions share karte hain â€” parallel processing.
+
+Replication Factor:
+  â†’ Har message 3 brokers pe copy â€” broker fail = no data loss.
+
+At-least-once + Idempotency:
+  â†’ Message duplicate ho sakta hai â€” consumer eventId check karke skip karta hai.
+
+DLQ (Dead Letter Queue):
+  â†’ 3 retry fail â†’ DLQ topic â†’ manual investigation + reprocess.
+
+â”€â”€ AI / RAG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+RAG (Retrieval Augmented Generation):
+  â†’ Pehle relevant documents search (retrieve) â†’ phir LLM ko context de ke answer generate.
+
+Embedding:
+  â†’ Text â†’ float[1536] vector. Similar meaning = similar vectors (cosine similarity).
+
+pgvector:
+  â†’ PostgreSQL extension â€” vector column store + similarity search (<=>, IVFFlat index).
+
+Chunking:
+  â†’ Long PDF â†’ 500 token pieces. Har chunk alag embedding â€” precise search.
+
+Hallucination:
+  â†’ LLM galat info invent karta hai. Healthcare me dangerous â€” validation layer mandatory.
+
+Temperature:
+  â†’ LLM creativity control. 0.3 = factual, less random. Healthcare me low temperature.
+
+â”€â”€ AWS / CLOUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+EKS: Managed Kubernetes â€” pods run. HPA auto-scale.
+ECR: Docker image registry â€” Jenkins push, EKS pull.
+MSK: Managed Kafka â€” consent-events, document-events.
+RDS: Managed PostgreSQL â€” consent_db, fhir_db, ai_db + pgvector.
+S3: Object storage â€” 50MB+ FHIR PDFs. RDS me BLOB nahi.
+ElastiCache Redis: In-memory cache â€” consent check 85msâ†’12ms.
+IRSA: Pod-level IAM role â€” S3/Secrets access bina hardcoded keys.
+API Gateway + ALB: JWT auth at edge + load balance to pods.
+
+
+================================================================================
+COMMUNICATION MAP â€” EPAM (Port + Protocol + Who talks to whom)
+================================================================================
+
+| From              | To                | Type        | Port  | Why                          |
+|-------------------|-------------------|-------------|-------|------------------------------|
+| Client            | API Gateway       | HTTPS       | 443   | JWT auth, rate limit         |
+| API Gateway       | ALB â†’ EKS Pod     | HTTP        | 8080  | Load balanced request        |
+| fhir-sync Pod     | consent-service   | REST sync   | 8080  | Consent check before PHI     |
+| ai-assistant Pod  | consent-service   | REST sync   | 8080  | AI_QUERY_ACCESS check        |
+| fhir-sync Pod     | External FHIR     | HTTPS       | 443   | Fetch DocumentReference      |
+| fhir-sync Pod     | S3                | HTTPS       | 443   | Store large PDF (VPC endpoint)|
+| fhir-sync Pod     | RDS fhir_db       | TCP/TLS     | 5432  | Document metadata            |
+| consent-service   | RDS consent_db    | TCP/TLS     | 5432  | Consent records + audit      |
+| ai-assistant      | OpenAI API        | HTTPS       | 443   | Embedding + Chat             |
+| ai-assistant      | RDS ai_db         | TCP/TLS     | 5432  | pgvector search              |
+| All services      | MSK Kafka         | TCP/SASL    | 9092  | Async events                 |
+| All services      | Redis             | TCP/TLS     | 6379  | Hot read cache               |
+
+
+================================================================================
+ARCHITECTURE DIAGRAMS (Whiteboard pe draw karo)
+================================================================================
+
+EPAM â€” High Level:
+  Doctor/Patient App â†’ Route53 â†’ API Gateway (JWT) â†’ ALB â†’ EKS
+    â”œâ”€â”€ consent-service      â†’ consent_db + Redis cache
+    â”œâ”€â”€ fhir-sync-service    â†’ fhir_db + S3 â†’ External FHIR (Hospital/Lab)
+    â”œâ”€â”€ ai-assistant-service â†’ ai_db (pgvector) + Redis â†’ OpenAI API
+    â””â”€â”€ notification-service â†’ notification_db â†’ SNS/Email
+  Kafka MSK: consent-events | document-events | fhir-sync-events
+  Redis: consent cache (60s TTL) | FHIR metadata cache (10 min TTL)
+
+EPAM â€” 3 Modules Interaction:
+  Document Request â†’ consent-service CHECK (sync REST) â†’ fhir-sync FETCH (sync REST)
+    â†’ User gets document â†’ Kafka document-received (async)
+    â†’ ai-assistant INDEX (async) â†’ pgvector searchable
+    â†’ notification-service NOTIFY (async)
+
+Blue Yonder â€” High Level:
+  Client Apps â†’ API Gateway â†’ ALB â†’ EKS
+    â”œâ”€â”€ order-service â†’ order_db â†’ Kafka order-created
+    â”œâ”€â”€ inventory-service â†’ inventory_db â†’ inventory-updated, materialization-trigger
+    â”œâ”€â”€ materialization-service â†’ materialized views + Redis cache
+    â””â”€â”€ notification-service
+  Client reads: GET /inventory/snapshot â†’ Redis (50ms pre-computed data)
+
+
+================================================================================
+EPAM â€” SECTION 1: PROJECT OVERVIEW (Detailed)
+================================================================================
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q1: Platform ek line me + tumhara exact contribution?
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+DETAILED ANSWER:
+
+PROBLEM:
+  Hospital A aur Lab B alag proprietary systems use karte hain â€” patient data share mushkil.
+  HIPAA ke under bina explicit patient permission ke koi PHI access nahi kar sakta.
+  50+ clinical documents me manually dhundna impractical â€” doctors/patients ko intelligent search chahiye.
+
+SOLUTION (3 pillars):
+  1. FHIR standard document exchange â€” external hospitals/labs se secure share/receive
+  2. Consent management â€” har document access consent-se gated, revoke instant propagate
+  3. AI semantic search â€” OpenAI + pgvector se natural language document query
+
+MY CONTRIBUTION:
+  - consent-service APIs (grant/revoke/check) + audit logging
+  - fhir-sync-service fetch/share flows (HAPI FHIR integration)
+  - ai-assistant-service RAG pipeline + pgvector indexing
+  - Kafka producers/consumers + Outbox pattern
+  - Performance: FHIR list 420msâ†’210ms, consent 85msâ†’12ms, overall 30% improvement
+
+INTERVIEW LINE:
+"EPAM me healthcare interoperability platform â€” FHIR document exchange, HIPAA consent
+ management, AI semantic search with OpenAI and pgvector. Kafka event architecture,
+ AWS EKS deployment, API optimization â€” 200ms latency drop, 30% improvement."
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q2: End-to-end architecture â€” har step explain
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+DETAILED FLOW (Doctor lab report dekhta hai):
+
+STEP 1 â€” Authentication:
+  Client login â†’ Cognito/API Gateway â†’ JWT token (contains sub=userId, roles)
+  Har subsequent request: Authorization: Bearer <token>
+
+STEP 2 â€” Document list request:
+  GET /api/v1/fhir/documents?patientId=pat-123
+  â†’ API Gateway JWT validate â†’ ALB â†’ fhir-sync-service Pod
+
+STEP 3 â€” Consent check (SYNC â€” mandatory):
+  fhir-sync â†’ consent-service (ClusterIP REST):
+  GET /consents/check?patientId=pat-123&scope=VIEW_LAB_RESULTS&requesterId=doc-456
+  consent-service: Redis cache check â†’ miss â†’ RDS query â†’ cache populate
+  Response: { allowed: true, consentId: "c-001" } OR 403 CONSENT_DENIED
+
+STEP 4 â€” Fetch documents:
+  fhir-sync â†’ RDS fhir_db (indexed query) â†’ metadata list
+  OR external FHIR server fetch if not cached locally
+
+STEP 5 â€” Response to user:
+  200 OK { documents: [...], presignedS3Urls: [...] }
+
+STEP 6 â€” Background (ASYNC â€” user already got response):
+  Kafka document-received â†’ ai-assistant indexes â†’ pgvector
+  â†’ notification-service â†’ email "New lab results available"
+
+WHY SYNC for steps 2-4: User screen pe result chahiye abhi. HIPAA â€” bina consent data mat do.
+WHY ASYNC for step 6: Indexing 30-60 sec lagta hai. User document pehle dekh sakta hai.
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q3: 3 core modules interaction â€” detailed example
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+SCENARIO: Patient AI se puchta hai "Mera cholesterol last year kya tha?"
+
+  [1] ai-assistant-service receives POST /api/v1/ai/query
+  [2] consent-service.check(AI_QUERY_ACCESS) â†’ ALLOWED (consent c-001 active)
+  [3] OpenAI embedding API â†’ query vector[1536]
+  [4] pgvector search ai_db â†’ top-5 chunks from doc-456 (lab report Jan 2026)
+  [5] Prompt build: system rules + chunks + user query
+  [6] OpenAI chat API â†’ answer with source citation
+  [7] Validation layer â†’ no diagnosis keywords â†’ pass
+  [8] Audit log + response to patient
+
+PARALLEL SCENARIO â€” Consent revoke during AI session:
+  Patient revokes consent â†’ Kafka consent-revoked
+  â†’ ai-assistant: clear Redis session cache, invalidate conversation
+  â†’ Next AI query from same doctor â†’ 403 (consent re-checked every request)
+
+WHY 3 alag modules:
+  Consent = legal/compliance boundary (separate audit, separate deploy)
+  FHIR Sync = external integration (slow/unreliable hospital systems)
+  AI = expensive OpenAI calls (isolate from core document access path)
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q4: External se FHIR document kaise aata/jaata hai?
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+RECEIVE FLOW (Lab â†’ Our System):
+  1. Scheduled job / webhook: "New results for Patient pat-123"
+  2. consent check: RECEIVE_FROM_LAB scope active?
+  3. GET https://lab.fhir.example.com/DocumentReference?patient=123&category=lab&date=ge2026-01-01
+  4. New DocumentReference found â†’ GET Binary/pdf-content (stream, no full memory load)
+  5. S3 PUT patients/pat-123/documents/doc-789/content.pdf (SSE encrypted)
+  6. RDS fhir_db INSERT document_metadata (s3_key, patient_id, type, hash, version)
+  7. Outbox â†’ Kafka document-received { eventId, patientId, documentId }
+  8. ai-assistant indexes | notification sends alert
+
+SHARE FLOW (Our System â†’ Hospital B):
+  1. POST /api/v1/fhir/documents/share { patientId, targetOrg, documentIds }
+  2. consent check: SHARE_WITH_PROVIDER scope
+  3. fhir-sync builds FHIR Bundle (type=collection) with DocumentReference + Binary entries
+  4. POST https://hospital-b.fhir.example.com/fhir/Bundle
+  5. sync_status=COMPLETED in fhir_db
+  6. Kafka document-shared â†’ audit + notification
+
+FHIR DocumentReference JSON example:
+```json
+{
+  "resourceType": "DocumentReference",
+  "id": "doc-789",
+  "meta": { "versionId": "2", "lastUpdated": "2026-06-25T10:00:00Z" },
+  "status": "current",
+  "type": { "coding": [{ "system": "http://loinc.org", "code": "11502-2" }], "text": "Laboratory Report" },
+  "subject": { "reference": "Patient/pat-123" },
+  "date": "2026-06-20",
+  "content": [{
+    "attachment": {
+      "contentType": "application/pdf",
+      "url": "Binary/bin-456",
+      "size": 5242880
+    }
+  }]
+}
+```
+Field explanation:
+  resourceType â†’ FHIR resource type identifier
+  meta.versionId â†’ version for change detection (reconciliation me use)
+  subject.reference â†’ kis patient ka document
+  content.attachment.url â†’ pointer to Binary resource (actual PDF)
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q5: Sync vs Async â€” detailed table + golden rule
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+| Action                         | Sync/Async | Protocol      | Why                                      |
+|--------------------------------|------------|---------------|------------------------------------------|
+| Consent check                  | SYNC       | REST (Feign)  | HIPAA real-time â€” stale = security hole |
+| FHIR document fetch (UI)       | SYNC       | REST          | User waiting for document on screen      |
+| AI query (interactive)         | SYNC       | REST          | User waiting for answer (2-4 sec OK)     |
+| Consent revoke propagate       | ASYNC      | Kafka         | 3+ services inform â€” user not waiting    |
+| Document AI indexing           | ASYNC      | Kafka         | Embedding slow â€” doc visible first       |
+| Notification email/SMS         | ASYNC      | Kafka         | Delay acceptable                         |
+| Bulk FHIR sync to external     | ASYNC      | Kafka         | External system slow/unreliable          |
+
+GOLDEN RULE:
+"User-facing security decision + immediate response = Sync REST.
+ Background propagation, indexing, notifications = Async Kafka."
+
+
+================================================================================
+EPAM â€” SECTION 2: MICROSERVICES DESIGN (Detailed + Code)
+================================================================================
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Microservices breakdown â€” DDD bounded contexts
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+| Service              | Owns What                          | Database        | Why Separate        |
+|----------------------|------------------------------------|-----------------|---------------------|
+| consent-service      | Grant/revoke/check, audit          | consent_db      | HIPAA legal boundary|
+| fhir-sync-service    | FHIR fetch/share, sync status      | fhir_db + S3    | External integration|
+| ai-assistant-service | AI query, embeddings, pgvector     | ai_db           | Expensive OpenAI    |
+| notification-service | Email/SMS/push alerts              | notification_db | Third-party deps    |
+
+API Endpoints:
+  consent:  POST /api/v1/consents | DELETE /api/v1/consents/{id} | GET /api/v1/consents/check
+  fhir:     POST /api/v1/fhir/documents/fetch | POST /share | GET /{id} | GET /documents
+  ai:       POST /api/v1/ai/query
+  notify:   (internal only â€” Kafka consumer triggered)
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Inter-service communication â€” Feign + Kafka annotated code
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+```java
+// â•â•â• FeignClient â€” SYNC consent check (fhir-sync-service) â•â•â•
+@FeignClient(
+    name = "consent-service",
+    url = "${app.consent-service.url}"
+    // â†‘ prod: http://consent-service.healthcare.svc.cluster.local:8080
+    // â†‘ K8s ClusterIP DNS â€” traffic cluster ke andar, internet pe nahi
+)
+public interface ConsentClient {
+
+    @GetMapping("/api/v1/consents/check")
+    ConsentCheckResponse check(
+        @RequestParam("patientId") String patientId,
+        @RequestParam("scope") String scope,
+        @RequestParam("requesterId") String requesterId
+    );
+    // â†‘ SYNC call â€” fhir-sync waits for response before proceeding
+    // â†‘ scope = VIEW_LAB_RESULTS | AI_QUERY_ACCESS | SHARE_WITH_PROVIDER
+}
+
+// â•â•â• Usage in FhirDocumentService â•â•â•
+@Service
+@RequiredArgsConstructor
+public class FhirDocumentService {
+
+    private final ConsentClient consentClient;
+    private final FhirExternalClient externalFhirClient;
+    private final DocumentMetadataRepository metadataRepo;
+    private final OutboxEventRepository outboxRepo;
+
+    public DocumentResponse fetchDocument(String patientId, String documentId,
+                                           String requesterId) {
+        // STEP 1: Mandatory consent check â€” fail-closed
+        ConsentCheckResponse consent = consentClient.check(
+            patientId, "VIEW_LAB_RESULTS", requesterId
+        );
+        if (!consent.isAllowed()) {
+            auditService.logDeniedAccess(patientId, requesterId, documentId);
+            throw new ConsentDeniedException("CONSENT_DENIED", consent.getReason());
+        }
+
+        // STEP 2: Only after consent OK â€” fetch external FHIR
+        DocumentReference fhirDoc = externalFhirClient.fetchDocumentReference(documentId);
+
+        // STEP 3: Store metadata + publish event (outbox in same TX)
+        saveAndPublishEvent(fhirDoc, patientId, documentId);
+
+        return mapToResponse(fhirDoc);
+    }
+
+    @Transactional
+    void saveAndPublishEvent(DocumentReference doc, String patientId, String documentId) {
+        metadataRepo.save(mapToMetadata(doc, patientId));
+        // Outbox â€” same transaction guarantees event eventually published
+        outboxRepo.save(OutboxEvent.builder()
+            .eventType("document-received")
+            .payload(buildEventPayload(patientId, documentId))
+            .published(false)
+            .build());
+    }
+}
+```
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Database per service â€” schemas explained
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+consent_db:
+```sql
+-- consents table â€” core consent records
+CREATE TABLE consents (
+    consent_id    UUID PRIMARY KEY,
+    patient_id    VARCHAR(50) NOT NULL,
+    grantee_id    VARCHAR(50) NOT NULL,   -- doctor/org who gets access
+    status        VARCHAR(20) NOT NULL,   -- ACTIVE | REVOKED | EXPIRED
+    valid_from    TIMESTAMP NOT NULL,
+    valid_until   TIMESTAMP,
+    created_at    TIMESTAMP DEFAULT NOW()
+);
+
+-- consent_scopes â€” granular permissions (minimum necessary)
+CREATE TABLE consent_scopes (
+    consent_id    UUID REFERENCES consents(consent_id),
+    scope         VARCHAR(50) NOT NULL    -- VIEW_LAB_RESULTS, AI_QUERY_ACCESS, etc.
+);
+
+-- audit_logs â€” HIPAA 6-year retention requirement
+CREATE TABLE audit_logs (
+    audit_id      UUID PRIMARY KEY,
+    timestamp     TIMESTAMP NOT NULL,
+    action        VARCHAR(50),            -- FHIR_DOCUMENT_ACCESS, AI_QUERY, etc.
+    patient_id    VARCHAR(50),
+    accessor_id   VARCHAR(50),
+    result        VARCHAR(20),            -- ALLOWED | DENIED
+    ip_address    VARCHAR(45)
+);
+```
+
+fhir_db:
+```sql
+CREATE TABLE document_metadata (
+    document_id   VARCHAR(50) PRIMARY KEY,
+    patient_id    VARCHAR(50) NOT NULL,
+    fhir_id       VARCHAR(100),           -- external FHIR resource ID
+    document_type VARCHAR(50),
+    s3_bucket     VARCHAR(100),
+    s3_key        VARCHAR(500),           -- S3 path â€” NOT file content in RDS
+    content_hash  VARCHAR(64),            -- SHA-256 for duplicate detection
+    version_id    VARCHAR(20),            -- FHIR meta.versionId
+    sync_status   VARCHAR(20),            -- PENDING | COMPLETED | FAILED
+    created_at    TIMESTAMP DEFAULT NOW()
+);
+-- Performance index (420ms â†’ 210ms improvement):
+CREATE INDEX idx_doc_metadata_patient_type_date
+    ON document_metadata(patient_id, document_type, created_at DESC);
+```
+
+Large PDFs â†’ S3 ONLY. fhir_db me sirf s3_key reference (~200 bytes).
+
+
+================================================================================
+EPAM â€” SECTION 3: FHIR DOCUMENT EXCHANGE (Detailed + Code)
+================================================================================
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: HAPI FHIR integration â€” annotated Java code
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+```java
+// â•â•â• HAPI FHIR Client Configuration â•â•â•
+@Configuration
+public class FhirClientConfig {
+
+    @Bean
+    public IGenericClient fhirClient(
+            @Value("${app.fhir.external-base-url}") String baseUrl) {
+        // baseUrl = https://lab.fhir.example.com/fhir
+        FhirContext ctx = FhirContext.forR4();
+        // â†‘ R4 = FHIR version 4 â€” industry standard we target
+
+        IGenericClient client = ctx.newRestfulGenericClient(baseUrl);
+        // â†‘ Generic client â€” any FHIR resource type fetch/create kar sakta hai
+        return client;
+    }
+}
+
+@Service
+@RequiredArgsConstructor
+public class FhirExternalClient {
+
+    private final IGenericClient fhirClient;
+
+    @CircuitBreaker(name = "externalFhir", fallbackMethod = "fetchFallback")
+    // â†‘ Resilience4j: 5 consecutive fails â†’ circuit OPEN â†’ fail fast 60 sec
+    // â†‘ External hospital FHIR down â†’ don't hang our service
+    @Retry(name = "externalFhir")
+    // â†‘ Retry: 2s â†’ 5s â†’ 15s before giving up
+    public DocumentReference fetchDocumentReference(String documentId) {
+        // HAPI FHIR read â€” GET /DocumentReference/{id}
+        return fhirClient.read()
+            .resource(DocumentReference.class)
+            .withId(documentId)
+            .execute();
+        // â†‘ Returns typed Java object â€” HAPI parses JSON automatically
+    }
+
+    public List<DocumentReference> searchByPatient(String patientId, String category) {
+        // FHIR search: GET /DocumentReference?patient=123&category=lab
+        return fhirClient.search()
+            .forResource(DocumentReference.class)
+            .where(DocumentReference.PATIENT.hasId(patientId))
+            .and(DocumentReference.CATEGORY.exactly().code(category))
+            .returnBundle(Bundle.class)
+            .execute()
+            .getEntry().stream()
+            .map(e -> (DocumentReference) e.getResource())
+            .toList();
+    }
+
+    DocumentReference fetchFallback(String documentId, Exception ex) {
+        throw new FhirUnavailableException("External FHIR temporarily unavailable", ex);
+    }
+}
+```
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Large document (50MB PDF) â€” S3 streaming code
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+```java
+@Service
+public class S3DocumentStorage {
+
+    private final S3Client s3Client;  // IRSA credentials â€” auto-configured
+
+    @Value("${app.aws.s3.bucket}")
+    private String bucket;  // healthcare-docs-prod
+
+    public String uploadFhirDocument(String patientId, String documentId,
+                                      InputStream content, long size) {
+        String s3Key = String.format("patients/%s/documents/%s/content.pdf",
+                                      patientId, documentId);
+
+        PutObjectRequest request = PutObjectRequest.builder()
+            .bucket(bucket)
+            .key(s3Key)
+            .contentType("application/pdf")
+            .serverSideEncryption(ServerSideEncryption.AES256)
+            // â†‘ SSE-S3: AWS-managed encryption at rest â€” HIPAA requirement
+            .build();
+
+        // Stream upload â€” 50MB NOT loaded in JVM heap
+        s3Client.putObject(request, RequestBody.fromInputStream(content, size));
+        return s3Key;  // store in fhir_db document_metadata.s3_key
+    }
+
+    public String generatePresignedDownloadUrl(String s3Key) {
+        return s3Presigner.presignGetObject(
+            GetObjectPresignRequest.builder()
+                .getObjectRequest(b -> b.bucket(bucket).key(s3Key))
+                .signatureDuration(Duration.ofMinutes(15))
+                // â†‘ URL valid 15 min â€” client directly S3 se download
+                // â†‘ No traffic through our pods for download
+                .build()
+        ).url().toString();
+    }
+}
+```
+
+WHY S3 not RDS:
+  50MB BLOB â†’ PostgreSQL buffer pool pollution â†’ all queries slow.
+  Backup bloat. JVM OOM risk. S3 = $0.023/GB vs RDS $0.115/GB.
+
+
+================================================================================
+EPAM â€” SECTION 4: CONSENT & HIPAA (Detailed + Code)
+================================================================================
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Consent middleware â€” centralized HIPAA enforcement
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+```java
+// â•â•â• Custom annotation â€” developer forget na kare consent check â•â•â•
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface RequiresConsent {
+    String scope();  // e.g. "VIEW_LAB_RESULTS", "AI_QUERY_ACCESS"
+}
+
+// â•â•â• Interceptor â€” har @RequiresConsent method pe auto-run â•â•â•
+@Component
+@RequiredArgsConstructor
+public class ConsentInterceptor implements HandlerInterceptor {
+
+    private final ConsentService consentService;
+    private final AuditService auditService;
+
+    @Override
+    public boolean preHandle(HttpServletRequest request,
+                             HttpServletResponse response,
+                             Object handler) {
+        if (!(handler instanceof HandlerMethod method)) return true;
+
+        RequiresConsent annotation = method.getMethodAnnotation(RequiresConsent.class);
+        if (annotation == null) return true;  // no consent required on this endpoint
+
+        String patientId = request.getParameter("patientId");
+        String requesterId = extractUserIdFromJwt(request);
+        // â†‘ JWT sub claim = logged-in user ID
+
+        ConsentCheckResponse result = consentService.check(
+            patientId, annotation.scope(), requesterId
+        );
+
+        if (!result.isAllowed()) {
+            auditService.log(request, patientId, requesterId,
+                annotation.scope(), "DENIED", result.getReason());
+            response.setStatus(HttpStatus.FORBIDDEN.value());
+            // â†‘ 403 â€” fail-closed, NO PHI returned
+            return false;  // stop request â€” controller method NOT called
+        }
+
+        auditService.log(request, patientId, requesterId,
+            annotation.scope(), "ALLOWED", result.getConsentId());
+        return true;  // proceed to controller
+    }
+}
+
+// â•â•â• Controller usage â•â•â•
+@RestController
+@RequestMapping("/api/v1/fhir/documents")
+public class FhirDocumentController {
+
+    @GetMapping("/{documentId}")
+    @RequiresConsent(scope = "VIEW_LAB_RESULTS")
+    // â†‘ Interceptor automatically checks consent before this method runs
+    public ResponseEntity<DocumentResponse> getDocument(
+            @PathVariable String documentId,
+            @RequestParam String patientId) {
+        return ResponseEntity.ok(fhirService.fetchDocument(patientId, documentId));
+    }
+}
+```
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Consent REVOKE flow â€” race condition handling
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+REVOKE FLOW:
+  1. DELETE /api/v1/consents/c-001 (patient JWT must match patientId)
+  2. @Transactional: consent_db status=REVOKED + outbox event (SAME TX)
+  3. Outbox worker â†’ Kafka consent-revoked { eventId, patientId, granteeId, scopes }
+  4. Consumers react:
+     fhir-sync: cancel in-progress syncs, evict Redis consent cache
+     ai-assistant: clear session context, invalidate cached embeddings access
+     notification: audit alert to compliance team
+
+RACE CONDITION â€” revoke during in-flight FHIR fetch:
+  Layer 1: Consent check at request START
+  Layer 2: Consent RE-check before response RETURN to client
+  Layer 3: Kafka revoke event â†’ abort in-progress fetch, discard partial data
+  Layer 4: Access tokens tied to consentId â€” revoke = token invalid
+
+â†’ Fail-closed: doubt ho to deny. HIPAA me unverified access > temporary block.
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Redis consent cache â€” annotated code
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+```java
+@Service
+public class ConsentCacheService {
+
+    private static final Duration TTL = Duration.ofSeconds(60);
+    // â†‘ 60 sec TTL â€” balance: performance vs revoke propagation speed
+    // â†‘ Revoke pe Kafka event â†’ immediate cache evict (not wait for TTL)
+
+    public ConsentCheckResponse check(String patientId, String granteeId, String scope) {
+        String key = String.format("consent:active:%s:%s:%s", patientId, granteeId, scope);
+
+        // STEP 1: Redis ElastiCache (~2ms) â€” 85ms â†’ 12ms improvement
+        ConsentCheckResponse cached = redisTemplate.opsForValue().get(key);
+        if (cached != null) return cached;
+
+        // STEP 2: Cache miss â€” RDS query (~80ms)
+        ConsentCheckResponse result = consentRepository.checkActive(
+            patientId, granteeId, scope);
+
+        // STEP 3: Cache only ALLOWED results (denials not cached long)
+        if (result.isAllowed()) {
+            redisTemplate.opsForValue().set(key, result, TTL);
+        }
+        return result;
+    }
+
+    // Called by Kafka consumer on consent-revoked event
+    public void evictAllForGrantee(String patientId, String granteeId) {
+        Set<String> keys = redisTemplate.keys(
+            String.format("consent:active:%s:%s:*", patientId, granteeId));
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+        }
+        // â†‘ Immediate invalidation â€” revoked consent not served from cache
+    }
+}
+```
+
+
+================================================================================
+EPAM â€” SECTION 5: KAFKA / EVENT-DRIVEN (Detailed + Code)
+================================================================================
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Outbox Pattern â€” CRITICAL (annotated code)
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+PROBLEM (without outbox):
+```java
+// âŒ WRONG â€” two separate operations, NOT atomic
+consentRepository.revoke(consentId);     // DB committed âœ“
+kafkaTemplate.send("consent-events", event);  // Kafka FAIL âœ—
+// Result: DB says REVOKED but fhir-sync/ai-assistant unaware = SECURITY HOLE
+```
+
+SOLUTION (outbox pattern):
+```java
+// â•â•â• Outbox Entity â•â•â•
+@Entity
+@Table(name = "outbox_events")
+public class OutboxEvent {
+    @Id
+    private UUID id;
+    private String eventType;      // consent-revoked, document-received
+    private String payload;        // JSON â€” IDs only, NO PHI in payload
+    private boolean published;     // false until Kafka confirms
+    private Instant createdAt;
+}
+
+// â•â•â• Same-transaction save â•â•â•
+@Service
+@RequiredArgsConstructor
+public class ConsentService {
+
+    @Transactional  // â† SINGLE transaction â€” both or neither
+    public void revokeConsent(String consentId) {
+        Consent consent = consentRepo.findById(consentId)
+            .orElseThrow(() -> new NotFoundException(consentId));
+
+        consent.setStatus(ConsentStatus.REVOKED);
+        consentRepo.save(consent);
+
+        // Outbox in SAME transaction â€” atomic with DB update
+        outboxRepo.save(OutboxEvent.builder()
+            .eventType("consent-revoked")
+            .payload(toJson(Map.of(
+                "eventId", UUID.randomUUID().toString(),
+                "patientId", consent.getPatientId(),
+                "granteeId", consent.getGranteeId(),
+                "scopes", consent.getScopes()
+                // â†‘ IDs only â€” NO patient name, lab results in Kafka payload
+            )))
+            .published(false)
+            .build());
+    }
+}
+
+// â•â•â• Outbox Worker â€” polls every 1 second â•â•â•
+@Component
+@Scheduled(fixedDelay = 1000)
+public class OutboxPublisher {
+
+    @Transactional
+    public void publishPendingEvents() {
+        List<OutboxEvent> pending = outboxRepo.findByPublishedFalse(
+            PageRequest.of(0, 100));
+
+        for (OutboxEvent event : pending) {
+            kafkaTemplate.send(mapTopic(event.getEventType()), event.getPayload())
+                .whenComplete((result, ex) -> {
+                    if (ex == null) {
+                        event.setPublished(true);
+                        outboxRepo.save(event);
+                    }
+                    // â†‘ Fail â†’ stays unpublished â†’ retry next poll (1 sec)
+                });
+        }
+    }
+}
+```
+
+GUARANTEE: DB committed = event saved in outbox = eventually published to Kafka.
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Idempotent Kafka consumer â€” annotated code
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+```java
+@Component
+@RequiredArgsConstructor
+public class ConsentEventConsumer {
+
+    private final ProcessedEventRepository processedEventRepo;
+    private final ConsentCacheService cacheService;
+    private final SyncJobService syncJobService;
+
+    @KafkaListener(
+        topics = "consent-events",
+        groupId = "fhir-sync-group",
+        // â†‘ groupId = consumer group â€” partitions shared among group members
+        containerFactory = "kafkaListenerContainerFactory"
+    )
+    @Transactional
+    public void handleConsentEvent(
+            @Payload String payload,
+            @Header(KafkaHeaders.RECEIVED_KEY) String key,
+            Acknowledgment ack) {
+        // â†‘ manual ack â€” commit offset ONLY after successful processing
+
+        ConsentEvent event = objectMapper.readValue(payload, ConsentEvent.class);
+
+        // IDEMPOTENCY CHECK â€” same event 3x process = process once
+        if (processedEventRepo.existsByEventId(event.getEventId())) {
+            ack.acknowledge();  // already processed â€” skip, commit offset
+            return;
+        }
+
+        switch (event.getEventType()) {
+            case "consent-revoked" -> {
+                cacheService.evictAllForGrantee(event.getPatientId(), event.getGranteeId());
+                syncJobService.cancelInProgressSyncs(event.getPatientId(), event.getGranteeId());
+            }
+            case "consent-granted" -> {
+                cacheService.evictAllForGrantee(event.getPatientId(), event.getGranteeId());
+                // â†‘ evict so next check hits DB with fresh consent
+            }
+        }
+
+        processedEventRepo.save(new ProcessedEvent(event.getEventId()));
+        ack.acknowledge();  // NOW commit offset â€” safe to mark done
+    }
+}
+```
+
+Topic design:
+```
+consent-events:    6 partitions, replication=3, key=patientId
+document-events:   12 partitions (higher throughput), key=patientId
+*-dlq topics:      failed after 3 retries â†’ manual reprocess
+Rule: max consumer instances = partition count (12 partitions = max 12 consumers)
+```
+
+
+================================================================================
+EPAM â€” SECTION 6: AI SEARCH & RAG (Detailed + Code)
+================================================================================
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Complete AI query flow â€” step by step with code
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+```java
+// â•â•â• AiQueryOrchestrator â€” full RAG pipeline â•â•â•
+@Service
+@RequiredArgsConstructor
+public class AiQueryOrchestrator {
+
+    private final ConsentClient consentClient;
+    private final EmbeddingService embeddingService;   // OpenAI embeddings
+    private final VectorSearchService vectorSearch;    // pgvector
+    private final ChatService chatService;             // OpenAI chat
+    private final ResponseValidator validator;
+    private final AuditService auditService;
+
+    public AiQueryResponse processQuery(AiQueryRequest request, String requesterId) {
+
+        // STEP 1: Consent check â€” BEFORE any OpenAI call (cost + HIPAA)
+        ConsentCheckResponse consent = consentClient.check(
+            request.getPatientId(), "AI_QUERY_ACCESS", requesterId);
+        if (!consent.isAllowed()) {
+            auditService.logUnauthorizedAiQuery(request.getPatientId(), requesterId);
+            throw new ConsentDeniedException("AI access denied");
+        }
+
+        // STEP 2: Generate query embedding
+        // "What was my blood sugar?" â†’ float[1536]
+        float[] queryVector = embeddingService.embed(request.getQuery());
+
+        // STEP 3: Semantic search in pgvector (top-5 similar chunks)
+        List<DocumentChunk> relevantChunks = vectorSearch.search(
+            request.getPatientId(), queryVector, 5);
+        // â†‘ patient_id filter = consent scope â€” sirf is patient ke docs
+
+        if (relevantChunks.isEmpty()) {
+            return AiQueryResponse.noResultsFound();
+        }
+
+        // STEP 4: Build RAG prompt
+        String prompt = promptBuilder.build(
+            relevantChunks,    // retrieved context
+            request.getQuery() // user question
+        );
+
+        // STEP 5: OpenAI chat completion (gpt-4, temperature=0.3)
+        String rawAnswer = chatService.complete(prompt);
+
+        // STEP 6: Validation â€” block diagnosis, require source citation
+        ValidationResult validation = validator.validate(rawAnswer, relevantChunks);
+        if (!validation.isValid()) {
+            return AiQueryResponse.fallback(validation.getReason());
+        }
+
+        // STEP 7: Audit + response
+        auditService.logAiQuery(request.getPatientId(), requesterId,
+            relevantChunks.stream().map(DocumentChunk::getDocumentId).toList());
+
+        return AiQueryResponse.builder()
+            .answer(rawAnswer)
+            .sources(mapSources(relevantChunks))
+            .disclaimer("This is not medical advice. Consult your doctor.")
+            .build();
+    }
+}
+```
+
+pgvector search SQL (annotated):
+```sql
+-- â•â•â• Semantic search query â•â•â•
+SELECT
+    chunk_text,                          -- actual text chunk from document
+    document_id,                         -- source document reference
+    document_type,
+    1 - (embedding <=> $1::vector) AS similarity
+    -- â†‘ <=> = cosine DISTANCE operator (pgvector)
+    -- â†‘ 1 - distance = similarity score (0 to 1, higher = more similar)
+    -- â†‘ $1 = query embedding vector[1536] from OpenAI
+FROM document_embeddings
+WHERE patient_id = $2                    -- consent scope filter
+ORDER BY embedding <=> $1::vector        -- nearest neighbors first
+LIMIT 5;                                 -- top-K retrieval for RAG context
+
+-- IVFFlat index (2800ms â†’ 1900ms improvement):
+CREATE INDEX idx_embeddings_vector ON document_embeddings
+    USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+-- â†‘ IVFFlat = approximate nearest neighbor â€” faster than exact scan
+-- â†‘ lists = 100 clusters â€” tune based on row count (~sqrt(rows) rule)
+```
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Prompt pipeline â€” system + dynamic context
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+```java
+public class PromptBuilder {
+
+    private static final String SYSTEM_PROMPT = """
+        You are a healthcare document assistant. STRICT RULES:
+        1. Answer ONLY from the provided document context below.
+        2. NEVER diagnose conditions or recommend treatments.
+        3. ALWAYS cite the source document ID for every fact.
+        4. If information is not in context, say: "Information not found in your records."
+        5. ALWAYS end with: "Please consult your doctor for medical advice."
+        """;
+
+    public String build(List<DocumentChunk> chunks, String userQuery) {
+        StringBuilder context = new StringBuilder("DOCUMENT CONTEXT:\n");
+        for (DocumentChunk chunk : chunks) {
+            context.append(String.format(
+                "[Doc: %s, Type: %s, Date: %s]\n%s\n\n",
+                chunk.getDocumentId(),
+                chunk.getDocumentType(),
+                chunk.getDocumentDate(),
+                chunk.getChunkText()
+            ));
+        }
+        // SYSTEM (fixed rules) + CONTEXT (dynamic per query) + USER QUERY
+        return SYSTEM_PROMPT + "\n" + context + "\nUSER QUESTION: " + userQuery;
+    }
+}
+```
+
+Hallucination control â€” 5 layers:
+  1. Context grounding â€” no chunks = "no info" response (no LLM call with empty context)
+  2. System prompt strict rules (no diagnosis, cite sources)
+  3. temperature=0.3 (factual, less creative)
+  4. ResponseValidator code â€” block "you have diabetes", medication dosage patterns
+  5. Mandatory source citation (documentId in every fact)
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Document indexing consumer â€” Kafka triggered
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+```java
+@KafkaListener(topics = "document-events", groupId = "ai-indexing-group")
+public void indexDocument(@Payload DocumentReceivedEvent event, Acknowledgment ack) {
+
+    if (processedEventRepo.existsByEventId(event.getEventId())) {
+        ack.acknowledge(); return;
+    }
+
+    // STEP 1: Stream from S3 (NOT full 50MB in memory)
+    try (InputStream docStream = s3Client.getObject(
+            GetObjectRequest.builder()
+                .bucket(event.getS3Bucket())
+                .key(event.getS3Key())
+                .build())) {
+
+        // STEP 2: Extract text (PDF â†’ PDFBox, clinical text â†’ direct)
+        String fullText = textExtractor.extract(docStream, event.getContentType());
+
+        // STEP 3: Chunk â€” 500 tokens, 50 overlap
+        List<String> chunks = textChunker.chunk(fullText, 500, 50);
+
+        // STEP 4: Embed each chunk + insert pgvector
+        for (int i = 0; i < chunks.size(); i++) {
+            float[] embedding = embeddingService.embed(chunks.get(i));
+            embeddingRepo.save(DocumentEmbedding.builder()
+                .patientId(event.getPatientId())
+                .documentId(event.getDocumentId())
+                .chunkIndex(i)
+                .chunkText(chunks.get(i))
+                .embedding(embedding)  // vector(1536) column
+                .build());
+        }
+    }
+
+    processedEventRepo.save(new ProcessedEvent(event.getEventId()));
+    ack.acknowledge();
+}
+// 20-page PDF â‰ˆ 40 chunks â‰ˆ 40 embedding API calls â‰ˆ 30-60 sec indexing time
+```
+
+
+================================================================================
+EPAM â€” SECTION 7: CLOUD / AWS (Essential â€” Full detail in 29Q_Cloud_OnProject.txt)
+================================================================================
+
+Stack summary:
+  Docker multi-stage â†’ ECR â†’ EKS (3 replicas, HPA 70% CPU, rolling deploy maxUnavailable:0)
+  API Gateway JWT auth â†’ ALB â†’ Ingress â†’ ClusterIP Service â†’ Pod:8080
+  MSK Kafka | RDS PostgreSQL pgvector | S3 large PDFs | ElastiCache Redis
+  IRSA pod IAM roles | Secrets Manager credentials | CloudWatch JSON logs + correlationId
+
+Key application-prod.yml (annotated excerpt):
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:5432/fhir_db?sslmode=require
+    # â†‘ sslmode=require = TLS encrypted â€” HIPAA in-transit
+    hikari:
+      maximum-pool-size: 20   # 3 pods Ã— 20 = 60 connections to RDS
+
+  kafka:
+    bootstrap-servers: ${MSK_BOOTSTRAP_SERVERS}
+    properties:
+      security.protocol: SASL_SSL
+      sasl.mechanism: AWS_MSK_IAM  # IRSA â€” no username/password
+
+app:
+  consent-service:
+    url: http://consent-service.healthcare.svc.cluster.local:8080
+    # â†‘ K8s internal DNS â€” inter-service communication inside cluster
+```
+
+Performance numbers (JMeter verified):
+  GET /fhir/documents: 420ms â†’ 210ms (index + Redis cache)
+  GET /consents/check:   85ms â†’ 12ms (Redis cache + Kafka invalidation)
+  POST /ai/query:        2800ms â†’ 1900ms (pgvector IVFFlat + parallel steps)
+  Overall weighted p99: ~30% improvement
+
+
+================================================================================
+EPAM â€” SECTION 8: KILLER QUESTIONS â€” Full Detailed Answers
+================================================================================
+
+"FHIR share request + consent revoked mid-flight?"
+â†’ Consent check at START â†’ if revoked before fetch completes â†’ RE-check before response.
+  Kafka consent-revoked â†’ cancel in-progress sync. Fail-closed: 403 REVOKED. Audit SHARE_DENIED.
+
+"AI wrong medical information?"
+â†’ Validation layer blocks diagnosis keywords. Disclaimer always shown.
+  User feedback button â†’ log for review â†’ prompt tightening. Repeated failures â†’ disable category.
+
+"50MB PDF â€” RDS me kyun nahi?"
+â†’ Buffer pool pollution, backup bloat, JVM OOM. S3 streaming upload.
+  fhir_db stores s3_key only. Presigned URL for download. AI indexes via S3 stream chunks.
+
+"consent-service down â€” FHIR access?"
+â†’ Fail-closed: 503, all document/AI APIs blocked. HIPAA: unverified access > temporary block.
+  Optional: Redis cache 60s for recently verified consents only. Fix: scale/restart/rollback.
+
+"Kafka consent-revoked delayed 30 min?"
+â†’ P1 SECURITY incident. Revoked user may still access until event processed.
+  Monitor: MSK lag alarm > 1 min for consent-events. Fix: scale consumers, check OOM.
+  Mitigation: reduce cache TTL to 10 sec during incident.
+
+"Distributed transaction â€” consent grant + FHIR sync?"
+â†’ NO 2PC. Saga-like eventual consistency:
+  Consent grant â†’ DB + outbox (same TX) â†’ Kafka â†’ downstream react.
+  FHIR sync fail â†’ retry + DLQ. Compensating: manual re-sync API.
+
+"Bug deployed production â€” rollback?"
+â†’ kubectl rollout undo deployment/fhir-sync-service -n healthcare
+  OR Jenkins deploy previous git SHA image tag. ~2-5 min rollback. maxUnavailable:0 = zero downtime.
+
+
+================================================================================
+EPAM â€” SECTION 9: P1 PRODUCTION (STAR Format)
+================================================================================
+
+STAR Example (prepare this):
+  SITUATION: MSK consumer lag spike â€” consent-revoked events 30 min delayed.
+             Security risk â€” revoked users potentially still accessing documents.
+  TASK: On-call engineer, immediate fix required, P1 escalation.
+  ACTION:
+    - CloudWatch MSK EstimatedMaxTimeLag alarm triggered
+    - kubectl describe pod â†’ ai-indexing consumer OOMKilled (Out of Memory)
+    - Root cause: large document indexing loaded full 30MB PDF in JVM heap
+    - Immediate: scale consumer pods 2â†’4, increase memory limit 512Miâ†’1Gi
+    - Fix: stream S3 read in 1MB chunks, max 5MB per indexing batch
+    - Added: MSK lag alarm > 5 min â†’ PagerDuty, chunk size limit in code review checklist
+  RESULT: Lag cleared in 1 hour. No data breach confirmed via audit log review.
+          Chunk streaming + lag alert added. Zero recurrence in 3 months.
+
+First 15 min on-call plan:
+  0-5 min:  Acknowledge PagerDuty, check CloudWatch dashboards, recent deployments
+  5-10 min: Identify affected service/API, blast radius (consent? FHIR? AI?)
+  10-15 min: Temp mitigate â€” scale pods / rollback if unclear root cause
+
+
+================================================================================
+BLUE YONDER â€” SECTION 10: PROJECT OVERVIEW (Detailed)
+================================================================================
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Platform ek line + contribution?
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+DETAILED ANSWER:
+Blue Yonder supply chain planning platform â€” inventory management, order processing,
+demand forecasting. High-volume event-driven architecture with Kafka.
+
+MY CONTRIBUTION:
+  - Spring Boot REST APIs (order, inventory services)
+  - Kafka producer/consumer implementation
+  - Materialization optimization: 40 min batch â†’ 8 min incremental
+  - P1 fix: order listing API 15s â†’ 400ms (N+1 query)
+  - JMeter/PSR load testing, 30% performance improvement
+  - Jenkins CI/CD deployment to AWS EKS
+
+INTERVIEW LINE:
+"Blue Yonder supply chain me Spring Boot microservices â€” Kafka high-volume events,
+ materialization optimize 40 min se 8 min, P1 fix order API 15s se 400ms,
+ JMeter load testing, 30% performance gain."
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Architecture + microservices breakdown
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+Services:
+  order-service          â†’ order lifecycle (create, cancel, status)
+  inventory-service      â†’ stock levels, warehouse data
+  materialization-service â†’ pre-computed read-optimized views
+  notification-service   â†’ alerts on order/inventory events
+  data-sync-service      â†’ external system synchronization
+
+Endpoints:
+  POST /api/v1/orders                              â†’ create order
+  GET  /api/v1/inventory/{warehouseId}             â†’ raw inventory
+  GET  /api/v1/inventory/snapshot/{warehouseId}    â†’ materialized view (fast)
+  PUT  /api/v1/inventory/{id}/adjust               â†’ stock adjustment
+
+Sync vs Async:
+  SYNC: Order validation, inventory snapshot read (Redis cached)
+  ASYNC: Inventory deduct after order, materialization trigger, notifications
+
+
+================================================================================
+BLUE YONDER â€” SECTION 11: MATERIALIZATION (Must Know â€” Detailed)
+================================================================================
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Materialization kya hai + kyun chahiye?
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+PROBLEM:
+  Inventory snapshot compute karna slow â€” multiple tables JOIN, aggregation, 3-5 sec.
+  Client apps har request pe wait nahi kar sakte (especially mobile/warehouse scanners).
+
+SOLUTION:
+  Pre-compute aggregated views â†’ store in materialized table + Redis cache.
+  Read path: GET /inventory/snapshot/mumbai â†’ Redis hit â†’ ~50ms.
+
+ANALOGY:
+  EPAM me pgvector indexing = documents pre-processed for fast AI search.
+  BY me materialization = inventory pre-computed for fast snapshot reads.
+  Dono me same pattern: write path async (Kafka), read path fast (pre-computed).
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Materialization flow â€” step by step
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  1. POST /api/v1/orders { warehouseId: "mumbai", items: [...] }
+  2. order-service: validate â†’ save order_db â†’ Kafka order-created
+  3. inventory-service (consumer): deduct stock â†’ inventory_db update
+     â†’ Kafka inventory-updated + materialization-trigger { warehouseId: "mumbai" }
+  4. materialization-service (consumer):
+     - Read raw inventory data for mumbai warehouse
+     - Compute aggregates (total SKUs, low-stock count, value)
+     - Write materialized_inventory_snapshots table
+     - Update Redis key: snapshot:mumbai â†’ TTL 5 min
+  5. GET /api/v1/inventory/snapshot/mumbai â†’ Redis hit â†’ 50ms response
+
+BEFORE my optimization:
+  Nightly batch job â€” full recompute ALL warehouses â€” ~40 min, single-threaded
+
+AFTER:
+  Kafka-triggered incremental â€” only changed warehouse recomputed
+  4 parallel consumers (4 partitions) â€” ~8 min for same workload
+  Changes: batchâ†’stream, parallel consumers, indexed queries, batch DB inserts
+
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+Q: Materialization consumer â€” annotated code
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+```java
+@KafkaListener(topics = "materialization-trigger", groupId = "materialization-group")
+public void materialize(@Payload MaterializationEvent event, Acknowledgment ack) {
+
+    if (processedEventRepo.existsByEventId(event.getEventId())) {
+        ack.acknowledge(); return;
+    }
+
+    String warehouseId = event.getWarehouseId();
+
+    // STEP 1: Read raw inventory data (indexed query â€” not full table scan)
+    List<InventoryItem> items = inventoryRepo.findByWarehouseId(warehouseId);
+
+    // STEP 2: Compute aggregates
+    InventorySnapshot snapshot = InventorySnapshot.builder()
+        .warehouseId(warehouseId)
+        .totalSkus(items.size())
+        .lowStockCount(items.stream().filter(i -> i.getQty() < i.getReorderLevel()).count())
+        .totalValue(items.stream().mapToDouble(i -> i.getQty() * i.getUnitPrice()).sum())
+        .computedAt(Instant.now())
+        .build();
+
+    // STEP 3: Write materialized table (upsert â€” idempotent)
+    snapshotRepo.upsert(snapshot);
+
+    // STEP 4: Update Redis cache â€” read path becomes ~50ms
+    redisTemplate.opsForValue().set(
+        "snapshot:" + warehouseId,
+        snapshot,
+        Duration.ofMinutes(5)  // TTL 5 min â€” stale max 5 min acceptable
+    );
+
+    processedEventRepo.save(new ProcessedEvent(event.getEventId()));
+    ack.acknowledge();
+}
+```
+
+
+================================================================================
+BLUE YONDER â€” SECTION 12: P1 PRODUCTION (STAR â€” Primary)
+================================================================================
+
+STAR (Blue Yonder â€” memorize this):
+  SITUATION: Order listing API degraded 3s â†’ 15s during peak hours (2-4 PM).
+             3 client support tickets. ~500 concurrent users affected.
+  TASK: On-call developer, immediate investigation and fix.
+  ACTION:
+    - CloudWatch: RDS CPU 90%, HikariCP pool 10/10 exhausted (all connections in use)
+    - Recent deployment 2 hours ago â€” new "order history with line items" feature
+    - Temporary fix: HikariCP maxPoolSize 10â†’25, scale pods 3â†’6 â†’ 15sâ†’3s
+    - Root cause: N+1 query â€” @OneToMany lazy loading
+      1 query for orders + 100 separate queries for line items per order
+    - Permanent fix:
+      @EntityGraph + JOIN FETCH on order query
+      Composite index: (order_id, status) on line_items table
+  RESULT: 15s â†’ 400ms in 2 hours. CloudWatch query time alarm >500ms added.
+          N+1 query checklist added to PR review template. Zero recurrence.
+
+Fix deploy vs rollback decision:
+  Root cause unclear + high impact â†’ rollback first (safe), fix in staging, redeploy.
+  Root cause clear + small targeted fix â†’ hotfix with team lead approval.
+
+
+================================================================================
+BLUE YONDER â€” SECTION 13: KAFKA + PERFORMANCE + JMETER
+================================================================================
+
+Kafka events:
+  order-created, order-cancelled, inventory-updated, materialization-trigger
+
+Duplicate handling:
+  Idempotent consumer â€” check eventId in processed_events before inventory update.
+  Same order-created 2x â†’ inventory deducted once only.
+
+JMeter setup:
+  500-1000 concurrent users, ramp-up 60 sec, staging environment
+  APIs tested: POST /orders (write), GET /inventory/snapshot (read â€” highest traffic)
+  Bottlenecks found: connection pool exhaustion, missing indexes, consumer lag
+
+Performance numbers:
+  Inventory snapshot: 350ms â†’ 120ms (Redis cache + query optimization)
+  Materialization: 40 min batch â†’ 8 min incremental
+  Order API P1 fix: 15s â†’ 400ms
+  Overall: ~30% improvement across high-traffic APIs
+
+
+================================================================================
+EPAM vs BLUE YONDER â€” Comparison Table
+================================================================================
+
+| Topic       | EPAM                              | Blue Yonder                       |
+|-------------|-----------------------------------|-----------------------------------|
+| Domain      | Healthcare FHIR, Consent, AI      | Supply chain, Inventory, Orders   |
+| Core USP    | FHIR + Consent + pgvector RAG     | Kafka volume + Materialization    |
+| Services    | consent, fhir-sync, ai-assistant  | order, inventory, materialization |
+| Kafka use   | Consent events, doc sync          | order-created, materialization    |
+| Compliance  | HIPAA, audit trail, fail-closed   | Enterprise SLA                    |
+| Pre-compute | pgvector indexing (AI search)     | Materialization (inventory read)  |
+| Performance | 200ms, 30% FHIR/AI APIs           | 30%, materialization 40â†’8 min     |
+| P1 story    | Consent lag / FHIR consumer OOM   | Order API 15sâ†’400ms N+1 query     |
+| Cloud       | EKS, MSK, RDS, S3, Redis          | Same AWS pattern                  |
+
+
+================================================================================
+2-MINUTE PITCHES + KEY NUMBERS (Memorize)
+================================================================================
+
+EPAM PITCH:
+"EPAM me healthcare interoperability platform â€” teen core areas:
+ pehla FHIR document exchange â€” health records securely share/receive external systems se;
+ doosra HIPAA consent management â€” har access consent-se control, revoke instant propagate via Kafka;
+ teesra AI semantic search â€” OpenAI + pgvector, natural language document query with RAG.
+ Kafka async events, AWS EKS deploy, APIs optimize â€” 200ms latency drop, 30% improvement."
+
+Blue Yonder PITCH:
+"Blue Yonder supply chain â€” Spring Boot microservices, Kafka high-volume events.
+ Materialization optimize 40 min batch se 8 min incremental Kafka-triggered.
+ JMeter load testing, P1 fix order API 15s se 400ms N+1 query.
+ 30% performance improvement."
+
+KEY NUMBERS:
+  EPAM:  FHIR list 420â†’210ms | consent 85â†’12ms | AI query 2800â†’1900ms | 30% overall
+  BY:    materialization 40minâ†’8min | order API 15sâ†’400ms | snapshot 350â†’120ms | 30% overall
+  Kafka: replication=3 | consent-events 6 partitions | lag alarm > 5 min
+  AI:    chunk 500 tokens | top-K 5 | temperature 0.3 | embedding 1536 dims
+  Cloud: 3 replicas | HPA 70% CPU | maxUnavailable:0 | Redis TTL 60s consent
+  JMeter: 300-500 concurrent users | ramp-up 60s | focus p99 not average
+
+QUICK REVISION:
+  Outbox = DB + event same TX â†’ worker publishes â†’ no security hole
+  Idempotent consumer = eventId check â†’ duplicate skip â†’ at-least-once safe
+  Fail-closed = consent down â†’ 503 deny ALL (HIPAA safe)
+  RAG = retrieve chunks â†’ prompt with context â†’ LLM answer â†’ validate
+  Materialization = pre-compute slow aggregation â†’ fast read from Redis
+  IRSA = pod gets IAM role â†’ S3/Secrets without hardcoded keys
+

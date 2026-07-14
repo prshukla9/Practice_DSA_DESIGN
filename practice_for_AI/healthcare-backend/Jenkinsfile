@@ -1,0 +1,65 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION = 'us-east-1'
+        AWS_ACCOUNT_ID = '123456789012'
+        ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        EKS_CLUSTER = 'healthcare-prod'
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps { checkout scm }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'mvn -B clean package -DskipTests'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'mvn -B test'
+            }
+        }
+
+        stage('Docker Build & Push') {
+            steps {
+                withAWS(credentials: 'aws-jenkins', region: "${AWS_REGION}") {
+                    sh '''
+                      aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_REGISTRY
+                      for svc in patient-service consent-service integration-service ai-service notification-service; do
+                        docker build -f Dockerfile --build-arg SERVICE=$svc -t $ECR_REGISTRY/$svc:$IMAGE_TAG .
+                        docker push $ECR_REGISTRY/$svc:$IMAGE_TAG
+                      done
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to EKS') {
+            steps {
+                withAWS(credentials: 'aws-jenkins', region: "${AWS_REGION}") {
+                    sh '''
+                      aws eks update-kubeconfig --name $EKS_CLUSTER --region $AWS_REGION
+                      sed -i "s#<AWS_ACCOUNT_ID>#${AWS_ACCOUNT_ID}#g" k8s/healthcare-platform.yaml
+                      for svc in patient-service consent-service integration-service ai-service notification-service; do
+                        kubectl set image deployment/$svc $svc=$ECR_REGISTRY/$svc:$IMAGE_TAG -n healthcare || true
+                      done
+                      kubectl apply -f k8s/healthcare-platform.yaml
+                      kubectl rollout status deployment/patient-service -n healthcare
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo 'Pipeline failed — check CloudWatch logs and Jenkins console output.'
+        }
+    }
+}

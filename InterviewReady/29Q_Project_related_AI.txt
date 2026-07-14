@@ -1,0 +1,54 @@
+PROJECT RELATED AI — Interview Questions (6 YOE)
+
+software Developer2 | Designing and developing scalable healthcare microservices for patient and doctor workflows, integrating FHIR-based interoperable data exchange and AI-driven capabilities for intelligent query handling and decision support. ● Designed and developed Spring Boot-based microservices for patient management and doctor availability in a distributed architecture ● Implemented FHIR-based interoperable data exchange to enable secure and standardized sharing of patient health records across systems ● Developed HIPAA-compliant patient consent management workflows for secure access to sensitive healthcare data ● Designed and implemented Kafka-based event-driven architecture for real-time updates and notifications ● Built AI-powered assistant using OpenAI APIs to handle patient and doctor queries with natural language interaction ● Implemented semantic search using pgvector and designed context-aware prompt pipelines to improve response accuracy and relevance ● Optimized high-traffic APIs, reducing latency by 200ms and improving response time by 30% 
+
+-----------------------------------------------------------
+
+Software Developer2 |  Developed and deployed RESTful microservices using Spring Boot, ensuring modularity, scalability, and ease of maintenance across multiple components. ● Implemented Kafka-based asynchronous communication between services to handle high-volume event-driven data processing and ensure real-time data consistency. ● Enhanced API functionality to improve system performance and ensure seamless integration with client-facing applications. Resolved P1 production issues, improving system reliability and, and ensuring a smooth user experience. ● Conducted JMeter and PSR load testing, optimizing server performance by identifying and resolving bottlenecks. ● Collaborated on the materialization process, significantly improving data processing speed and efficiency. ● Designed event-driven architecture using Kafka. ● Handled async processing and data consistency.
+
+SECTION 1: AI INTEGRATION (Basics → Deep — 6 YOE)
+Q1: OpenAI API exactly kis use case ke liye use kiya?
+Q2: AI assistant architecture — components kaise communicate karte hain
+Q3: User query se response — complete step-by-step flow
+Q4: FHIR documents searchable kaise banaye? (Indexing flow)
+Q5: Sync vs async AI calls
+Q6: Biggest challenges
+Q7: Consent before AI query — full flow
+
+SECTION 2: LLM UNDERSTANDING (6 YOE — Deep)
+Q: LLM kya hai, kaise kaam karta hai?
+Q: Prompt design — system prompt + user prompt
+Q: Context window + token limit management
+
+SECTION 3: SEMANTIC SEARCH + pgvector (STRONGEST — 6 YOE DEEP)
+Q: Semantic search vs keyword search — with example
+Q: Embeddings — kya hain, kaise generate, kaise store
+Q: pgvector — database schema + similarity search SQL
+
+SECTION 4: DOCUMENT INDEXING PIPELINE (Kafka → pgvector)
+
+SECTION 5: HALLUCINATION & GUARDRAILS (Interviewer Favorite)
+Q: Hallucination kya hai + 5-layer defense
+Q: AI search vs FHIR REST search — kab kya use?
+
+SECTION 6: MULTI-TURN CONVERSATION
+
+SECTION 7: SECURITY, PERFORMANCE, COST (6 YOE)
+Q: Sensitive data AI ko securely kaise diya?
+Q: Performance optimization — before/after numbers
+Q: Cost optimization
+Q: OpenAI down / slow — fallback strategy
+
+SECTION 8: KILLER QUESTIONS — FULL DETAILED ANSWERS
+
+SECTION 4: DOCUMENT INDEXING PIPELINE
+Document indexing pipeline (Kafka → pgvector) explain karo?
+
+SECTION 6: MULTI-TURN CONVERSATION
+Multi-turn conversation context kaise manage karte ho?
+Session history store kahan aur kaise?
+
+SECTION 8: KILLER QUESTIONS
+AI hallucination patient data pe risk kaise handle?
+pgvector vs Elasticsearch — kyun choose kiya?
+OpenAI cost control kaise karte ho production me?

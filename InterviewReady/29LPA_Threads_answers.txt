@@ -1,0 +1,1785 @@
+
+================================================================================
+  JAVA MULTITHREADING - COMPLETE INTERVIEW PREPARATION (6 YRS EXPERIENCE)
+  Hinglish mein - Simple + Code + Real Interview Answers
+================================================================================
+
+> Yeh document 8 sections cover karta hai with 29 questions + missing topics.
+> 6 years experience ke liye depth expected hai - surface level nahi chalega.
+> Har answer mein: Concept → Real Life Example → Code → Interview Tip
+
+================================================================================
+SECTION 1: CORE THREAD BASICS
+================================================================================
+
+------------------------------------------------------------------------
+Q1. Thread kya hota hai? Process se difference?
+------------------------------------------------------------------------
+
+CONCEPT:
+- Process = ek independent program jo apni memory mein chalta hai (e.g., Chrome browser)
+- Thread = process ke andar ek lightweight execution unit
+- Ek process mein multiple threads ho sakte hain jo SAME memory share karte hain
+
+REAL LIFE ANALOGY:
+- Process = ek restaurant
+- Thread = us restaurant ke alag-alag waiters
+- Sab waiters ek hi kitchen (memory) use karte hain, but kaam alag alag karte hain
+
+KEY DIFFERENCES:
+| Feature          | Process                    | Thread                        |
+|------------------|----------------------------|-------------------------------|
+| Memory           | Apni alag memory           | Process ki memory share karta |
+| Creation cost    | Heavy (slow)               | Lightweight (fast)            |
+| Communication    | IPC chahiye (complex)      | Direct (shared memory)        |
+| Crash impact     | Sirf usi process pe        | Poora process crash ho sakta  |
+
+INTERVIEW TIP: 6 yrs exp se expect hai ki tum bolo — "Context switching between threads is cheaper than processes kyunki address space same rehta hai."
+
+------------------------------------------------------------------------
+Q2. Thread create kaise karte ho? Thread vs Runnable vs Callable
+------------------------------------------------------------------------
+
+3 TARIKE HAIN:
+
+--- WAY 1: Thread class extend karo ---
+
+// Thread ko extend karo — lekin Java mein single inheritance hai,
+// isliye is approach ki limitation hai
+class MyThread extends Thread {
+    @Override
+    public void run() {
+        // Yeh logic new thread mein execute hoga
+        System.out.println("Thread running: " + Thread.currentThread().getName());
+    }
+}
+
+// Usage:
+// MyThread t = new MyThread();
+// t.start(); // start() NEW thread create karta hai, run() same thread pe
+
+--- WAY 2: Runnable implement karo (PREFERRED) ---
+
+// Runnable = functional interface with run() method
+// Iska fayda: class doosre cheez bhi extend kar sakti hai
+class MyRunnable implements Runnable {
+    @Override
+    public void run() {
+        // Thread ka actual kaam yahan hota hai
+        System.out.println("Runnable running: " + Thread.currentThread().getName());
+    }
+}
+
+// Usage:
+// Thread t = new Thread(new MyRunnable());
+// t.start();
+
+// Lambda se bhi kar sakte ho (modern Java):
+// Thread t = new Thread(() -> System.out.println("Lambda thread"));
+
+--- WAY 3: Callable (result return karta hai + exception throw kar sakta hai) ---
+
+import java.util.concurrent.Callable;
+import java.util.concurrent.FutureTask;
+
+// Callable = Runnable jaisa, but result return karta hai
+// Runnable mein run() void hai, Callable mein call() return type hai
+class MyCallable implements Callable<String> {
+    @Override
+    public String call() throws Exception {
+        // Heavy computation ya DB call
+        Thread.sleep(1000);
+        return "Result from Callable";
+    }
+}
+
+// Usage with FutureTask:
+// FutureTask<String> future = new FutureTask<>(new MyCallable());
+// Thread t = new Thread(future);
+// t.start();
+// String result = future.get(); // blocking call - result aane tak rukta hai
+
+COMPARISON:
+| Feature          | Thread        | Runnable      | Callable          |
+|------------------|---------------|---------------|-------------------|
+| Return value     | No            | No            | Yes (via Future)  |
+| Exception        | Unchecked only| Unchecked only| Checked bhi       |
+| Inheritance free | No            | Yes           | Yes               |
+| Use with pool    | Not ideal     | Yes           | Yes               |
+
+INTERVIEW TIP: Bolo "In production, hum Runnable ya Callable use karte hain with ExecutorService.
+ Direct Thread extend karna avoid karte hain because it ties the task to the execution mechanism."
+
+------------------------------------------------------------------------
+Q3. start() vs run() difference?
+------------------------------------------------------------------------
+
+// GALAT TARIKA — run() directly call karna
+MyRunnable r = new MyRunnable();
+Thread t = new Thread(r);
+t.run(); // ❌ Yeh NEW thread create NAHI karta, same main thread pe chalta hai!
+
+// SAHI TARIKA — start() call karna
+t.start(); // ✅ JVM ek NAYA thread create karta hai, usmein run() call hoti hai
+
+SIMPLE RULE:
+- start() → JVM ko bolo "ek naya thread banao aur usmein run() chalo"
+- run() → sirf ek normal method call hai, koi naya thread nahi banta
+
+INTERVIEW TIP: "start() ko sirf ek baar call kar sakte ho. Dobara call karo toh IllegalThreadStateException aata hai."
+
+------------------------------------------------------------------------
+Q4. Thread Lifecycle (States) explain karo?
+------------------------------------------------------------------------
+
+Thread ke 6 states hain (java.lang.Thread.State enum):
+
+    NEW ──start()──> RUNNABLE ──scheduler──> RUNNING
+                         ^                      |
+                         |              sleep/wait/join/IO
+                         |                      |
+                      notify()           BLOCKED/WAITING/TIMED_WAITING
+                                                |
+                                           TERMINATED
+
+1. NEW         → Thread object bana, start() nahi hua
+2. RUNNABLE    → start() call ho gaya, CPU ka wait kar raha hai
+3. BLOCKED     → Synchronized block ka lock lene ki wait mein
+4. WAITING     → wait(), join() call ke baad indefinitely wait kar raha hai
+5. TIMED_WAITING → sleep(n), wait(n), join(n) ke baad limited time wait
+6. TERMINATED  → run() complete ho gaya ya exception aayi
+
+CODE TO CHECK STATE:
+Thread t = new Thread(() -> {
+    try { Thread.sleep(2000); } catch (InterruptedException e) {}
+});
+System.out.println(t.getState()); // NEW
+t.start();
+System.out.println(t.getState()); // RUNNABLE or TIMED_WAITING
+
+------------------------------------------------------------------------
+Q5. sleep() vs wait() vs yield() difference?
+------------------------------------------------------------------------
+
+| Feature         | sleep()              | wait()                  | yield()              |
+|-----------------|----------------------|-------------------------|----------------------|
+| Class           | Thread               | Object                  | Thread               |
+| Lock release?   | NO (lock hold karta) | YES (lock release karta)| NO                   |
+| Wake condition  | Time expire hone par | notify()/notifyAll()    | Scheduler decide kare|
+| Context         | Kahi bhi             | Synchronized block mein | Kahi bhi             |
+| InterruptedException | Yes          | Yes                     | No                   |
+
+// sleep() example — lock nahi chhorta
+synchronized(lock) {
+    Thread.sleep(1000); // lock apne paas rakhta hai, dusre threads wait karte hain
+}
+
+// wait() example — lock release karta hai
+synchronized(lock) {
+    lock.wait(); // lock release karta hai, dusra thread enter kar sakta hai
+    // notify() ke baad yahan se resume hoga
+}
+
+// yield() — CPU ko hint deta hai ki "koi aur thread lo abhi"
+// Guarantee nahi hai ki actually switch hoga — OS ka decision
+Thread.yield();
+
+INTERVIEW TIP: "wait() sirf synchronized block mein call hoti hai, 
+warna IllegalMonitorStateException. sleep() koi bhi jagah se call ho sakti hai."
+
+================================================================================
+SECTION 2: SYNCHRONIZATION & LOCKS
+================================================================================
+
+------------------------------------------------------------------------
+Q6. Synchronization kya hota hai?
+------------------------------------------------------------------------
+
+PROBLEM: Jab multiple threads ek hi shared data access karte hain toh race condition hoti hai.
+
+// WITHOUT SYNCHRONIZATION — PROBLEM
+class Counter {
+    private int count = 0;
+
+    // Yeh method thread-safe NAHI hai
+    public void increment() {
+        count++; // Yeh ek step nahi hai! Read → Modify → Write — 3 steps hain
+        // Thread A padhta hai count=5, Thread B bhi count=5 padhta hai
+        // Dono 6 likhte hain — ek increment lost ho jaata hai!
+    }
+}
+
+// WITH SYNCHRONIZATION — FIXED
+class SafeCounter {
+    private int count = 0;
+
+    // synchronized keyword ensure karta hai ek hi thread ek time par execute kare
+    public synchronized void increment() {
+        count++; // Ab yeh atomically hoga
+    }
+}
+
+CONCEPT: Synchronization = ek time par ek hi thread critical section mein ho
+
+------------------------------------------------------------------------
+Q7. synchronized method vs synchronized block?
+------------------------------------------------------------------------
+
+// METHOD LEVEL — puri method lock ho jaati hai
+// Lock object = 'this' (current instance)
+public synchronized void methodLevel() {
+    // Sirf ek thread at a time yahan enter kar sakta hai
+    doWork();
+}
+
+// BLOCK LEVEL — sirf specific code lock hota hai (BETTER PERFORMANCE)
+public void blockLevel() {
+    // Yeh part concurrent chal sakta hai — koi lock nahi
+    doPreWork();
+
+    synchronized(this) {
+        // Sirf yeh critical section lock hai
+        // Baki code concurrent chal sakta hai
+        doWork();
+    }
+
+    // Yeh bhi concurrent chal sakta hai
+    doPostWork();
+}
+
+// DIFFERENT LOCK OBJECT use kar sakte ho
+private final Object lock1 = new Object();
+private final Object lock2 = new Object();
+
+public void methodA() {
+    synchronized(lock1) { /* lock1 se guard */ }
+}
+
+public void methodB() {
+    synchronized(lock2) { /* lock2 se guard — methodA ke saath concurrent chal sakta hai */ }
+}
+
+INTERVIEW TIP: "Block-level synchronization preferred hai kyunki
+ granular control milta hai aur throughput better hota hai. Method-level lazy approach hai."
+
+------------------------------------------------------------------------
+Q8. Object-level vs Class-level lock?
+------------------------------------------------------------------------
+
+// OBJECT-LEVEL LOCK (non-static synchronized)
+// Har instance ka apna lock hota hai
+public synchronized void instanceMethod() {
+    // 'this' object ka lock — Thread1 obj1 pe, Thread2 obj2 pe simultaneously chal sakte hain
+}
+
+// CLASS-LEVEL LOCK (static synchronized)
+// Poori class ka ek lock — SABHI instances share karte hain
+public static synchronized void classMethod() {
+    // MyClass.class ka lock
+    // Thread1 aur Thread2 dono simultaneously enter NAHI kar sakte chahe alag instances ho
+}
+
+// Explicitly:
+synchronized(MyClass.class) {
+    // class-level lock
+}
+
+WHEN TO USE:
+- Object lock: instance variables protect karne ke liye
+- Class lock: static variables protect karne ke liye
+
+------------------------------------------------------------------------
+Q9. Intrinsic lock (Monitor) kya hota hai?
+------------------------------------------------------------------------
+
+CONCEPT:
+- Java mein har object ke saath ek built-in lock hota hai — ise "intrinsic lock" ya "monitor" kehte hain
+- synchronized keyword is monitor ko use karta hai
+- Ek thread jo synchronized block mein ghusta hai, woh us object ka monitor acquire karta hai
+- Dusra thread wahi monitor chahiye toh BLOCKED state mein chala jaata hai
+
+// Under the hood — Java bytecode mein MONITORENTER aur MONITOREXIT instructions generate hote hain
+synchronized(obj) {
+    // MONITORENTER — lock acquire
+    doWork();
+    // MONITOREXIT — lock release (exception pe bhi release hota hai — finally jaisa)
+}
+
+PROPERTIES:
+- Reentrant hai (same thread dobara lock le sakta hai — niche dekho)
+- Non-interruptible hai (lock wait kar rahe thread ko interrupt nahi kar sakte — ReentrantLock mein hota hai)
+
+------------------------------------------------------------------------
+Q10. Reentrant Lock kya hota hai?
+------------------------------------------------------------------------
+
+CONCEPT: Reentrant = same thread ek hi lock ko multiple times acquire kar sakta hai
+
+// Yeh problem solve karta hai:
+public synchronized void outer() {
+    inner(); // inner() bhi synchronized hai same lock pe
+}
+
+public synchronized void inner() {
+    // Same thread yahan aata hai — reentrant hone ki wajah se deadlock NAHI hota
+    // Lock count 2 ho jaata hai, do baar release hoga
+}
+
+// ReentrantLock class (java.util.concurrent.locks):
+import java.util.concurrent.locks.ReentrantLock;
+
+ReentrantLock lock = new ReentrantLock();
+
+public void method() {
+    lock.lock(); // acquire
+    try {
+        // critical section
+        doWork();
+    } finally {
+        lock.unlock(); // ALWAYS finally mein — warna lock kabhi release nahi hoga!
+    }
+}
+
+INTERVIEW TIP: "synchronized bhi reentrant hai by default.
+ ReentrantLock additionally tryLock(), lockInterruptibly(), fairness aur condition variables deta hai."
+
+------------------------------------------------------------------------
+Q11. ExecutorService, submit vs execute
+------------------------------------------------------------------------
+
+// EXECUTORSERVICE = thread pool manage karne ka standard way
+import java.util.concurrent.*;
+
+ExecutorService executor = Executors.newFixedThreadPool(5);
+
+// execute() — fire and forget, Runnable ke liye, return nahi karta
+executor.execute(() -> {
+    System.out.println("Task running in: " + Thread.currentThread().getName());
+    // Exception handle nahi hoti — UncaughtExceptionHandler chahiye
+});
+
+// submit() — Runnable ya Callable, Future return karta hai
+Future<String> future = executor.submit(() -> {
+    return "Result"; // Callable
+});
+
+try {
+    String result = future.get(); // blocking — result aane tak rukta hai
+    String result2 = future.get(5, TimeUnit.SECONDS); // timeout ke saath
+} catch (ExecutionException e) {
+    // Task ke andar aayi exception yahan aati hai
+    e.getCause(); // actual exception
+}
+
+// SHUTDOWN properly karo — warna JVM exit nahi hoga
+executor.shutdown(); // naye task nahi lega, existing complete karega
+executor.awaitTermination(60, TimeUnit.SECONDS); // wait karo
+// ya
+executor.shutdownNow(); // running tasks ko interrupt karega
+
+------------------------------------------------------------------------
+Q12. Thread.join() kya karta hai?
+------------------------------------------------------------------------
+
+// join() = ek thread doosre thread ke khatam hone ka wait karta hai
+
+Thread worker = new Thread(() -> {
+    System.out.println("Worker kaam kar raha hai...");
+    try { Thread.sleep(2000); } catch (InterruptedException e) {}
+    System.out.println("Worker done");
+});
+
+worker.start();
+System.out.println("Main thread wait kar raha hai...");
+worker.join(); // Main thread yahaan BLOCK hoga jab tak worker complete na ho
+System.out.println("Main thread resume hua — worker complete ho gaya");
+
+// join(timeout) bhi hota hai:
+worker.join(5000); // max 5 seconds wait karo, phir aage badho
+
+================================================================================
+SECTION 3: ADVANCED LOCKS
+================================================================================
+
+------------------------------------------------------------------------
+Q13. ReentrantLock vs synchronized?
+------------------------------------------------------------------------
+
+| Feature                  | synchronized        | ReentrantLock               |
+|--------------------------|---------------------|-----------------------------|
+| Syntax                   | Simple keyword      | Explicit lock/unlock        |
+| Fairness                 | No guarantee        | new ReentrantLock(true)     |
+| Try to acquire           | No                  | tryLock() available         |
+| Interruptible wait       | No                  | lockInterruptibly()         |
+| Multiple conditions      | wait/notify (1 set) | Multiple Condition objects  |
+| Performance (high contention) | Slower       | Faster                      |
+| Automatic release        | Yes (finally block) | Manual (must call unlock()) |
+
+import java.util.concurrent.locks.*;
+
+ReentrantLock lock = new ReentrantLock(true); // true = fair lock
+
+// INTERRUPTIBLE LOCK — synchronized mein yeh nahi hota
+try {
+    lock.lockInterruptibly(); // Lock wait mein interrupt kar sakte hain
+    try {
+        doWork();
+    } finally {
+        lock.unlock();
+    }
+} catch (InterruptedException e) {
+    // Thread interrupted while waiting for lock
+}
+
+// TRYLOCK — non-blocking lock attempt
+if (lock.tryLock()) { // turant return karta hai
+    try {
+        doWork();
+    } finally {
+        lock.unlock();
+    }
+} else {
+    System.out.println("Lock available nahi — kuch aur karo");
+}
+
+// TRYLOCK WITH TIMEOUT
+if (lock.tryLock(500, TimeUnit.MILLISECONDS)) {
+    // 500ms tak try karo
+}
+
+// MULTIPLE CONDITIONS (Producer-Consumer ke liye useful)
+Condition notFull = lock.newCondition();
+Condition notEmpty = lock.newCondition();
+// Producer: notFull.await() aur notEmpty.signal()
+// Consumer: notEmpty.await() aur notFull.signal()
+
+------------------------------------------------------------------------
+Q14. ReadWriteLock kya hota hai?
+------------------------------------------------------------------------
+
+CONCEPT: Jab reads bahut zyada hain aur writes kam — ReadWriteLock better performance deta hai
+
+RULES:
+- Multiple threads SIMULTANEOUSLY read kar sakte hain (no lock needed)
+- Write ke time KISI ko bhi access nahi (exclusive lock)
+- Read lock hold karte hue write nahi ho sakta
+
+import java.util.concurrent.locks.*;
+
+ReadWriteLock rwLock = new ReentrantReadWriteLock();
+Lock readLock = rwLock.readLock();
+Lock writeLock = rwLock.writeLock();
+
+Map<String, String> cache = new HashMap<>(); // HashMap thread-safe nahi hai
+
+// READ — multiple threads simultaneously
+public String get(String key) {
+    readLock.lock(); // Multiple readers allowed simultaneously
+    try {
+        return cache.get(key);
+    } finally {
+        readLock.unlock();
+    }
+}
+
+// WRITE — exclusive access
+public void put(String key, String value) {
+    writeLock.lock(); // Sirf ek writer, koi reader bhi nahi
+    try {
+        cache.put(key, value);
+    } finally {
+        writeLock.unlock();
+    }
+}
+
+USE CASE: Cache implementation, config store (read many, write rare)
+
+------------------------------------------------------------------------
+Q15. Lock Fairness kya hota hai?
+------------------------------------------------------------------------
+
+CONCEPT:
+- Unfair lock (default): Koi bhi waiting thread lock le sakta hai — barging allowed
+  → Higher throughput but possible starvation
+- Fair lock: Jo pehle aaya, usse pehle lock milega (FIFO order)
+  → Lower throughput but no starvation
+
+ReentrantLock unfairLock = new ReentrantLock();       // default = unfair
+ReentrantLock fairLock   = new ReentrantLock(true);   // fair
+
+INTERVIEW TIP: "Production mein mostly unfair lock use karte hain kyunki throughput better hota hai. Fair lock sirf tab jab starvation ek real problem ho."
+
+------------------------------------------------------------------------
+Q16. tryLock() kya karta hai?
+------------------------------------------------------------------------
+
+// tryLock() — non-blocking lock attempt, immediately return karta hai
+
+ReentrantLock lock = new ReentrantLock();
+
+// BASIC TRYLOCK
+if (lock.tryLock()) {
+    try {
+        // Lock mila! Kaam karo
+        doWork();
+    } finally {
+        lock.unlock();
+    }
+} else {
+    // Lock nahi mila, koi aur kaam karo ya retry karo
+    doAlternativeWork();
+}
+
+// TRYLOCK WITH TIMEOUT
+try {
+    if (lock.tryLock(2, TimeUnit.SECONDS)) {
+        try {
+            doWork();
+        } finally {
+            lock.unlock();
+        }
+    } else {
+        System.out.println("2 seconds mein lock nahi mila");
+    }
+} catch (InterruptedException e) {
+    Thread.currentThread().interrupt();
+}
+
+USE CASE: Deadlock avoid karne ke liye — agar lock nahi mila toh resource release karo aur retry karo
+
+------------------------------------------------------------------------
+Q17. Deadlock kya hota hai? Kaise avoid karte ho?
+------------------------------------------------------------------------
+
+DEADLOCK = do ya zyada threads ek doosre ke lock ka wait kar rahe hain — sab stuck!
+
+CONDITIONS FOR DEADLOCK (Coffman conditions - SAARI zaruri hain):
+1. Mutual Exclusion — resource ek time pe ek hi thread ke paas
+2. Hold and Wait — ek resource hold karo aur doosra wait karo
+3. No Preemption — kisi se force nahi le sakte resource
+4. Circular Wait — Thread A → Thread B → Thread A
+
+// DEADLOCK EXAMPLE
+Object lock1 = new Object();
+Object lock2 = new Object();
+
+// Thread A: lock1 lega phir lock2 mangega
+Thread threadA = new Thread(() -> {
+    synchronized(lock1) {
+        System.out.println("Thread A: lock1 liya");
+        try { Thread.sleep(100); } catch (InterruptedException e) {}
+        synchronized(lock2) { // Thread B ke paas hai — STUCK!
+            System.out.println("Thread A: lock2 liya");
+        }
+    }
+});
+
+// Thread B: lock2 lega phir lock1 mangega — CIRCULAR!
+Thread threadB = new Thread(() -> {
+    synchronized(lock2) {
+        System.out.println("Thread B: lock2 liya");
+        try { Thread.sleep(100); } catch (InterruptedException e) {}
+        synchronized(lock1) { // Thread A ke paas hai — STUCK!
+            System.out.println("Thread B: lock1 liya");
+        }
+    }
+});
+
+// SOLUTION 1: Lock ordering — ALWAYS same order mein locks lo
+Thread safeA = new Thread(() -> {
+    synchronized(lock1) {    // pehle lock1
+        synchronized(lock2) { // phir lock2
+            doWork();
+        }
+    }
+});
+
+Thread safeB = new Thread(() -> {
+    synchronized(lock1) {    // Thread B bhi pehle lock1 lega — no circular wait
+        synchronized(lock2) {
+            doWork();
+        }
+    }
+});
+
+// SOLUTION 2: tryLock() with timeout
+boolean got1 = false, got2 = false;
+try {
+    got1 = lock1.tryLock(1, TimeUnit.SECONDS);
+    got2 = lock2.tryLock(1, TimeUnit.SECONDS);
+    if (got1 && got2) {
+        doWork();
+    }
+} finally {
+    if (got1) lock1.unlock(); // cleanup
+    if (got2) lock2.unlock();
+}
+
+// SOLUTION 3: Single lock use karo instead of multiple
+
+INTERVIEW TIP: "Production mein deadlock detect karne ke liye ThreadMXBean use karte hain. JVM thread dump bhi deadlock dikhata hai."
+
+================================================================================
+SECTION 4: VOLATILE & MEMORY MODEL
+================================================================================
+
+------------------------------------------------------------------------
+Q18. volatile keyword kya karta hai?
+------------------------------------------------------------------------
+
+PROBLEM WITHOUT VOLATILE:
+- CPU performance ke liye variables ko CPU cache mein store karta hai
+- Thread A variable update karta hai main memory mein, Thread B apni cache se padh raha hai — STALE VALUE!
+
+// WITHOUT VOLATILE — PROBLEM
+class Server {
+    private boolean running = true; // Thread B apni cache mein copy rakh sakta hai
+
+    public void stop() {
+        running = false; // Thread A main memory update karta hai
+        // Thread B ko pata hi nahi chala!
+    }
+
+    public void run() {
+        while (running) { // Thread B kabhi nahi rukega!
+            doWork();
+        }
+    }
+}
+
+// WITH VOLATILE — FIXED
+class Server {
+    private volatile boolean running = true;
+    // volatile ensure karta hai:
+    // 1. Har read DIRECTLY main memory se hoga (no cache)
+    // 2. Har write DIRECTLY main memory mein hoga (no cache)
+    // 3. Visibility guarantee — sabhi threads updated value dekhenge
+
+    public void stop() { running = false; }
+    public void run() {
+        while (running) { doWork(); } // Ab correctly rukega
+    }
+}
+
+VOLATILE GUARANTEES:
+✅ Visibility — changes sabhi threads ko immediately visible
+✅ Ordering — volatile se pehle ki writes volatile write se pehle visible hain (happens-before)
+❌ Atomicity — volatile count++ thread-safe NAHI hai! (read-modify-write atomic nahi)
+
+WHEN TO USE VOLATILE:
+- Simple flag variables (stop/start)
+- Status variables jo ek thread write kare, multiple threads read karein
+- Single writer, multiple readers
+
+WHEN NOT TO USE:
+- count++ jaise compound operations → AtomicInteger use karo
+- Check-then-act patterns → synchronized use karo
+
+------------------------------------------------------------------------
+Q19. Visibility vs Atomicity vs Ordering?
+------------------------------------------------------------------------
+
+1. VISIBILITY: Ek thread ka change doosre thread ko dikhna chahiye
+   - Problem: CPU cache
+   - Solution: volatile, synchronized
+
+2. ATOMICITY: Operation indivisible hona chahiye
+   - Problem: count++ = 3 steps (read, modify, write) — interrupted ho sakta hai
+   - Solution: synchronized, AtomicInteger, AtomicLong etc.
+   - count++ NAHIN atomic hai! (int, long, double bhi nahi)
+   - Reference assignments (=) 32-bit ke liye atomic hain (long/double nahi JVM pe)
+
+3. ORDERING: Instructions ka order as expected hona chahiye
+   - Problem: Compiler/CPU reorder kar sakta hai instructions (optimization ke liye)
+   - Solution: volatile (limited), synchronized (full), happens-before rules
+
+// ATOMICITY EXAMPLE:
+import java.util.concurrent.atomic.*;
+
+AtomicInteger counter = new AtomicInteger(0);
+counter.incrementAndGet(); // Thread-safe, atomic increment
+counter.compareAndSet(5, 10); // CAS — atomic check + update
+
+------------------------------------------------------------------------
+Q20. Java Memory Model (JMM) kya hai?
+------------------------------------------------------------------------
+
+CONCEPT:
+JMM = specification jo define karta hai ki:
+- Threads memory kaise access karein
+- Compiler/CPU kab reorder kar sakta hai
+- Kab ek thread ka write doosre thread ko visible hoga
+
+JMM KEY RULES:
+1. Har thread ka apna "working memory" (CPU cache/registers) hota hai
+2. Main memory se copy leke kaam karta hai
+3. flush to main memory optional hai — unless volatile/synchronized
+
+JMM ACTIONS:
+- READ/WRITE to main memory
+- LOCK/UNLOCK (synchronized)
+- LOAD/STORE from/to working memory
+
+WITHOUT JMM GUARANTEES, yeh sab ho sakta hai:
+- Stale reads (purani value padhna)
+- Out-of-order writes visible hona
+- Partially constructed objects dekhna
+
+JMM SOLUTIONS:
+- volatile → visibility + limited ordering
+- synchronized → visibility + atomicity + full ordering
+- final fields → safe publication guarantee
+
+------------------------------------------------------------------------
+Q21. Happens-Before relationship kya hota hai?
+------------------------------------------------------------------------
+
+CONCEPT: "A happens-before B" = A ke actions B ko visible hain
+
+JMM ke HAPPENS-BEFORE RULES:
+1. Program order: Thread mein line 1 → line 2 (same thread)
+2. Monitor lock: unlock → lock (synchronized exit se entry)
+3. Volatile write → volatile read (same variable)
+4. Thread start: start() call → thread ke pehle action
+5. Thread join: thread ka last action → join() return
+6. Transitivity: A HB B aur B HB C → A HB C
+
+// Example:
+int x = 0;
+volatile boolean flag = false;
+
+// Thread 1:
+x = 42;          // (A)
+flag = true;      // (B) volatile write
+
+// Thread 2:
+if (flag) {       // (C) volatile read
+    // Yahan x KO 42 dikhega — guaranteed!
+    // Kyunki: A HB B (program order), B HB C (volatile), A HB C (transitivity)
+    System.out.println(x); // 42 print hoga
+}
+
+------------------------------------------------------------------------
+Q22. Double-checked locking kya hota hai?
+------------------------------------------------------------------------
+
+// PROBLEM: Lazy initialization mein synchronization overhead
+class Singleton {
+    private static Singleton instance;
+
+    // BROKEN — without volatile (Java 5 se pehle ka pattern)
+    public static Singleton getInstance() {
+        if (instance == null) {        // CHECK 1: No lock, fast
+            synchronized(Singleton.class) {
+                if (instance == null) { // CHECK 2: With lock
+                    instance = new Singleton();
+                    // PROBLEM: instance = new Singleton() 3 steps hai:
+                    // 1. Memory allocate karo
+                    // 2. Object initialize karo
+                    // 3. instance variable ko point karo
+                    // Compiler steps 2 aur 3 reorder kar sakta hai!
+                    // Thread B step 3 dekh sakta hai before step 2 — PARTIALLY INIT OBJECT!
+                }
+            }
+        }
+        return instance;
+    }
+}
+
+// FIXED — volatile se (Java 5+)
+class Singleton {
+    // volatile reordering prevent karta hai
+    private static volatile Singleton instance;
+
+    public static Singleton getInstance() {
+        if (instance == null) {           // Fast path — no lock
+            synchronized(Singleton.class) {
+                if (instance == null) {   // Safe check under lock
+                    instance = new Singleton(); // volatile ensures no reordering
+                }
+            }
+        }
+        return instance;
+    }
+}
+
+// BETTER ALTERNATIVE: Initialization-on-demand holder (no volatile, no sync needed)
+class Singleton {
+    // JVM class loading thread-safe hai — LazyHolder tabhi load hoga jab getInstance() call ho
+    private static class LazyHolder {
+        static final Singleton INSTANCE = new Singleton(); // JVM guarantees this is safe
+    }
+
+    public static Singleton getInstance() {
+        return LazyHolder.INSTANCE;
+    }
+}
+
+INTERVIEW TIP: "Initialization-on-demand holder pattern is the best lazy singleton approach in Java
+ — no explicit synchronization needed, thread-safe by JVM class loading guarantee."
+
+================================================================================
+SECTION 5: EXECUTORS & THREAD POOLS
+================================================================================
+
+------------------------------------------------------------------------
+Q23. Executor Framework kya hai?
+------------------------------------------------------------------------
+
+CONCEPT: Thread creation aur management manually karna expensive aur error-prone hai.
+Executor framework task submission aur execution ko decouple karta hai.
+
+HIERARCHY:
+Executor (interface)
+  └── ExecutorService (interface) — submit, shutdown
+        └── AbstractExecutorService
+              └── ThreadPoolExecutor ← ACTUAL IMPLEMENTATION
+              └── ScheduledThreadPoolExecutor
+
+// FACTORY METHODS (Executors class):
+ExecutorService fixed    = Executors.newFixedThreadPool(10);     // fixed N threads
+ExecutorService cached   = Executors.newCachedThreadPool();       // dynamic threads
+ExecutorService single   = Executors.newSingleThreadExecutor();   // 1 thread, ordered
+ScheduledExecutorService sched = Executors.newScheduledThreadPool(5); // scheduled tasks
+
+------------------------------------------------------------------------
+Q24. ThreadPoolExecutor ka working?
+------------------------------------------------------------------------
+
+// FULL CONTROL — directly ThreadPoolExecutor use karo
+ThreadPoolExecutor executor = new ThreadPoolExecutor(
+    5,                          // corePoolSize: min threads always alive
+    10,                         // maximumPoolSize: max threads possible
+    60L, TimeUnit.SECONDS,      // keepAliveTime: idle thread kitne time baad mare
+    new LinkedBlockingQueue<>(100), // workQueue: pending tasks ki queue
+    Executors.defaultThreadFactory(), // threadFactory
+    new ThreadPoolExecutor.CallerRunsPolicy() // rejection policy
+);
+
+// FLOW (bahut important!):
+// 1. Task aaya → core thread available? → assign karo
+// 2. All core busy → queue full nahi? → queue mein dalo
+// 3. Queue full → max threads tak create karo
+// 4. Max threads bhi busy + queue full → RejectionHandler call karo
+
+// REJECTION POLICIES:
+// AbortPolicy (default)      → RejectedExecutionException throw
+// CallerRunsPolicy           → Calling thread hi task run kare (backpressure)
+// DiscardPolicy              → Silently discard
+// DiscardOldestPolicy        → Queue ka oldest task remove karke naya daalo
+
+// QUEUE TYPES:
+// LinkedBlockingQueue(n)     → Bounded — memory safe
+// SynchronousQueue           → No storage, directly hand off (CachedThreadPool uses this)
+// PriorityBlockingQueue      → Priority-based tasks
+
+INTERVIEW TIP: "Production mein hamesha bounded queue use karo. Unbounded queue OOM le aa sakti hai under load."
+
+------------------------------------------------------------------------
+Q25. Fixed vs Cached thread pool?
+------------------------------------------------------------------------
+
+// FIXED THREAD POOL
+ExecutorService fixed = Executors.newFixedThreadPool(10);
+// - Exactly 10 threads hamesha
+// - Tasks unbounded queue mein collect hote hain (LinkedBlockingQueue - UNBOUNDED!)
+// - Use case: Known, stable workload
+// - Risk: Queue bhar sakti hai → OOM
+
+// CACHED THREAD POOL
+ExecutorService cached = Executors.newCachedThreadPool();
+// - 0 to Integer.MAX_VALUE threads (practically unlimited!)
+// - SynchronousQueue — no buffer, direct handoff
+// - 60 sec idle → thread die ho jaata hai
+// - Use case: Short-lived, burst tasks
+// - Risk: Thread explosion under load
+
+// INTERVIEW TIP — PRODUCTION RECOMMENDATION:
+// Dono Executors factory methods avoid karo!
+// "I prefer creating ThreadPoolExecutor directly with bounded queue and
+// explicit rejection policy for production workloads."
+
+ThreadPoolExecutor productionPool = new ThreadPoolExecutor(
+    10, 20, 30, TimeUnit.SECONDS,
+    new LinkedBlockingQueue<>(500), // BOUNDED queue
+    new ThreadPoolExecutor.CallerRunsPolicy() // Backpressure — no task lost
+);
+
+------------------------------------------------------------------------
+Q26. Queue ka role thread pool mein?
+------------------------------------------------------------------------
+
+Queue = buffer jahan tasks wait karte hain jab sab threads busy ho
+
+- Direct Handoff (SynchronousQueue): Queue nahi — thread available hona chahiye ya naya banao
+- Bounded Queue (LinkedBlockingQueue(n)): Limited waiting — better memory control
+- Unbounded Queue (LinkedBlockingQueue): Unlimited waiting — OOM risk
+- Priority Queue: Task priority ke hisaab se process karo
+
+------------------------------------------------------------------------
+Q27. Future vs CompletableFuture?
+------------------------------------------------------------------------
+
+// FUTURE — basic, blocking
+ExecutorService executor = Executors.newFixedThreadPool(2);
+
+Future<String> future = executor.submit(() -> {
+    Thread.sleep(2000);
+    return "Done";
+});
+
+// future.get() BLOCKS current thread — inefficient!
+String result = future.get(); // wait karo...
+
+// PROBLEMS WITH FUTURE:
+// 1. get() blocking hai
+// 2. Chain nahi kar sakte (kaam ho gaya toh agle step manually)
+// 3. Exception handling poor
+// 4. Multiple futures combine karna mushkil
+
+// COMPLETABLEFUTURE — non-blocking, chainable, composable
+import java.util.concurrent.CompletableFuture;
+
+// BASIC ASYNC
+CompletableFuture<String> cf = CompletableFuture.supplyAsync(() -> {
+    // Background thread mein chalta hai (ForkJoinPool.commonPool by default)
+    return "Hello";
+});
+
+// CHAINING — result ke baad kya karna hai
+CompletableFuture<String> result = CompletableFuture
+    .supplyAsync(() -> fetchUser(userId))           // Step 1: User fetch
+    .thenApply(user -> fetchOrders(user))           // Step 2: Orders fetch (same thread)
+    .thenApplyAsync(orders -> processOrders(orders)) // Step 3: Process (new thread)
+    .thenApply(processed -> sendNotification(processed)); // Step 4: Notify
+
+// COMBINING TWO FUTURES
+CompletableFuture<String> userCF = CompletableFuture.supplyAsync(() -> getUser());
+CompletableFuture<String> orderCF = CompletableFuture.supplyAsync(() -> getOrders());
+
+// Dono complete hone ke baad combine karo
+CompletableFuture<String> combined = userCF.thenCombine(orderCF,
+    (user, orders) -> user + " has " + orders);
+
+// WAIT FOR ALL
+CompletableFuture<Void> allDone = CompletableFuture.allOf(userCF, orderCF);
+
+// WAIT FOR ANY (jo pehle complete ho)
+CompletableFuture<Object> anyDone = CompletableFuture.anyOf(userCF, orderCF);
+
+// EXCEPTION HANDLING
+CompletableFuture<String> safe = CompletableFuture
+    .supplyAsync(() -> riskyOperation())
+    .exceptionally(ex -> "Default value on error: " + ex.getMessage())
+    .whenComplete((result2, ex) -> {
+        if (ex != null) log.error("Failed", ex);
+        else log.info("Success: " + result2);
+    });
+
+// CUSTOM THREAD POOL USE KARO (production mein)
+ExecutorService customPool = Executors.newFixedThreadPool(10);
+CompletableFuture.supplyAsync(() -> doWork(), customPool);
+
+INTERVIEW TIP: "Future vs CompletableFuture ka difference ek mature engineer se expect hai.
+ CompletableFuture non-blocking, composable, aur better exception handling deta hai — yahi production-grade async code hai."
+
+================================================================================
+SECTION 6: CONCURRENT COLLECTIONS
+================================================================================
+
+------------------------------------------------------------------------
+Q28. ConcurrentHashMap ka internal working?
+------------------------------------------------------------------------
+
+JAVA 7 (Segment-based):
+- 16 segments, each segment ek lock — 16 threads simultaneously write kar sakte the
+
+JAVA 8+ (Node-level locking — better):
+- Array of buckets (Node[])
+- EACH BUCKET ka apna lock (synchronized on first node of bucket)
+- Default 16 concurrent writers simultaneously!
+- CAS (Compare-And-Swap) for empty buckets — NO LOCK needed!
+- TREEIFY: Bucket mein 8+ elements → LinkedList → Red-Black Tree (O(n) to O(log n))
+
+KEY METHODS:
+import java.util.concurrent.*;
+
+ConcurrentHashMap<String, Integer> map = new ConcurrentHashMap<>();
+
+// putIfAbsent — atomic check + put
+map.putIfAbsent("key", 1); // ek hi operation — thread-safe
+
+// compute — atomic read-modify-write
+map.compute("key", (k, v) -> v == null ? 1 : v + 1); // thread-safe increment
+
+// merge
+map.merge("key", 1, Integer::sum); // existing value se merge
+
+// get/put — thread-safe
+// BUT: get() + conditional put() is NOT thread-safe — use computeIfAbsent()
+
+// SIZE — approximate! (not exactly consistent under concurrent updates)
+map.size(); // ConcurrentHashMap.MappingCount() better hai
+
+INTERVIEW TIP: "ConcurrentHashMap null keys/values allow NAHI karta
+ — kyunki null se tum pata nahi kar sakte ki key exist nahi karti ya value null thi. HashMap mein null allowed hai."
+
+------------------------------------------------------------------------
+Q29. ConcurrentHashMap vs HashMap?
+------------------------------------------------------------------------
+
+| Feature              | HashMap            | ConcurrentHashMap        |
+|----------------------|--------------------|--------------------------|
+| Thread-safe          | No                 | Yes                      |
+| Null keys/values     | Allowed            | NOT allowed              |
+| Locking              | None               | Node-level (Java 8+)     |
+| Performance (single thread) | Faster    | Slightly slower          |
+| Iteration            | Fail-fast          | Fail-safe (weakly consistent)|
+| Use case             | Single thread      | Multi-thread shared map  |
+
+------------------------------------------------------------------------
+Q30. CopyOnWriteArrayList kya hota hai?
+------------------------------------------------------------------------
+
+CONCEPT:
+- Write pe poori list ki COPY ban jaati hai
+- Read ALWAYS old snapshot pe — never blocked!
+- Write ke baad reference swap hota hai
+
+import java.util.concurrent.CopyOnWriteArrayList;
+
+CopyOnWriteArrayList<String> list = new CopyOnWriteArrayList<>();
+
+// WRITE — expensive (full array copy)
+list.add("item");  // New array create hoti hai
+list.remove("item");
+
+// READ — ZERO locking, very fast
+for (String s : list) { // Iterator old snapshot use karta hai
+    process(s);
+    // Iteration ke time koi element remove karo — ConcurrentModificationException NAHI aayega!
+    list.remove(s); // Safe! (but wrong — actual list change hogi, iterator nahi)
+}
+
+USE CASE: Read-heavy, write-rare scenarios
+- Event listener lists
+- Configuration lists
+- Subscriber lists in pub-sub
+
+AVOID WHEN: Writes frequent hain — har write pe copy overhead bahut zyada
+
+------------------------------------------------------------------------
+Q31. BlockingQueue kya hota hai?
+------------------------------------------------------------------------
+
+// BlockingQueue = thread-safe queue with blocking operations
+// Producer-Consumer pattern ke liye ideal
+
+import java.util.concurrent.*;
+
+BlockingQueue<String> queue = new LinkedBlockingQueue<>(100); // bounded
+
+// PRODUCER — put() BLOCKS if queue full
+new Thread(() -> {
+    try {
+        queue.put("item"); // queue full ho → BLOCK
+        queue.offer("item", 2, TimeUnit.SECONDS); // 2 sec wait phir false return
+    } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+}).start();
+
+// CONSUMER — take() BLOCKS if queue empty
+new Thread(() -> {
+    try {
+        String item = queue.take(); // queue empty ho → BLOCK
+        String item2 = queue.poll(2, TimeUnit.SECONDS); // 2 sec wait phir null return
+        process(item);
+    } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+}).start();
+
+// IMPLEMENTATIONS:
+// LinkedBlockingQueue  → General purpose, optionally bounded
+// ArrayBlockingQueue   → Bounded, array-backed, better memory
+// PriorityBlockingQueue → Priority ordering, unbounded
+// SynchronousQueue     → No buffer, direct hand-off between threads
+// DelayQueue           → Elements available after delay
+
+------------------------------------------------------------------------
+Q32. Fail-fast vs Fail-safe iterators?
+------------------------------------------------------------------------
+
+// FAIL-FAST — Modification detect karo aur ConcurrentModificationException throw
+import java.util.*;
+
+List<String> list = new ArrayList<>();
+list.add("A"); list.add("B"); list.add("C");
+
+Iterator<String> iter = list.iterator();
+list.add("D"); // Structural modification AFTER iterator creation
+
+iter.next(); // ← ConcurrentModificationException! (modCount check fails)
+
+// HOW IT WORKS: modCount variable track karta hai structural changes
+// Iterator check karta hai expected modCount == actual modCount
+
+// FAIL-SAFE — ConcurrentModificationException NAHI, snapshot ya weakly consistent
+CopyOnWriteArrayList<String> safeList = new CopyOnWriteArrayList<>();
+safeList.add("A"); safeList.add("B");
+
+Iterator<String> safeIter = safeList.iterator();
+safeList.add("D"); // OK! Iterator snapshot pe chal raha hai
+
+safeIter.next(); // "A" — no exception, but new "D" nahi dikhega
+
+// ConcurrentHashMap iterator bhi fail-safe (weakly consistent)
+ConcurrentHashMap<String, Integer> chm = new ConcurrentHashMap<>();
+chm.put("a", 1);
+for (Map.Entry<String, Integer> entry : chm.entrySet()) {
+    chm.put("b", 2); // No exception, but "b" may or may not appear in this iteration
+}
+
+================================================================================
+SECTION 7: REAL PROBLEMS & DEBUGGING
+================================================================================
+
+------------------------------------------------------------------------
+Q33. Race condition kya hota hai? Real example?
+------------------------------------------------------------------------
+
+RACE CONDITION = Multiple threads shared state access karte hain aur result execution ORDER pe depend karta hai
+
+// REAL EXAMPLE: Bank account debit
+class BankAccount {
+    private int balance = 1000;
+
+    // RACE CONDITION — NOT thread-safe
+    public void debit(int amount) {
+        if (balance >= amount) {      // Thread A checks: 1000 >= 500 → true
+                                      // Thread B checks: 1000 >= 500 → true (SAME TIME!)
+            balance -= amount;        // Thread A: balance = 500
+                                      // Thread B: balance = 0 ← OVERDRAFT! 1000 gaya 1000
+        }
+    }
+}
+
+// FIXED
+class SafeBankAccount {
+    private volatile int balance = 1000;
+
+    public synchronized void debit(int amount) {
+        // Now atomic — Thread B gets serialized AFTER Thread A
+        if (balance >= amount) {
+            balance -= amount;
+        } else {
+            throw new InsufficientFundsException();
+        }
+    }
+}
+
+// ANOTHER APPROACH: AtomicInteger with loop
+AtomicInteger atomicBalance = new AtomicInteger(1000);
+
+public boolean atomicDebit(int amount) {
+    while (true) {
+        int current = atomicBalance.get();
+        if (current < amount) return false;
+        // compareAndSet — only update if value hasn't changed (no lock needed!)
+        if (atomicBalance.compareAndSet(current, current - amount)) {
+            return true;
+        }
+        // CAS failed → kisi aur thread ne change kiya → retry
+    }
+}
+
+------------------------------------------------------------------------
+Q34. Thread starvation kya hota hai?
+------------------------------------------------------------------------
+
+STARVATION = Ek thread kabhi ya rarely CPU time nahi paata kyunki doosre threads hamesha prioritize ho jaate hain
+
+CAUSES:
+1. High priority threads hamesha low priority se pehle run hote hain
+2. Unfair locks — same thread bar bar lock le jaata hai
+3. Long-running synchronized methods doosron ko wait karwate hain
+
+// EXAMPLE: Thread priority starvation
+Thread highPriority = new Thread(task);
+highPriority.setPriority(Thread.MAX_PRIORITY); // 10
+
+Thread lowPriority = new Thread(task);
+lowPriority.setPriority(Thread.MIN_PRIORITY); // 1
+// lowPriority thread ko bahut kam CPU time milta hai
+
+SOLUTIONS:
+- Fair locks use karo: new ReentrantLock(true)
+- Thread priority carefully set karo
+- synchronized blocks ko chote karo
+- Time-slicing ensure karo
+- Aging: waiting time ke saath priority badhao
+
+------------------------------------------------------------------------
+Q35. Livelock kya hota hai?
+------------------------------------------------------------------------
+
+LIVELOCK = Deadlock jaisa, but threads actively chal rahe hain — woh kaam nahi kar rahe
+(Deadlock = stuck, Livelock = busy-wait but no progress)
+
+// ANALOGY: Do log ek corridor mein milte hain, dono same side move karte hain
+// Dono polite hain — dono ek saath side change karte hain — forever!
+
+// CODE EXAMPLE:
+class Resource {
+    private boolean inUse = false;
+    public boolean tryAcquire() { /* ... */ return !inUse; }
+    public void release() { inUse = false; }
+}
+
+// Thread A and B both check, yield, retry — but both always retry at the same time
+// No progress despite both being "active"
+
+SOLUTION: Random backoff (Thread.sleep(random time) before retry)
+// This desynchronizes the threads so they don't always conflict
+
+------------------------------------------------------------------------
+Q36. Deadlock detect kaise karte ho production mein?
+------------------------------------------------------------------------
+
+// METHOD 1: ThreadMXBean programmatically
+import java.lang.management.*;
+
+ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+
+long[] deadlockedThreadIds = threadMXBean.findDeadlockedThreads();
+if (deadlockedThreadIds != null) {
+    ThreadInfo[] threadInfos = threadMXBean.getThreadInfo(deadlockedThreadIds);
+    for (ThreadInfo info : threadInfos) {
+        System.out.println("Deadlocked: " + info.getThreadName());
+        System.out.println("Waiting for: " + info.getLockName());
+        System.out.println("Held by: " + info.getLockOwnerName());
+    }
+}
+
+// METHOD 2: Thread Dump (Production most common)
+// jstack <pid>                   → command line
+// kill -3 <pid>                  → Linux signal (prints to stdout)
+// jcmd <pid> Thread.print        → modern way
+
+// Thread dump mein deadlock directly dikhata hai:
+// "Found one Java-level deadlock:
+//  Thread-1 waiting for lock held by Thread-2
+//  Thread-2 waiting for lock held by Thread-1"
+
+// METHOD 3: APM Tools
+// Datadog, New Relic, Dynatrace — automatically deadlock alert
+
+// METHOD 4: JVisualVM / JConsole (local debugging)
+
+------------------------------------------------------------------------
+Q37. High CPU threads kaise debug karte ho?
+------------------------------------------------------------------------
+
+// STEP 1: High CPU process find karo
+// top -H -p <pid>          → Linux: thread-level CPU
+// ps -mo pid,tid,%cpu,comm -p <pid>
+
+// STEP 2: Thread ID (TID) ko hex mein convert karo
+// TID = 12345 → hex = 0x3039
+
+// STEP 3: Thread dump lo
+// jstack <pid> | grep -A 30 "0x3039"
+
+// STEP 4: Dump mein stack trace dekho — kahan loop chal raha hai
+
+// PROGRAMMATIC WAY (Spring Boot Actuator):
+// GET /actuator/threaddump — thread dump as JSON
+
+// COMMON CAUSES:
+// 1. Infinite loop (while(true) without sleep)
+// 2. Tight spin-wait (CAS loop without backoff)
+// 3. Regex catastrophic backtracking
+// 4. Memory leak → GC thread 100% CPU
+
+================================================================================
+SECTION 8: PRACTICAL DESIGN QUESTIONS
+================================================================================
+
+------------------------------------------------------------------------
+Q38. Thread-safe Singleton kaise banate ho?
+------------------------------------------------------------------------
+
+// APPROACH 1: Eager initialization (simplest, always thread-safe)
+public class Singleton {
+    // Class load hone pe hi create ho jaata hai — JVM thread-safe guarantee deta hai
+    private static final Singleton INSTANCE = new Singleton();
+    private Singleton() {}
+    public static Singleton getInstance() { return INSTANCE; }
+}
+
+// APPROACH 2: Initialization-on-demand holder (BEST for lazy init)
+public class Singleton {
+    private Singleton() {}
+
+    // Inner class tabhi load hogi jab getInstance() pehli baar call ho
+    // JVM class initialization thread-safe — no sync needed!
+    private static class Holder {
+        static final Singleton INSTANCE = new Singleton();
+    }
+
+    public static Singleton getInstance() {
+        return Holder.INSTANCE;
+    }
+}
+
+// APPROACH 3: Double-checked locking (volatile use karo!)
+public class Singleton {
+    private static volatile Singleton instance; // volatile MUST!
+    private Singleton() {}
+
+    public static Singleton getInstance() {
+        if (instance == null) {              // Fast path
+            synchronized(Singleton.class) {
+                if (instance == null) {      // Safe path
+                    instance = new Singleton();
+                }
+            }
+        }
+        return instance;
+    }
+}
+
+// APPROACH 4: Enum (Effective Java recommended — serialization safe!)
+public enum Singleton {
+    INSTANCE; // Enum values JVM-level thread-safe + serialization safe
+    public void doWork() { /* ... */ }
+}
+// Usage: Singleton.INSTANCE.doWork();
+
+INTERVIEW TIP: "Enum singleton is the best approach when serialization is a concern. Initialization-on-demand holder is best for pure lazy initialization."
+
+------------------------------------------------------------------------
+Q39. Producer-Consumer problem ka solution?
+------------------------------------------------------------------------
+
+// CLASSIC SOLUTION: BlockingQueue use karo
+import java.util.concurrent.*;
+
+public class ProducerConsumer {
+    // Bounded queue — natural flow control (backpressure)
+    private static final BlockingQueue<String> queue = new LinkedBlockingQueue<>(10);
+
+    // PRODUCER — items produce karta hai
+    static class Producer implements Runnable {
+        @Override
+        public void run() {
+            try {
+                for (int i = 0; i < 100; i++) {
+                    String item = "item-" + i;
+                    queue.put(item); // queue full → BLOCK karo (backpressure!)
+                    System.out.println("Produced: " + item + " | Queue size: " + queue.size());
+                    Thread.sleep(100); // production rate simulate karo
+                }
+                queue.put("POISON_PILL"); // Consumer ko signal — kaam khatam!
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    // CONSUMER — items consume karta hai
+    static class Consumer implements Runnable {
+        @Override
+        public void run() {
+            try {
+                while (true) {
+                    String item = queue.take(); // queue empty → BLOCK karo
+                    if ("POISON_PILL".equals(item)) break; // graceful shutdown
+                    System.out.println("Consumed: " + item);
+                    Thread.sleep(200); // processing simulate karo (slower than producer)
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        ExecutorService executor = Executors.newFixedThreadPool(4);
+        executor.submit(new Producer());
+        executor.submit(new Consumer()); // Multiple consumers possible
+        executor.submit(new Consumer());
+        executor.shutdown();
+        executor.awaitTermination(30, TimeUnit.SECONDS);
+    }
+}
+
+------------------------------------------------------------------------
+Q40. Rate Limiter design using threads?
+------------------------------------------------------------------------
+
+// APPROACH 1: Token Bucket using Semaphore
+import java.util.concurrent.*;
+
+public class TokenBucketRateLimiter {
+    private final Semaphore semaphore;  // Tokens represent karta hai
+    private final int maxTokens;
+    private final ScheduledExecutorService scheduler;
+
+    public TokenBucketRateLimiter(int tokensPerSecond) {
+        this.maxTokens = tokensPerSecond;
+        this.semaphore = new Semaphore(tokensPerSecond); // Initial tokens
+        this.scheduler = Executors.newScheduledThreadPool(1);
+
+        // Har second tokens refill karo
+        scheduler.scheduleAtFixedRate(this::refillTokens, 1, 1, TimeUnit.SECONDS);
+    }
+
+    private void refillTokens() {
+        // Current available tokens calculate karo
+        int tokensToAdd = maxTokens - semaphore.availablePermits();
+        if (tokensToAdd > 0) {
+            semaphore.release(tokensToAdd); // Tokens add karo
+        }
+    }
+
+    // Request allow karo ya reject karo
+    public boolean tryAcquire() {
+        return semaphore.tryAcquire(); // Non-blocking — immediately return
+    }
+
+    // Blocking version
+    public void acquire() throws InterruptedException {
+        semaphore.acquire(); // Wait until token available
+    }
+
+    public void shutdown() {
+        scheduler.shutdown();
+    }
+}
+
+// USAGE:
+// TokenBucketRateLimiter limiter = new TokenBucketRateLimiter(100); // 100 req/sec
+// if (limiter.tryAcquire()) {
+//     processRequest();
+// } else {
+//     return ResponseEntity.status(429).body("Too Many Requests");
+// }
+
+// APPROACH 2: Use Guava RateLimiter (production preferred)
+// RateLimiter limiter = RateLimiter.create(100.0); // 100 permits/sec
+// limiter.acquire(); // blocks until permit available
+
+------------------------------------------------------------------------
+Q41. Parallel processing kaise implement karte ho?
+------------------------------------------------------------------------
+
+// APPROACH 1: CompletableFuture (most common in modern Java)
+import java.util.concurrent.*;
+import java.util.*;
+import java.util.stream.*;
+
+List<String> userIds = Arrays.asList("u1", "u2", "u3", "u4", "u5");
+ExecutorService executor = Executors.newFixedThreadPool(10);
+
+// Sabhi users simultaneously fetch karo
+List<CompletableFuture<UserData>> futures = userIds.stream()
+    .map(id -> CompletableFuture.supplyAsync(() -> fetchUser(id), executor))
+    .collect(Collectors.toList());
+
+// Sabhi complete hone ka wait karo
+CompletableFuture<Void> allFutures = CompletableFuture.allOf(
+    futures.toArray(new CompletableFuture[0])
+);
+
+// Results collect karo
+List<UserData> results = allFutures
+    .thenApply(v -> futures.stream()
+        .map(CompletableFuture::join) // Non-blocking kyunki sab done hain
+        .collect(Collectors.toList()))
+    .get();
+
+// APPROACH 2: Parallel Streams (simple tasks ke liye)
+List<String> processed = userIds.parallelStream()
+    .map(id -> processUser(id))   // ForkJoinPool.commonPool() use karta hai
+    .collect(Collectors.toList());
+// WARNING: Default pool sabhi parallel streams share karte hain! Custom pool better:
+
+ForkJoinPool customPool = new ForkJoinPool(4);
+List<String> result = customPool.submit(
+    () -> userIds.parallelStream().map(this::processUser).collect(Collectors.toList())
+).get();
+
+// APPROACH 3: Fork/Join Framework (divide and conquer)
+import java.util.concurrent.*;
+
+class SumTask extends RecursiveTask<Long> {
+    private final long[] array;
+    private final int start, end;
+    private static final int THRESHOLD = 1000; // Isse chhota toh directly compute karo
+
+    SumTask(long[] array, int start, int end) {
+        this.array = array; this.start = start; this.end = end;
+    }
+
+    @Override
+    protected Long compute() {
+        if (end - start <= THRESHOLD) {
+            // Base case: directly sum karo
+            long sum = 0;
+            for (int i = start; i < end; i++) sum += array[i];
+            return sum;
+        }
+        // Divide: do halves mein split karo
+        int mid = (start + end) / 2;
+        SumTask left = new SumTask(array, start, mid);
+        SumTask right = new SumTask(array, mid, end);
+        left.fork(); // left ko background mein run karo
+        long rightResult = right.compute(); // right current thread mein
+        long leftResult = left.join(); // left ka wait karo
+        return leftResult + rightResult;
+    }
+}
+
+// Usage:
+// ForkJoinPool pool = new ForkJoinPool();
+// long total = pool.invoke(new SumTask(array, 0, array.length));
+
+------------------------------------------------------------------------
+Q42. Async processing Spring Boot mein kaise karte ho?
+------------------------------------------------------------------------
+
+// STEP 1: Enable async in Spring Boot
+@SpringBootApplication
+@EnableAsync // Yeh MUST hai!
+public class Application { }
+
+// STEP 2: ThreadPoolTaskExecutor configure karo
+@Configuration
+@EnableAsync
+public class AsyncConfig {
+    @Bean(name = "taskExecutor")
+    public Executor taskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(5);          // Min threads
+        executor.setMaxPoolSize(10);          // Max threads
+        executor.setQueueCapacity(100);       // Queue size
+        executor.setThreadNamePrefix("Async-"); // Thread naam prefix
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.initialize();
+        return executor;
+    }
+}
+
+// STEP 3: @Async method banao
+@Service
+public class EmailService {
+
+    // @Async — yeh method background thread mein execute hogi
+    @Async("taskExecutor") // specific executor specify karo
+    public CompletableFuture<String> sendEmail(String to, String subject) {
+        // Yeh background mein chalega, caller block nahi hoga
+        emailClient.send(to, subject);
+        return CompletableFuture.completedFuture("Email sent to " + to);
+    }
+
+    // Return void — fire and forget
+    @Async
+    public void sendNotification(String userId) {
+        notificationService.notify(userId);
+    }
+}
+
+// STEP 4: Controller mein use karo
+@RestController
+public class UserController {
+    @Autowired EmailService emailService;
+
+    @PostMapping("/register")
+    public ResponseEntity<String> register(@RequestBody User user) {
+        userService.save(user); // Sync — fast
+        emailService.sendEmail(user.getEmail(), "Welcome!"); // Async — non-blocking
+        return ResponseEntity.ok("Registered!"); // Turant return — email background mein
+    }
+}
+
+// IMPORTANT GOTCHAS:
+// 1. @Async same class mein call → NAHI chalega! (proxy bypass ho jaata hai)
+//    Fix: Method doosri class mein rakho ya self-injection karo
+// 2. @Async method MUST public ho
+// 3. Exception handling: @Async void methods ki exceptions silently lost ho sakti hain
+//    Fix: AsyncUncaughtExceptionHandler implement karo
+
+@Configuration
+public class AsyncExceptionConfig implements AsyncConfigurer {
+    @Override
+    public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
+        return (throwable, method, params) -> {
+            log.error("Async exception in method: " + method.getName(), throwable);
+        };
+    }
+}
+
+================================================================================
+WHAT'S MISSING — 6 YRS EXPERIENCE KE LIYE IMPORTANT TOPICS
+================================================================================
+
+In topics ko zaroor padho — interviewer ye pooch sakta hai:
+
+1. VIRTUAL THREADS (Java 21+) — Project Loom
+   - Platform threads vs Virtual threads
+   - Thread.ofVirtual().start(() -> ...)
+   - Structured Concurrency
+   - 6 yrs exp mein ye expect hone laga hai — Java 21 LTS hai
+
+2. SEMAPHORE
+   - Semaphore(n) — n threads simultaneously critical section mein
+   - acquire() / release()
+   - Use case: Connection pool, rate limiting
+
+3. COUNTDOWNLATCH
+   - ek ya zyada threads ka wait karwa sakte ho jab tak n threads complete na ho
+   - countdown() / await()
+   - Ek baar use — reset nahi hota
+
+4. CYCLICBARRIER
+   - N threads ek saath ek point tak pahunchen phir aage badhe
+   - await() — n threads ke aane ka wait
+   - Reusable (CountDownLatch ke unlike)
+
+5. PHASER
+   - Dynamic parties — CyclicBarrier ka advanced version
+   - register() / arriveAndAwaitAdvance()
+
+6. STAMPEDLOCK (Java 8+)
+   - ReadWriteLock ka better version
+   - Optimistic reads — no lock (validate karo baad mein)
+   - Higher throughput than ReadWriteLock
+
+7. THREADLOCAL
+   - Har thread ka apna variable instance
+   - Request context, user sessions, DB transactions
+   - Memory leak common — InheritableThreadLocal, remove() zaroori
+
+8. ATOMIC CLASSES
+   - AtomicInteger, AtomicLong, AtomicBoolean, AtomicReference
+   - AtomicStampedReference (ABA problem solve karta hai)
+   - LongAdder / LongAccumulator (high contention counter — ConcurrentHashMap.addCount uses it)
+
+9. ABA PROBLEM
+   - Value A→B→A change hua — CAS kuch nahi notice karta
+   - AtomicStampedReference se fix
+
+10. THREAD INTERRUPTION MODEL
+    - Thread.interrupt() — flag set karta hai
+    - isInterrupted() / interrupted()
+    - InterruptedException — flag clear karta hai
+    - "I always restore interrupt flag in catch: Thread.currentThread().interrupt()"
+
+11. STRUCTURED CONCURRENCY (Java 21+)
+    - StructuredTaskScope
+    - ShutdownOnFailure / ShutdownOnSuccess
+
+EXAMPLE — ThreadLocal:
+import java.util.concurrent.*;
+
+public class RequestContext {
+    // Har thread ka apna userId store
+    private static final ThreadLocal<String> USER_ID = new ThreadLocal<>();
+
+    public static void setUser(String userId) {
+        USER_ID.set(userId);
+    }
+
+    public static String getUser() {
+        return USER_ID.get();
+    }
+
+    public static void clear() {
+        USER_ID.remove(); // MUST call — memory leak prevent karo (thread pool mein)
+    }
+}
+
+// Usage in interceptor:
+// RequestContext.setUser(request.getHeader("X-User-Id"));
+// try { chain.doFilter(request, response); }
+// finally { RequestContext.clear(); } // Always cleanup!
+
+EXAMPLE — CountDownLatch:
+CountDownLatch latch = new CountDownLatch(3); // 3 workers ka wait
+
+for (int i = 0; i < 3; i++) {
+    int workerId = i;
+    new Thread(() -> {
+        doWork(workerId);
+        latch.countDown(); // ek countdown
+    }).start();
+}
+
+latch.await(); // Jab tak teeno complete na ho, yahan rukta hai
+System.out.println("All 3 workers done!");
+
+EXAMPLE — Semaphore:
+Semaphore dbConnections = new Semaphore(10); // Max 10 concurrent DB connections
+
+public void queryDatabase() throws InterruptedException {
+    dbConnections.acquire(); // Connection lo (blocking if none available)
+    try {
+        executeQuery();
+    } finally {
+        dbConnections.release(); // Return connection — ALWAYS finally mein!
+    }
+}
+
+================================================================================
+INTERVIEW TIPS — 6 YEARS EXPERIENCE
+================================================================================
+
+1. "Synchronized se thread safety guarantee nahi hoti agar object escape ho jaaye"
+   → Safe publication — constructor mein 'this' share mat karo
+
+2. "Production mein hum monitoring tools use karte hain — Micrometer + Prometheus
+   thread pool metrics track karte hain: active threads, queue depth, rejected tasks"
+
+3. "CompletableFuture mein hamesha custom executor pass karo — common pool
+   blockage se poori JVM slow ho sakti hai"
+
+4. "Immutable objects inherently thread-safe hote hain — String, Integer, LocalDate
+   ko synchronize karne ki zaroorat nahi"
+
+5. "Lock granularity matter karta hai — zyada fine-grained locks = better throughput
+   but deadlock risk zyada"
+
+6. "Virtual threads (Java 21) se platform threads like thread-per-request models
+   scale karte hain — 1 million virtual threads possible"
+
+7. "InterruptedException pakad ke ignore mat karo —
+   Thread.currentThread().interrupt() zaroor call karo"
+
+================================================================================
+QUICK CHEAT SHEET — KAUNSA TOOL KAB USE KARO?
+================================================================================
+
+PROBLEM                         → SOLUTION
+-------------------------------   ----------------------------------------
+Simple thread create karo         → Runnable + ExecutorService
+Result chahiye thread se          → Callable + Future / CompletableFuture
+Shared variable protect karo      → synchronized ya ReentrantLock
+Multiple readers, rare writes     → ReadWriteLock / StampedLock
+N concurrent access limit karo    → Semaphore
+N threads ka wait karo            → CountDownLatch
+N threads ek saath barrier cross  → CyclicBarrier
+Thread-safe map                   → ConcurrentHashMap
+Thread-safe list (read-heavy)     → CopyOnWriteArrayList
+Producer-Consumer                 → BlockingQueue
+Periodic scheduling               → ScheduledExecutorService
+CPU-intensive parallel work       → Fork/Join / parallelStream()
+Per-thread data                   → ThreadLocal (remove() zaroor!)
+Visibility only (no atomicity)    → volatile
+Atomic counter                    → AtomicInteger / LongAdder
+Non-blocking lock attempt         → tryLock()
+Fair lock (no starvation)         → new ReentrantLock(true)
+Async in Spring Boot              → @Async + CompletableFuture
+
+================================================================================
+END OF DOCUMENT
+Written for: 6 Years Java Backend Developer Interview Preparation
+Topics: Java Multithreading — Complete Coverage
+================================================================================

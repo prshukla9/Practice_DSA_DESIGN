@@ -1,0 +1,183 @@
+“Microservices horizontal scaling allow karte hain, lekin network latency, data consistency aur observability challenges introduce karte hain — jise handle karne ke liye humne Kafka-based async communication aur centralized logging use kiya”
+
+
+MICROSERVICES BASICS
+
+SECTION 1: Fundamentals (but deep answers expected)
+Microservices architecture kya hota hai?
+Monolith vs Microservices — trade-offs kya hain?
+Microservices kab use nahi karne chahiye?
+Service boundaries kaise define karte ho?
+Database per service kyun important hai?
+
+
+⚙️ SECTION 2: Communication
+Synchronous vs Asynchronous communication
+REST vs Messaging (Kafka/RabbitMQ) — kab kya use karte ho?
+Service-to-service communication kaise secure karte ho?
+API Gateway ka role kya hota hai?
+Service discovery kya hota hai?
+
+
+🔥 SECTION 3: Data Management
+Distributed transactions kaise handle karte ho?
+Saga pattern kya hota hai?
+Event sourcing kya hota hai?
+CQRS pattern kya hota hai?
+Data consistency vs availability trade-off
+
+
+🧩 SECTION 4: Resilience & Fault Tolerance
+Circuit breaker kya hota hai?
+Retry mechanism kaise design karte ho?
+Timeout handling kaise karte ho?
+Bulkhead pattern kya hota hai?
+Graceful degradation kya hota hai?
+
+
+⚡ SECTION 5: Scaling & Performance
+Horizontal scaling kaise achieve karte ho?
+Load balancing kaise hota hai?
+Caching strategies kya hoti hain?
+Rate limiting kaise implement karte ho?
+High traffic scenario kaise handle karte ho?
+
+
+🏗️ SECTION 6: Observability
+Logging strategy microservices me kaise hoti hai?
+Distributed tracing kya hota hai?
+Metrics kaise collect karte ho?
+Monitoring tools kaise use karte ho?
+Debugging distributed system kaise karte ho?
+
+
+🚀 SECTION 7: Deployment & DevOps
+Containerization (Docker) ka role kya hai?
+Kubernetes ka use kyun hota hai?
+CI/CD pipeline kaise design karte ho?
+Blue-green deployment kya hota hai?
+Canary deployment kya hota hai?
+
+
+💣 SECTION 8: Real-World Scenarios (MOST IMPORTANT)
+Service down ho jaye to system kaise behave karega?
+Database slow ho jaye to kya karoge?
+Kafka delay ho jaye to impact kya hoga?
+Data inconsistency kaise fix karoge?
+10x traffic aajaye to system kaise scale karega?
+---------------------------------------------------------------------------------------
+
+KAFKA
+
+SECTION 1: Fundamentals (Deep Understanding)
+Apache Kafka kya hai aur kyun use karte hain?
+Kafka vs traditional messaging systems (RabbitMQ etc.)
+Kafka architecture explain karo (broker, topic, partition)
+Topic aur partition ka concept kya hai?
+Partitioning ka benefit kya hai?
+
+
+⚙️ SECTION 2: Producers & Consumers
+Producer ka working kaise hota hai?
+Consumer group kya hota hai?
+Multiple consumers ek hi topic kaise read karte hain?
+Offset kya hota hai?
+Auto commit vs manual commit difference
+
+
+🔥 SECTION 3: Delivery Semantics
+At-most-once, At-least-once, Exactly-once kya hote hain?
+Exactly-once achieve kaise karte ho Kafka me?
+Duplicate messages kaise avoid karte ho?
+Idempotent producer kya hota hai?
+Transactional producer kya hota hai?
+
+
+🧩 SECTION 4: Performance & Scaling
+Kafka me high throughput kaise achieve hota hai?
+Partition count kaise decide karte ho?
+Producer batching kaise kaam karta hai?
+Compression ka role kya hai?
+Consumer lag kya hota hai? kaise monitor karte ho?
+
+
+⚡ SECTION 5: Fault Tolerance
+Replication factor kya hota hai?
+Leader-follower model kaise kaam karta hai?
+Broker down ho jaye to kya hota hai?
+Data loss kaise prevent karte ho?
+ISR (In-Sync Replicas) kya hota hai?
+
+
+🏗️ SECTION 6: Real-World Usage (Tere Project type)
+Kafka ko microservices me kaise use karte ho?
+Event-driven architecture kaise design karte ho?
+Message ordering kaise maintain karte ho?
+Retry mechanism kaise implement karte ho?
+Dead Letter Queue (DLQ) kya hota hai? kaise use karte ho?
+💣 Interviewer Killer Questions
+
+👉 “Agar consumer slow ho jaye to kya hoga?”
+👉 “Kafka me message lost ho sakta hai?”
+👉 “Exactly-once practical hai ya theory?”
+
+
+----------------------------------------------------------------------------------------------------
+
+SCENARIO BASED
+
+SECTION 1: Service Communication Failures
+Ek service down ho jaye — system kaise behave karega?
+Synchronous call fail ho jaye toh fallback kya hoga?
+Kafka unavailable ho jaye toh kya strategy hogi?
+API timeout ho raha hai — root cause kaise find karoge?
+Retry kab use karoge aur kab avoid karoge?
+
+
+⚙️ SECTION 2: Kafka Message Handling
+Consumer message process karte waqt crash ho gaya — kya hoga?
+Duplicate message process ho gaya — kaise handle karoge?
+Message lost ho gaya — kaise detect karoge?
+Out-of-order messages aaye — kya karoge?
+Consumer lag continuously badh raha hai — fix kaise karoge?
+
+
+🔥 SECTION 3: Data Consistency (MOST IMPORTANT)
+Multiple services me data inconsistent ho gaya — kaise fix karoge?
+Distributed transaction fail ho gaya — rollback kaise hoga?
+Saga pattern implement karna ho toh kaise karoge?
+Partial failure me system ka behavior kya hoga?
+Eventually consistent system me correctness kaise ensure karte ho?
+
+
+🧩 SECTION 4: Scaling Scenarios
+Traffic suddenly 10x ho gaya — kya steps loge?
+Kafka partitions kam pad gaye — kya karoge?
+Ek consumer slow hai — kaise scale karoge?
+Database bottleneck ban gaya — solution kya hai?
+High latency under load — kaise debug karoge?
+
+
+⚡ SECTION 5: Real Event-Driven Use Cases
+Appointment booking event flow design karo
+Payment success event miss ho gaya — kaise handle karoge?
+Notification service delay kar raha hai — impact kya hoga?
+Same event multiple baar trigger ho raha hai — fix kaise karoge?
+Event schema change ho gaya — backward compatibility kaise maintain karoge?
+
+
+🏗️ SECTION 6: Fault Tolerance & Recovery
+Kafka broker crash ho gaya — system kaise recover karega?
+Service restart hone ke baad state kaise restore karoge?
+Poison message (invalid data) aaya — kya karoge?
+Dead Letter Queue ka design kaise karoge?
+Retry strategy design karo (backoff etc.)
+
+
+💣 SECTION 7: Production Debugging
+Logs me kuch nahi mil raha — issue kaise debug karoge?
+Distributed tracing kaise use karoge?
+High CPU usage ka reason kaise find karoge?
+Memory leak kaise detect karoge microservices me?
+End-to-end latency kaise measure karoge (API → Kafka → consumer)?
+----------------------------------------------------------------------------------------------------

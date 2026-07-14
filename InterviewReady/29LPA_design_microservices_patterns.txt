@@ -1,0 +1,1677 @@
+==========================================================================================
+  29LPA — DESIGN PATTERNS + MICROSERVICES + DATABASE DESIGN
+  For: 6 Years Java Developer | Target: Rakuten, Target, Walmart, Publicis Sapient
+  Language: Hinglish | Style: Interview-Ready Explanations with Java Code
+==========================================================================================
+
+
+==========================================================================================
+  PART 1: DESIGN PATTERNS — LLD Ka Backbone
+  "Inke bina LLD round nikalna almost impossible hai"
+==========================================================================================
+
+------------------------------------------------------------------------------------------
+WHAT ARE DESIGN PATTERNS? (Pehle ye samjho)
+------------------------------------------------------------------------------------------
+
+Real life analogy:
+  Socho tum ek builder ho aur tumhe baar baar same type ke ghar banana padta hai.
+  Tum baar baar naye se design nahi karte — ek blueprint banate ho aur use follow karte ho.
+
+  Design patterns = Wahi blueprints hain software problems ke liye.
+  Ye PROVEN SOLUTIONS hain aise problems ke liye jo baar baar aate hain.
+
+Types (yaad rakho ye teen categories):
+  1. CREATIONAL  → Object kaise create karein (Singleton, Factory, Builder)
+  2. STRUCTURAL  → Objects ko kaise arrange/combine karein (Decorator, Proxy)
+  3. BEHAVIORAL  → Objects kaise baat karte hain aapas mein (Observer, Strategy)
+
+Interview mein pehle ye bolna:
+  "Design patterns reusable solutions hain commonly occurring problems ke liye.
+   Ye code ko maintainable, extensible, aur loosely coupled banate hain."
+
+
+==========================================================================================
+  1. SINGLETON PATTERN  (Creational)
+==========================================================================================
+
+SIMPLE EXPLANATION:
+  Ek poori application mein sirf EK hi object banana allowed ho — yahi Singleton hai.
+  Jaise ek company mein sirf ek CEO hota hai, hamesha wahi hota hai, naya nahi banta.
+
+REAL WORLD USE:
+  - Database connection pool (ek hi pool chahiye poori app mein)
+  - Logger (sab ek hi logger use kare)
+  - Configuration manager (settings ek jagah se aayein)
+  - Spring mein by default saari beans Singleton hoti hain!
+
+PROBLEM WITHOUT SINGLETON:
+  Socho har jagah new DatabaseConnection() karo — 100 threads = 100 connections.
+  Memory waste, inconsistency, aur DB overload.
+
+CODE (Thread-Safe Double-Checked Locking):
+
+  public class DatabaseConnection {
+
+      // volatile keyword ensure karta hai ki changes sare threads ko dikhein
+      private static volatile DatabaseConnection instance = null;
+
+      // Private constructor — bahar se new nahi bana sakte
+      private DatabaseConnection() {
+          System.out.println("DB Connection created!");
+          // Actual DB connection logic yahan hoga
+      }
+
+      public static DatabaseConnection getInstance() {
+          if (instance == null) {                    // First check (no sync, fast)
+              synchronized (DatabaseConnection.class) { // Sirf ek thread ek time pe
+                  if (instance == null) {             // Second check (inside sync)
+                      instance = new DatabaseConnection();
+                  }
+              }
+          }
+          return instance;   // Hamesha same object return hoga
+      }
+
+      public void executeQuery(String sql) {
+          System.out.println("Executing: " + sql);
+      }
+  }
+
+  // Usage:
+  DatabaseConnection db1 = DatabaseConnection.getInstance();
+  DatabaseConnection db2 = DatabaseConnection.getInstance();
+  System.out.println(db1 == db2);  // true — same object!
+
+WHY DOUBLE-CHECKED?
+  - Pehla check (without sync): Performance ke liye — agar already bana hai toh sync skip
+  - synchronized block: Thread safety ke liye — ek waqt ek hi thread andar aaye
+  - Doosra check (inside sync): Rare case — do threads ek saath pehla check pass kar lein
+
+ENUM SINGLETON (Simplest & Best):
+  public enum AppConfig {
+      INSTANCE;   // Yahi ek instance hai
+
+      private String dbUrl = "jdbc:mysql://localhost/mydb";
+
+      public String getDbUrl() { return dbUrl; }
+  }
+
+  // Usage:
+  AppConfig.INSTANCE.getDbUrl();
+
+  // Enum Singleton kyun best hai?
+  // 1. Thread-safe by default
+  // 2. Serialization safe
+  // 3. Reflection attacks se protected
+  // Josh Bloch (Effective Java author) ne recommend kiya hai
+
+INTERVIEW MEIN BOLO:
+  "Main Double-Checked Locking use karta hun Thread safety ke liye,
+   aur volatile keyword isliye lagata hun taki memory visibility ensure ho.
+   Lekin agar simplicity chahiye toh Enum Singleton best practice hai —
+   Josh Bloch ne Effective Java mein bhi yahi recommend kiya hai."
+
+SPRING CONNECTION:
+  @Component → by default Singleton scope
+  @Scope("prototype") → har baar naya object
+
+
+==========================================================================================
+  2. FACTORY PATTERN  (Creational)
+==========================================================================================
+
+SIMPLE EXPLANATION:
+  Tum ek toy factory mein kaam karte ho.
+  Customer bolte hain "mujhe car chahiye" ya "mujhe doll chahiye"
+  Tum directly toy nahi banate — factory ko bolta ho, factory banake deti hai.
+
+  Factory Pattern = Object creation ki responsibility ek alag class ko de do.
+  Client ko nahi pata KAISE bana, bas maangta hai.
+
+REAL WORLD USE:
+  - Payment processing: CreditCard, UPI, NetBanking — same interface, alag implementation
+  - Notification: Email, SMS, Push — same send() method, alag logic
+  - Shape drawing: Circle, Square, Rectangle
+
+WITHOUT FACTORY (Problem):
+  // Client ko har jagah type check karni padti hai — TIGHT COUPLING
+  if (type.equals("EMAIL")) {
+      new EmailNotification().send(msg);
+  } else if (type.equals("SMS")) {
+      new SMSNotification().send(msg);
+  }
+  // Naya type add karo → client code change karna padega → OCP violation
+
+WITH FACTORY (Solution):
+
+  // Step 1: Common interface banao
+  public interface Notification {
+      void send(String message);
+  }
+
+  // Step 2: Concrete implementations
+  public class EmailNotification implements Notification {
+      @Override
+      public void send(String message) {
+          System.out.println("Email bheja: " + message);
+          // SMTP logic yahan
+      }
+  }
+
+  public class SMSNotification implements Notification {
+      @Override
+      public void send(String message) {
+          System.out.println("SMS bheja: " + message);
+          // Twilio/AWS SNS logic yahan
+      }
+  }
+
+  public class PushNotification implements Notification {
+      @Override
+      public void send(String message) {
+          System.out.println("Push notification: " + message);
+          // FCM logic yahan
+      }
+  }
+
+  // Step 3: Factory class — object creation ki zimmedari yahan
+  public class NotificationFactory {
+      public static Notification create(String type) {
+          switch (type.toUpperCase()) {
+              case "EMAIL": return new EmailNotification();
+              case "SMS":   return new SMSNotification();
+              case "PUSH":  return new PushNotification();
+              default: throw new IllegalArgumentException("Unknown type: " + type);
+          }
+      }
+  }
+
+  // Step 4: Client — sirf maangta hai, KAISE bana nahi jaanta
+  public class OrderService {
+      public void notifyUser(String type, String message) {
+          Notification notification = NotificationFactory.create(type);
+          notification.send(message);  // Same line, alag behavior
+      }
+  }
+
+  // Usage:
+  OrderService service = new OrderService();
+  service.notifyUser("EMAIL", "Order placed successfully!");
+  service.notifyUser("SMS", "Your OTP is 1234");
+  // Naya type add karna ho? Sirf factory mein ek case add karo — client change nahi
+
+INTERVIEW MEIN BOLO:
+  "Factory pattern use karta hun jab object creation complex ho ya
+   runtime pe decide ho kaunsa object banana hai.
+   Isse client code aur implementation loose couple rehti hai —
+   Open/Closed Principle follow hota hai:
+   Naya type add karo, existing code touch mat karo."
+
+
+==========================================================================================
+  3. BUILDER PATTERN  (Creational)
+==========================================================================================
+
+SIMPLE EXPLANATION:
+  Socho tum Subway mein sandwich order kar rahe ho.
+  Pehle bread choose karo, phir filling, phir toppings, phir sauce.
+  Step by step build karte ho apna sandwich.
+
+  Builder = Complex object ko step-by-step build karne ka pattern.
+  Especially useful jab object ke bohot saare optional fields hon.
+
+PROBLEM WITHOUT BUILDER:
+  // Constructor mein 8 parameters — kaun sa kya hai?! Confusing!
+  User user = new User("Prashant", "prashant@gmail.com", 29, "Male",
+                        "Delhi", "9876543210", true, "PREMIUM");
+  // 3rd parameter kya hai? Age? Id? — No idea!
+
+WITH BUILDER:
+
+  public class User {
+      // Required fields
+      private final String name;
+      private final String email;
+
+      // Optional fields
+      private final int age;
+      private final String gender;
+      private final String city;
+      private final String phone;
+      private final boolean isPremium;
+      private final String plan;
+
+      // Private constructor — sirf Builder se bana sakte ho
+      private User(Builder builder) {
+          this.name      = builder.name;
+          this.email     = builder.email;
+          this.age       = builder.age;
+          this.gender    = builder.gender;
+          this.city      = builder.city;
+          this.phone     = builder.phone;
+          this.isPremium = builder.isPremium;
+          this.plan      = builder.plan;
+      }
+
+      // Static inner Builder class
+      public static class Builder {
+          // Required
+          private final String name;
+          private final String email;
+
+          // Optional (default values ke saath)
+          private int age = 0;
+          private String gender = "Not specified";
+          private String city = "";
+          private String phone = "";
+          private boolean isPremium = false;
+          private String plan = "FREE";
+
+          // Required fields constructor mein
+          public Builder(String name, String email) {
+              this.name  = name;
+              this.email = email;
+          }
+
+          // Har optional field ke liye method — returns Builder (chaining ke liye)
+          public Builder age(int age)           { this.age = age; return this; }
+          public Builder gender(String gender)  { this.gender = gender; return this; }
+          public Builder city(String city)      { this.city = city; return this; }
+          public Builder phone(String phone)    { this.phone = phone; return this; }
+          public Builder premium(boolean val)   { this.isPremium = val; return this; }
+          public Builder plan(String plan)      { this.plan = plan; return this; }
+
+          public User build() {
+              // Yahan validation bhi add kar sakte ho
+              if (name == null || name.isEmpty()) throw new IllegalStateException("Name required");
+              return new User(this);
+          }
+      }
+  }
+
+  // Usage — ab readable hai!
+  User user = new User.Builder("Prashant", "prashant@gmail.com")
+                  .age(29)
+                  .city("Delhi")
+                  .premium(true)
+                  .plan("GOLD")
+                  .build();
+
+  // Sirf required fields ke saath bhi kaam karega
+  User simpleUser = new User.Builder("Rahul", "rahul@gmail.com").build();
+
+REAL WORLD:
+  - StringBuilder (Java built-in builder)
+  - HttpRequest.newBuilder() in Java 11
+  - Lombok ka @Builder annotation yahi karta hai behind the scenes
+  - OkHttpClient.Builder() in Android
+
+INTERVIEW MEIN BOLO:
+  "Builder pattern use karta hun jab object mein bohot saare optional parameters hon
+   aur telescoping constructors se bachna ho.
+   Lombok mein @Builder annotation isi ko automate karta hai.
+   Is pattern mein object immutable bhi ban sakta hai — final fields use karke."
+
+
+==========================================================================================
+  4. OBSERVER PATTERN  (Behavioral)
+==========================================================================================
+
+SIMPLE EXPLANATION:
+  Socho tum YouTube pe channel subscribe karte ho.
+  Jab bhi YouTuber naya video dalte hain — tumhe notification aata hai automatically.
+  Tumhe baar baar check nahi karna padata.
+
+  YouTuber = Subject (Publisher)
+  Tum = Observer (Subscriber)
+  Notification = Event
+
+  Observer Pattern = Ek object (subject) ka state change hone pe
+                     usse connected saare objects (observers) automatically notify ho jaate hain.
+
+REAL WORLD USE:
+  - Spring Events (@EventListener, ApplicationEventPublisher)
+  - Kafka/RabbitMQ (publisher-subscriber)
+  - GUI events (button click)
+  - Stock price change → notify all traders
+  - E-commerce: Order placed → notify inventory, email, SMS, analytics simultaneously
+
+CODE (E-commerce example):
+
+  // Observer interface — jo bhi notify hona chahta ho, ye implement kare
+  public interface OrderObserver {
+      void onOrderPlaced(Order order);
+  }
+
+  // Subject interface
+  public interface OrderSubject {
+      void addObserver(OrderObserver observer);
+      void removeObserver(OrderObserver observer);
+      void notifyObservers(Order order);
+  }
+
+  // Concrete Subject — OrderService
+  public class OrderService implements OrderSubject {
+      private List<OrderObserver> observers = new ArrayList<>();
+
+      @Override
+      public void addObserver(OrderObserver observer) {
+          observers.add(observer);
+      }
+
+      @Override
+      public void removeObserver(OrderObserver observer) {
+          observers.remove(observer);
+      }
+
+      @Override
+      public void notifyObservers(Order order) {
+          for (OrderObserver observer : observers) {
+              observer.onOrderPlaced(order);   // Saare observers ko notify karo
+          }
+      }
+
+      public void placeOrder(Order order) {
+          // Order database mein save karo
+          System.out.println("Order saved: " + order.getId());
+
+          // Saare registered observers ko notify karo
+          notifyObservers(order);
+      }
+  }
+
+  // Observer 1: Email service
+  public class EmailNotificationObserver implements OrderObserver {
+      @Override
+      public void onOrderPlaced(Order order) {
+          System.out.println("Email bheja customer ko: Order #" + order.getId());
+      }
+  }
+
+  // Observer 2: Inventory service
+  public class InventoryObserver implements OrderObserver {
+      @Override
+      public void onOrderPlaced(Order order) {
+          System.out.println("Inventory update kiya: -" + order.getQuantity() + " units");
+      }
+  }
+
+  // Observer 3: Analytics service
+  public class AnalyticsObserver implements OrderObserver {
+      @Override
+      public void onOrderPlaced(Order order) {
+          System.out.println("Analytics event logged: NEW_ORDER");
+      }
+  }
+
+  // Usage — wiring sab together
+  OrderService orderService = new OrderService();
+  orderService.addObserver(new EmailNotificationObserver());
+  orderService.addObserver(new InventoryObserver());
+  orderService.addObserver(new AnalyticsObserver());
+
+  orderService.placeOrder(new Order("ORD001", 2));
+  // Output:
+  // Order saved: ORD001
+  // Email bheja customer ko: Order #ORD001
+  // Inventory update kiya: -2 units
+  // Analytics event logged: NEW_ORDER
+
+SPRING MEIN (Real-world mein aise use hota hai):
+  // Publisher
+  @Service
+  public class OrderService {
+      @Autowired
+      private ApplicationEventPublisher publisher;
+
+      public void placeOrder(Order order) {
+          // save order...
+          publisher.publishEvent(new OrderPlacedEvent(order));  // Event fire karo
+      }
+  }
+
+  // Listener (Observer)
+  @Component
+  public class EmailListener {
+      @EventListener
+      public void handleOrderPlaced(OrderPlacedEvent event) {
+          // Email bhejo
+      }
+  }
+
+INTERVIEW MEIN BOLO:
+  "Observer pattern use karta hun jab ek event pe multiple systems ko notify karna ho.
+   E-commerce mein order place hone pe email, inventory, analytics — sab simultaneously trigger.
+   Spring mein ApplicationEventPublisher isi pattern ko implement karta hai.
+   Microservices mein Kafka bhi observer pattern ka distributed version hai."
+
+
+==========================================================================================
+  5. STRATEGY PATTERN  (Behavioral)
+==========================================================================================
+
+SIMPLE EXPLANATION:
+  Socho tum Google Maps use kar rahe ho.
+  Delhi se Mumbai: Car se jaana hai, ya flight se, ya train se?
+  Route wahi hai, lekin STRATEGY (kaise jaana) alag alag hai.
+  Aur tum runtime pe decide kar sakte ho kaunsi strategy use karni hai.
+
+  Strategy Pattern = Ek algorithm ko interchangeable banana —
+                     runtime pe decide karo kaunsa algorithm use karna hai.
+
+REAL WORLD USE:
+  - Payment: CreditCard, UPI, Wallet — same checkout, alag payment logic
+  - Sorting: QuickSort, MergeSort, BubbleSort — algorithm runtime pe choose
+  - Discount: FlatDiscount, PercentageDiscount, BuyOneGetOne
+  - Compression: ZIP, RAR, GZIP
+
+CODE (Payment example):
+
+  // Strategy interface
+  public interface PaymentStrategy {
+      boolean pay(double amount);
+  }
+
+  // Concrete Strategy 1
+  public class CreditCardPayment implements PaymentStrategy {
+      private String cardNumber;
+      private String cvv;
+
+      public CreditCardPayment(String cardNumber, String cvv) {
+          this.cardNumber = cardNumber;
+          this.cvv = cvv;
+      }
+
+      @Override
+      public boolean pay(double amount) {
+          System.out.println("Credit card se Rs." + amount + " pay kiya (Card: " + cardNumber + ")");
+          // Actual payment gateway call
+          return true;
+      }
+  }
+
+  // Concrete Strategy 2
+  public class UPIPayment implements PaymentStrategy {
+      private String upiId;
+
+      public UPIPayment(String upiId) {
+          this.upiId = upiId;
+      }
+
+      @Override
+      public boolean pay(double amount) {
+          System.out.println("UPI se Rs." + amount + " pay kiya (" + upiId + ")");
+          return true;
+      }
+  }
+
+  // Concrete Strategy 3
+  public class WalletPayment implements PaymentStrategy {
+      private double walletBalance;
+
+      public WalletPayment(double balance) {
+          this.walletBalance = balance;
+      }
+
+      @Override
+      public boolean pay(double amount) {
+          if (walletBalance >= amount) {
+              walletBalance -= amount;
+              System.out.println("Wallet se Rs." + amount + " pay kiya. Remaining: " + walletBalance);
+              return true;
+          }
+          System.out.println("Insufficient wallet balance!");
+          return false;
+      }
+  }
+
+  // Context — strategy use karne wala
+  public class ShoppingCart {
+      private PaymentStrategy paymentStrategy;   // Strategy inject hogi
+
+      // Runtime pe strategy set karo
+      public void setPaymentStrategy(PaymentStrategy strategy) {
+          this.paymentStrategy = strategy;
+      }
+
+      public void checkout(double totalAmount) {
+          if (paymentStrategy == null) throw new IllegalStateException("Payment strategy set nahi hai!");
+          boolean success = paymentStrategy.pay(totalAmount);
+          if (success) System.out.println("Order confirmed!");
+      }
+  }
+
+  // Usage
+  ShoppingCart cart = new ShoppingCart();
+
+  // User ne UPI choose kiya
+  cart.setPaymentStrategy(new UPIPayment("prashant@okicici"));
+  cart.checkout(1500.0);
+
+  // Abhi wallet choose kiya
+  cart.setPaymentStrategy(new WalletPayment(2000.0));
+  cart.checkout(500.0);
+
+FACTORY + STRATEGY COMBO (Real-world mein aise hota hai):
+  PaymentStrategy strategy = PaymentStrategyFactory.create(user.getPreferredPayment());
+  cart.setPaymentStrategy(strategy);
+  cart.checkout(amount);
+
+INTERVIEW MEIN BOLO:
+  "Strategy pattern use karta hun jab multiple algorithms interchangeable hon
+   aur runtime pe decide karna ho kaunsa use karna hai.
+   Payment processing mein yahi karta hun — CreditCard, UPI, Wallet alag strategies hain
+   lekin checkout() method same rehta hai.
+   Isse Open/Closed Principle follow hota hai — naya payment method add karo,
+   ShoppingCart code touch mat karo."
+
+
+==========================================================================================
+  6. DECORATOR PATTERN  (Structural)
+==========================================================================================
+
+SIMPLE EXPLANATION:
+  Socho tumhare paas ek plain coffee hai — Rs. 50.
+  Ab tum milk add karte ho — Rs. 15 extra.
+  Phir sugar add karte ho — Rs. 5 extra.
+  Phir whipped cream — Rs. 20 extra.
+  Har addition pehle wale ke upar wrap ho raha hai.
+
+  Decorator = Existing object ko modify kiye bina usmein naye features add karo.
+  Inheritance ki jagah Composition use karo.
+
+REAL WORLD USE:
+  - Java I/O: BufferedReader wraps FileReader wraps File
+  - Spring Security: Authentication filters chain
+  - Logging: Existing service ke upar logging add karo
+  - Coffee shop billing system
+
+CODE:
+
+  // Base interface
+  public interface Coffee {
+      String getDescription();
+      double getCost();
+  }
+
+  // Concrete component — plain coffee
+  public class SimpleCoffee implements Coffee {
+      @Override
+      public String getDescription() { return "Plain Coffee"; }
+
+      @Override
+      public double getCost() { return 50.0; }
+  }
+
+  // Abstract Decorator — sabse important part
+  public abstract class CoffeeDecorator implements Coffee {
+      protected Coffee coffee;   // Wrapped object
+
+      public CoffeeDecorator(Coffee coffee) {
+          this.coffee = coffee;   // Jo bhi wrap kar rahe ho usse hold karo
+      }
+
+      @Override
+      public String getDescription() { return coffee.getDescription(); }
+
+      @Override
+      public double getCost() { return coffee.getCost(); }
+  }
+
+  // Concrete Decorator 1 — Milk add karo
+  public class MilkDecorator extends CoffeeDecorator {
+      public MilkDecorator(Coffee coffee) { super(coffee); }
+
+      @Override
+      public String getDescription() {
+          return coffee.getDescription() + ", Milk";   // Pehle wala + apna addition
+      }
+
+      @Override
+      public double getCost() {
+          return coffee.getCost() + 15.0;   // Pehle wala cost + apna cost
+      }
+  }
+
+  // Concrete Decorator 2 — Sugar add karo
+  public class SugarDecorator extends CoffeeDecorator {
+      public SugarDecorator(Coffee coffee) { super(coffee); }
+
+      @Override
+      public String getDescription() { return coffee.getDescription() + ", Sugar"; }
+
+      @Override
+      public double getCost() { return coffee.getCost() + 5.0; }
+  }
+
+  // Concrete Decorator 3 — Whipped cream
+  public class WhipDecorator extends CoffeeDecorator {
+      public WhipDecorator(Coffee coffee) { super(coffee); }
+
+      @Override
+      public String getDescription() { return coffee.getDescription() + ", Whip Cream"; }
+
+      @Override
+      public double getCost() { return coffee.getCost() + 20.0; }
+  }
+
+  // Usage — layers of wrapping
+  Coffee myCoffee = new SimpleCoffee();
+  System.out.println(myCoffee.getDescription() + " = Rs." + myCoffee.getCost());
+  // Plain Coffee = Rs.50.0
+
+  myCoffee = new MilkDecorator(myCoffee);
+  System.out.println(myCoffee.getDescription() + " = Rs." + myCoffee.getCost());
+  // Plain Coffee, Milk = Rs.65.0
+
+  myCoffee = new SugarDecorator(myCoffee);
+  myCoffee = new WhipDecorator(myCoffee);
+  System.out.println(myCoffee.getDescription() + " = Rs." + myCoffee.getCost());
+  // Plain Coffee, Milk, Sugar, Whip Cream = Rs.90.0
+
+JAVA REAL EXAMPLE (I/O Streams):
+  // Yahi decorator pattern hai!
+  InputStream file      = new FileInputStream("data.txt");       // Plain
+  InputStream buffered  = new BufferedInputStream(file);         // Buffering add kiya
+  InputStream data      = new DataInputStream(buffered);         // Data reading add kiya
+  // Har layer upar se wrap ho rahi hai — classic decorator
+
+INTERVIEW MEIN BOLO:
+  "Decorator pattern inheritance se better hai jab features dynamically add-remove karne hon.
+   Java ke I/O streams isi pattern pe based hain — BufferedReader wraps FileReader.
+   Spring Security mein bhi filter chains decorator pattern follow karti hain."
+
+
+==========================================================================================
+  7. PROXY PATTERN  (Structural)
+==========================================================================================
+
+SIMPLE EXPLANATION:
+  Socho tumhara manager tumse directly nahi milta.
+  Uska ek assistant hai jo pehle check karta hai — kya ye meeting zaruri hai?
+  Agar haan, toh manager se milne deta hai. Warna rok leta hai.
+
+  Proxy = Ek wrapper jo original object ke aage baithta hai
+          aur access control, caching, logging, lazy loading karta hai.
+
+REAL WORLD USE:
+  - Spring AOP (@Transactional, @Cacheable) — Spring proxy banata hai!
+  - Lazy loading in Hibernate (entity tab load hoti hai jab actually access karo)
+  - API caching proxy
+  - Security proxy (authorization check)
+  - Remote proxy (RPC/REST calls ko local calls ki tarah dikhana)
+
+TYPES OF PROXY:
+  1. Virtual Proxy  → Lazy loading (expensive object tab banao jab zaroorat ho)
+  2. Protection Proxy → Access control (role-based)
+  3. Caching Proxy → Cache results (same request → same result)
+  4. Remote Proxy → Remote object ko local jaisa treat karo
+
+CODE (Caching Proxy — most asked):
+
+  // Service interface
+  public interface UserService {
+      User getUserById(int id);
+  }
+
+  // Real service — DB se data laata hai
+  public class UserServiceImpl implements UserService {
+      @Override
+      public User getUserById(int id) {
+          System.out.println("DB se user fetch kar raha hun: " + id);  // Expensive!
+          // Actual DB call
+          return new User(id, "User" + id);
+      }
+  }
+
+  // Proxy — caching add karta hai
+  public class CachingUserServiceProxy implements UserService {
+      private UserService realService;
+      private Map<Integer, User> cache = new HashMap<>();
+
+      public CachingUserServiceProxy(UserService realService) {
+          this.realService = realService;
+      }
+
+      @Override
+      public User getUserById(int id) {
+          if (cache.containsKey(id)) {
+              System.out.println("Cache se diya: " + id);  // Fast!
+              return cache.get(id);
+          }
+
+          // Cache miss → real service se lo aur cache karo
+          User user = realService.getUserById(id);
+          cache.put(id, user);
+          return user;
+      }
+  }
+
+  // Usage
+  UserService service = new CachingUserServiceProxy(new UserServiceImpl());
+
+  service.getUserById(1);  // "DB se user fetch kar raha hun: 1"
+  service.getUserById(1);  // "Cache se diya: 1"  ← DB call nahi!
+  service.getUserById(2);  // "DB se user fetch kar raha hun: 2"
+  service.getUserById(2);  // "Cache se diya: 2"
+
+SPRING MEIN PROXY (Ye bohot important hai!):
+  @Service
+  public class ProductService {
+
+      @Cacheable("products")   // Spring ek Proxy banata hai jo caching handle kare
+      public Product getProduct(int id) {
+          return productRepo.findById(id);  // Sirf pehli baar DB call hoga
+      }
+
+      @Transactional   // Spring proxy transaction manage karta hai automatically
+      public void updateProduct(Product p) {
+          productRepo.save(p);  // Proxy ensure karta hai transaction commit/rollback ho
+      }
+  }
+  // @Cacheable aur @Transactional ke peeche Proxy Pattern hi hai!
+
+INTERVIEW MEIN BOLO:
+  "Proxy pattern ka use main primarily do jagah karta hun:
+   1. Caching: Expensive DB calls ko cache karna — Spring ka @Cacheable isi pe based hai.
+   2. AOP: @Transactional annotation ke peeche Spring ek proxy create karta hai
+      jo method ke around transaction management karta hai.
+   Hibernate mein bhi lazy loading proxy isi pattern se implement hoti hai."
+
+
+==========================================================================================
+  DESIGN PATTERNS QUICK REFERENCE
+==========================================================================================
+
+Pattern      Type          Ek Line Mein                      Real Example
+------------ ------------- ---------------------------------- ----------------------------
+Singleton    Creational    Ek hi instance, hamesha wahi       DB Connection Pool, Logger
+Factory      Creational    Object creation logic alag raho    NotificationFactory
+Builder      Creational    Step-by-step complex object bana   User.Builder, HttpRequest
+Observer     Behavioral    Event pe sab ko notify karo        Kafka, Spring Events
+Strategy     Behavioral    Runtime pe algorithm swap karo     Payment Methods
+Decorator    Structural    Dynamically features add karo      Java I/O Streams
+Proxy        Structural    Original ke aage wrapper lagao     Spring @Cacheable, @Tx
+
+SOLID Principles se connection:
+  S - Single Responsibility → Factory, Strategy (har class ek kaam)
+  O - Open/Closed → Factory, Strategy (extend karo, modify mat karo)
+  L - Liskov Substitution → Decorator, Proxy (subclass safely replace kare parent)
+  I - Interface Segregation → Observer (chhote interfaces)
+  D - Dependency Inversion → Strategy, Observer (abstraction pe depend karo)
+
+
+==========================================================================================
+  PART 2: MICROSERVICES PATTERNS
+  "6 saal ke experience mein ye poochhhna mandatory hai"
+==========================================================================================
+
+------------------------------------------------------------------------------------------
+MICROSERVICES KYA HAIN? (Context samjho pehle)
+------------------------------------------------------------------------------------------
+
+MONOLITH vs MICROSERVICES:
+
+  MONOLITH:
+  Socho ek bada dabba — UserService, OrderService, PaymentService, ProductService
+  sab ek hi application mein hain.
+  Ek jagah change karo → pura dabba redeploy karo.
+  Ek jagah problem → puri app down.
+
+  MICROSERVICES:
+  Wahi sab alag alag chhote services hain.
+  OrderService change karo → sirf OrderService deploy karo.
+  PaymentService down → sirf payment affected, baaki sab chalte rahein.
+
+  Tradeoff:
+  + Independent deployment, scaling, tech stack
+  - Network calls, distributed transactions, complexity
+
+
+==========================================================================================
+  1. CIRCUIT BREAKER PATTERN  (Hystrix / Resilience4j)
+==========================================================================================
+
+SIMPLE EXPLANATION:
+  Ghar mein electrical circuit breaker socho.
+  Zyada load aaya → trip kar jaata hai → ghar ke baaki appliances bachao.
+  Thodi der baad automatically reset hota hai.
+
+  Software mein:
+  Agar ek service baar baar fail ho rahi hai → usse temporarily block karo.
+  Baaki services ko wait karke timeout mat karne do.
+  Thodi der baad dobara try karo.
+
+PROBLEM WITHOUT CIRCUIT BREAKER:
+  OrderService → PaymentService (down) → 30 second timeout wait karo
+  1000 requests = 1000 threads waiting = Memory exhausted = OrderService bhi down!
+  Ek service ki failure poori chain ko kill kar deti hai.
+
+3 STATES:
+  CLOSED   → Normal, sab calls jaate hain (circuit band = current flow kar raha hai)
+  OPEN     → Calls block kar raha hai, fast fail return (circuit khula = current nahi)
+  HALF-OPEN → Kuch calls allow karo test karne ke liye, kya service theek hua?
+
+CODE (Resilience4j — modern Java standard):
+
+  // Dependency: resilience4j-spring-boot2
+  // application.yml mein config:
+  // resilience4j:
+  //   circuitbreaker:
+  //     instances:
+  //       paymentService:
+  //         slidingWindowSize: 10
+  //         failureRateThreshold: 50    # 50% failures → OPEN
+  //         waitDurationInOpenState: 30s # 30 sec baad HALF-OPEN try
+  //         permittedNumberOfCallsInHalfOpenState: 3
+
+  @Service
+  public class OrderService {
+
+      @Autowired
+      private PaymentServiceClient paymentClient;
+
+      // @CircuitBreaker → agar PaymentService fail ho toh fallback method call karo
+      @CircuitBreaker(name = "paymentService", fallbackMethod = "paymentFallback")
+      public PaymentResponse processPayment(PaymentRequest request) {
+          return paymentClient.pay(request);  // Actual call
+      }
+
+      // Fallback method — jab circuit OPEN ho ya service fail ho
+      public PaymentResponse paymentFallback(PaymentRequest request, Exception ex) {
+          System.out.println("Payment service down, fallback: " + ex.getMessage());
+          // Option 1: Queue mein daal do retry ke liye
+          // Option 2: User ko pending status dikhao
+          return PaymentResponse.pending("Payment queued for retry");
+      }
+  }
+
+INTERVIEW MEIN BOLO:
+  "Circuit Breaker pattern use karta hun cascading failures rokne ke liye.
+   Humari OrderService mein Resilience4j use kiya tha.
+   Agar PaymentService 50% requests fail kare 10 calls mein,
+   circuit OPEN ho jaata hai aur 30 seconds tak fast-fail karta hai.
+   Fallback mein payment queue karte hain Kafka mein — retry hoga automatically.
+   Isse OrderService ka thread pool exhaust nahi hota."
+
+STATES ka flow:
+  Normal traffic → CLOSED
+  50% failures  → OPEN (fast fail, no real calls)
+  30s baad      → HALF-OPEN (3 test calls allow)
+  Test pass     → CLOSED again ✓
+  Test fail     → OPEN again ✗
+
+
+==========================================================================================
+  2. SAGA PATTERN  (Distributed Transactions)
+==========================================================================================
+
+SIMPLE EXPLANATION:
+  Socho Flipkart pe order kiya:
+  1. Order create ho
+  2. Payment deduct ho
+  3. Inventory update ho
+  4. Shipping initiate ho
+
+  Sab alag microservices hain — ek distributed transaction.
+  Agar step 3 (Inventory) fail ho? Payment toh ho chuki — kaise rollback karein?
+
+  SAGA = Distributed transaction ko chhhote local transactions mein todna,
+         aur failure pe compensating transactions chalana (undo operations).
+
+2 TYPES:
+
+  CHOREOGRAPHY SAGA (Events se):
+  Koi central controller nahi.
+  Har service apna kaam kare aur event publish kare.
+  Agle service ne event sun ke apna kaam kare.
+
+    OrderService → [OrderCreated event] → PaymentService
+    PaymentService → [PaymentDone event] → InventoryService
+    InventoryService → [StockUpdated event] → ShippingService
+
+    Failure:
+    InventoryService fail → [StockFailed event] → PaymentService compensate
+    PaymentService → [PaymentRefunded event] → OrderService compensate
+    OrderService → Order cancelled
+
+  ORCHESTRATION SAGA (Central controller se):
+  Ek Saga Orchestrator hai jo sab ko direct karta hai.
+
+    SagaOrchestrator:
+    1. OrderService.createOrder()
+    2. PaymentService.deductPayment()
+    3. InventoryService.updateStock()
+    4. ShippingService.createShipment()
+    Agar koi fail → orchestrator compensating calls karta hai in reverse order
+
+CODE (Choreography with Kafka):
+
+  // OrderService — Order banao aur event publish karo
+  @Service
+  public class OrderService {
+      @Autowired KafkaTemplate<String, Object> kafka;
+      @Autowired OrderRepository orderRepo;
+
+      @Transactional
+      public Order createOrder(OrderRequest req) {
+          Order order = new Order(req);
+          order.setStatus("PENDING");
+          orderRepo.save(order);   // Local transaction — apna DB update karo
+
+          // Event publish karo — PaymentService sunega
+          kafka.send("order-events", new OrderCreatedEvent(order.getId(), req.getAmount()));
+          return order;
+      }
+
+      // Inventory fail hua → payment refund hua → ab order cancel karo
+      @KafkaListener(topics = "payment-refunded")
+      public void handlePaymentRefunded(PaymentRefundedEvent event) {
+          Order order = orderRepo.findById(event.getOrderId()).orElseThrow();
+          order.setStatus("CANCELLED");
+          orderRepo.save(order);
+          System.out.println("Order cancelled due to inventory failure: " + order.getId());
+      }
+  }
+
+  // PaymentService — payment event suno, process karo
+  @Service
+  public class PaymentService {
+      @Autowired KafkaTemplate<String, Object> kafka;
+
+      @KafkaListener(topics = "order-events")
+      public void handleOrderCreated(OrderCreatedEvent event) {
+          try {
+              deductFromWallet(event.getUserId(), event.getAmount());   // Payment karo
+              kafka.send("payment-events", new PaymentSuccessEvent(event.getOrderId()));
+          } catch (Exception e) {
+              // Compensating transaction
+              kafka.send("payment-events", new PaymentFailedEvent(event.getOrderId()));
+          }
+      }
+
+      // Inventory fail hua → payment refund karo (COMPENSATING TRANSACTION)
+      @KafkaListener(topics = "inventory-failed")
+      public void refundPayment(InventoryFailedEvent event) {
+          refundToWallet(event.getUserId(), event.getAmount());
+          kafka.send("payment-refunded", new PaymentRefundedEvent(event.getOrderId()));
+      }
+  }
+
+CHOREOGRAPHY vs ORCHESTRATION:
+  Choreography:
+  + Simple, loose coupling, no single point of failure
+  - Debugging hard (flow distributed hai), circular events ka risk
+
+  Orchestration:
+  + Easy to track (ek jagah se flow visible), easier debugging
+  - Orchestrator bottleneck ban sakta hai, central point of failure
+
+INTERVIEW MEIN BOLO:
+  "Distributed transactions ke liye Saga pattern use karta hun.
+   2PC (Two-Phase Commit) use nahi karta — wo blocking hai aur microservices mein impractical.
+   Hamare e-commerce project mein Choreography-based Saga tha with Kafka.
+   Order → Payment → Inventory → Shipping.
+   Inventory fail hua toh compensating transactions reverse order mein chalte hain —
+   Payment refund, Order cancel.
+   Idempotency ensure karna zaroori hai kyunki Kafka events duplicate aa sakte hain."
+
+
+==========================================================================================
+  3. API GATEWAY PATTERN
+==========================================================================================
+
+SIMPLE EXPLANATION:
+  Socho ek bade hotel ka reception.
+  Tum seedha room mein, kitchen mein, spa mein nahi jaate.
+  Pehle reception pe aao — wo tumhe route karega, check karega, help karega.
+
+  API Gateway = Microservices ka single entry point.
+  Sab client requests yahan aati hain, gateway unhe sahi service pe forward karta hai.
+
+GATEWAY KYA KARTA HAI:
+  1. Routing       → /api/orders → OrderService, /api/users → UserService
+  2. Authentication → JWT token verify karo (har service khud nahi kare)
+  3. Rate Limiting  → 100 requests/min per user
+  4. Load Balancing → Multiple instances mein distribute karo
+  5. SSL Termination → HTTPS handle karo, services HTTP pe
+  6. Logging       → Sab requests log karo ek jagah
+  7. Circuit Breaker → Downstream service down → fast fail
+
+POPULAR OPTIONS:
+  - Spring Cloud Gateway (Java ecosystem, recommended)
+  - Netflix Zuul (older, Spring Cloud mein)
+  - AWS API Gateway
+  - Kong, NGINX
+
+CODE (Spring Cloud Gateway):
+
+  # application.yml
+  spring:
+    cloud:
+      gateway:
+        routes:
+          # /api/orders/** → OrderService pe forward karo
+          - id: order-service
+            uri: lb://ORDER-SERVICE      # lb:// = load balanced (Eureka se)
+            predicates:
+              - Path=/api/orders/**
+            filters:
+              - StripPrefix=1             # /api prefix hata do
+
+          # /api/users/** → UserService pe forward karo
+          - id: user-service
+            uri: lb://USER-SERVICE
+            predicates:
+              - Path=/api/users/**
+            filters:
+              - StripPrefix=1
+
+  // Global filter — har request ke liye JWT check karo
+  @Component
+  public class AuthenticationFilter implements GlobalFilter {
+      @Override
+      public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+          String path = exchange.getRequest().getPath().toString();
+
+          // Public endpoints skip karo
+          if (path.contains("/auth/") || path.contains("/public/")) {
+              return chain.filter(exchange);   // Aage bhej do bina check kiye
+          }
+
+          // JWT token check karo
+          String token = exchange.getRequest().getHeaders().getFirst("Authorization");
+          if (token == null || !jwtValidator.isValid(token)) {
+              exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+              return exchange.getResponse().setComplete();   // 401 return karo
+          }
+
+          return chain.filter(exchange);   // Valid token → aage bhej do
+      }
+  }
+
+GATEWAY PATTERNS:
+  BFF (Backend for Frontend):
+  Alag alag clients ke liye alag gateways:
+  MobileGateway → lightweight responses (chhoti screen)
+  WebGateway    → full responses
+  AdminGateway  → extra fields, admin-only APIs
+
+INTERVIEW MEIN BOLO:
+  "API Gateway sab microservices ka single entry point hai.
+   Main Spring Cloud Gateway use karta hun.
+   Authentication, rate limiting, routing sab gateway pe karta hun —
+   har individual service ko ye implement nahi karna padta.
+   BFF pattern bhi implement kiya hai — mobile aur web ke liye alag gateways
+   kyunki mobile ko different data format chahiye tha."
+
+
+==========================================================================================
+  4. SERVICE DISCOVERY  (Eureka)
+==========================================================================================
+
+SIMPLE EXPLANATION:
+  Socho tum naye shahar mein ho aur pizza order karna hai.
+  Tum Zomato (directory) open karte ho — nearest Dominos dhundho.
+  Tum har Dominos ka address pehle se nahi jaante — Zomato track karta hai.
+
+  Service Discovery = Microservices ek registry mein apne aap register karte hain.
+  Aur doosri services registry se address dhundh leti hain.
+
+PROBLEM WITHOUT IT:
+  // Hardcoded URL — bahut bura!
+  String orderServiceUrl = "http://192.168.1.10:8081";
+  // Agar OrderService ka IP change ho? Scale karo? Load balance karo?
+  // Sab manually update karna padega — nightmare!
+
+EUREKA SETUP:
+
+  // 1. Eureka Server (Registry)
+  @SpringBootApplication
+  @EnableEurekaServer   // Ye server hai
+  public class ServiceRegistry {
+      public static void main(String[] args) {
+          SpringApplication.run(ServiceRegistry.class, args);
+      }
+  }
+
+  // 2. OrderService — Eureka mein register karo
+  @SpringBootApplication
+  @EnableEurekaClient   // Ye client hai, khud register karega
+  public class OrderServiceApp {
+      public static void main(String[] args) {
+          SpringApplication.run(OrderServiceApp.class, args);
+      }
+  }
+
+  # OrderService application.yml
+  spring:
+    application:
+      name: ORDER-SERVICE      # Yahi naam se Eureka mein register hoga
+
+  eureka:
+    client:
+      service-url:
+        defaultZone: http://localhost:8761/eureka/
+
+  // 3. PaymentService — OrderService ka address Eureka se lo
+  @Service
+  public class PaymentService {
+      @Autowired
+      private DiscoveryClient discoveryClient;   // Eureka client
+
+      public void callOrderService() {
+          // Eureka se ORDER-SERVICE ke instances lo
+          List<ServiceInstance> instances = discoveryClient.getInstances("ORDER-SERVICE");
+          ServiceInstance instance = instances.get(0);   // Pehla instance (ya load balance karo)
+          String url = instance.getUri().toString();      // "http://192.168.1.10:8081"
+          // Ab call karo
+      }
+  }
+
+  // Better: Spring Cloud LoadBalancer use karo (auto load balancing)
+  @Bean
+  @LoadBalanced   // Automatically load balance karega ORDER-SERVICE instances mein
+  public RestTemplate restTemplate() {
+      return new RestTemplate();
+  }
+
+  // Usage — IP nahi, naam use karo
+  restTemplate.getForObject("http://ORDER-SERVICE/api/orders/1", Order.class);
+  // Spring automatically Eureka se IP dhundhega aur load balance karega
+
+FLOW:
+  1. OrderService starts → Eureka mein register karta hai {name: "ORDER-SERVICE", ip: "10.0.0.1", port: 8081}
+  2. PaymentService needs to call OrderService → Eureka se pucha: "ORDER-SERVICE kahan hai?"
+  3. Eureka ne diya: "10.0.0.1:8081"
+  4. PaymentService ne call kiya
+
+HEARTBEAT:
+  Services har 30 seconds pe Eureka ko heartbeat bhejti hain.
+  Heartbeat nahi aaya 90 seconds → Eureka ne registry se remove kiya.
+
+INTERVIEW MEIN BOLO:
+  "Service Discovery ke liye Netflix Eureka use karta hun Spring Cloud ke saath.
+   Services khud register karti hain Eureka mein startup pe.
+   LoadBalanced RestTemplate ya OpenFeign client use karta hun —
+   IP hardcode nahi karta, service name se call karta hun.
+   Kubernetes mein ye DNS-based Service Discovery se handle hota hai automatically."
+
+
+==========================================================================================
+  5. SIDECAR & STRANGLER FIG PATTERNS
+==========================================================================================
+
+---- SIDECAR PATTERN ----
+
+SIMPLE EXPLANATION:
+  Socho ek motorbike ke saath ek sidecar attached hai.
+  Main motorbike apna kaam karti hai.
+  Sidecar extra features provide karta hai — passenger carry karna, luggage.
+  Dono alag hain but saath chalte hain.
+
+  Sidecar = Main application ke saath ek helper container deploy karo
+             jo cross-cutting concerns handle kare.
+
+USE CASES:
+  - Logging (Fluentd/Logstash sidecar)
+  - Metrics collection (Prometheus exporter sidecar)
+  - Service mesh (Istio/Envoy proxy sidecar)
+  - Secret management (Vault agent sidecar)
+
+KUBERNETES EXAMPLE:
+  # Pod mein 2 containers — main app + sidecar
+  apiVersion: v1
+  kind: Pod
+  spec:
+    containers:
+      # Main application
+      - name: order-service
+        image: order-service:1.0
+        ports:
+          - containerPort: 8080
+
+      # Sidecar — logging agent
+      - name: log-shipper
+        image: fluentd:latest
+        # Order-service ke logs Elasticsearch mein bhejo
+        volumeMounts:
+          - name: app-logs
+            mountPath: /var/log/app
+
+BENEFIT:
+  OrderService mein logging code likhne ki zaroorat nahi.
+  Sidecar handle karta hai — separation of concerns.
+  Alag languages mein bhi kaam karta hai — Java app + Python sidecar fine hai.
+
+
+---- STRANGLER FIG PATTERN ----
+
+SIMPLE EXPLANATION:
+  Jungle mein Strangler Fig ek tree ke upar ugta hai.
+  Dheere dheere purana tree replace kar deta hai.
+  New tree grow karta rehta hai, old tree dheere dheere khatam hota hai.
+
+  Software mein:
+  Purana monolith hai.
+  Ek saath rewrite karna risky hai (Big Bang approach — failure ka risk).
+  Dheere dheere ek ek feature monolith se nikaalo, alag microservice banao.
+  Jab sab nikal jaye → monolith retire kar do.
+
+STEPS:
+  1. Facade/Proxy banao sab requests ke aage
+  2. Kuch routes naye microservice pe bhejo
+  3. Baaki monolith pe
+  4. Dheere dheere sab migrate karo
+
+EXAMPLE:
+  Legacy Monolith: Java EE application, 10 saal purana
+  Plan: UserService pehle microservice bana lo
+
+  Phase 1:
+    All requests → API Gateway
+    /api/users/** → NEW UserService (microservice)
+    /api/*       → OLD Monolith (sab kuch)
+
+  Phase 2 (3 months baad):
+    /api/users/** → UserService ✓
+    /api/orders/** → NEW OrderService
+    /api/*        → OLD Monolith (shrinking)
+
+  Phase 3 (6 months baad):
+    Monolith retire, sab microservices ✓
+
+INTERVIEW MEIN BOLO:
+  "Sidecar pattern Kubernetes mein use kiya tha — har pod ke saath ek Fluentd sidecar tha
+   jo logs centralized Elasticsearch mein bhejta tha.
+   Application code mein logging infrastructure nahi hai — sidecar handle karta hai.
+
+   Strangler Fig pattern ek previous project mein use kiya tha jahan monolith ko
+   microservices mein migrate kar rahe the.
+   Big Bang rewrite ki jagah incremental migration — pehle UserService, phir OrderService.
+   API Gateway pehle se tha jo gradually traffic route shift karta gaya."
+
+
+==========================================================================================
+  PART 3: DATABASE DESIGN
+  "6 years mein ye puchhna confirm hai"
+==========================================================================================
+
+==========================================================================================
+  1. SQL vs NoSQL — Kab Kya Use Karein
+==========================================================================================
+
+SQL (Relational Databases: MySQL, PostgreSQL, Oracle):
+  - Structured data with clear schema (table, rows, columns)
+  - ACID transactions guaranteed
+  - Complex queries (JOINs, aggregations)
+  - Relationships between data (foreign keys)
+
+NoSQL (MongoDB, Cassandra, Redis, DynamoDB):
+  - Flexible schema (schema-less ya schema-optional)
+  - Horizontal scaling easy
+  - High write throughput
+  - Specific access patterns ke liye optimized
+
+DECISION FRAMEWORK — Interviews mein yaise bolna:
+
+USE SQL WHEN:
+  ✓ Data mein relationships hain (User → Orders → Products)
+  ✓ ACID transactions chahiye (Banking, Payment — money transfer)
+  ✓ Complex queries chahiye (reports, analytics with JOINs)
+  ✓ Schema stable hai (zyada change nahi hogi structure)
+  ✓ Vertical scaling sufficient hai
+
+  Example: Banking system, ERP, E-commerce orders
+
+USE NoSQL WHEN:
+  ✓ Schema flexible chahiye (alag alag products ke alag fields)
+  ✓ Massive scale chahiye (billions of records, horizontal sharding)
+  ✓ High write throughput (IoT, logs, real-time data)
+  ✓ Simple access patterns (key-value, document by ID)
+  ✓ Specific use cases: Cache (Redis), Time-series, Graph
+
+  Example: Product catalog (alag attributes), User sessions (Redis),
+           Social media posts, Log storage, IoT sensor data
+
+REAL EXAMPLE — E-commerce system:
+  SQL:
+    users table         → User accounts (ACID, relationships)
+    orders table        → Orders (transactions zaroori)
+    order_items table   → Order line items (JOINs)
+    payments table      → Payment records (strict consistency)
+
+  NoSQL:
+    MongoDB: Product catalog (har product ke alag attributes)
+    Redis:   User sessions, shopping cart, product cache
+    Cassandra: Order activity logs (high write volume)
+    Elasticsearch: Product search (full-text search)
+
+INTERVIEW MEIN BOLO:
+  "SQL vs NoSQL ka choice use case pe depend karta hai — blanket statement nahi deta.
+   Financial transactions ke liye always SQL — ACID guarantees chahiye.
+   Product catalog ke liye MongoDB prefer karta hun — schema flexible hai,
+   har product ke different attributes hote hain.
+   Caching ke liye Redis — in-memory, fast.
+   Ye polyglot persistence hai — right tool for right job."
+
+
+==========================================================================================
+  2. INDEXING STRATEGIES
+==========================================================================================
+
+SIMPLE EXPLANATION:
+  Dictionary mein word dhundne ke 2 tarike:
+  1. Pehle page se last page tak padhte jao (Full table scan — O(n))
+  2. Index dekhte ho: 'S' → page 543 (Index scan — O(log n))
+
+  Database index bhi yahi karta hai — fast lookup ke liye extra data structure.
+
+PRIMARY INDEX:
+  Primary Key pe automatically banta hai.
+  CREATE TABLE users (
+      id INT PRIMARY KEY,   -- Index automatic
+      name VARCHAR(100),
+      email VARCHAR(100)
+  );
+
+SECONDARY INDEX (Most important):
+  -- email se baar baar search karte ho? Index lagao
+  CREATE INDEX idx_users_email ON users(email);
+
+  -- Query:
+  SELECT * FROM users WHERE email = 'prashant@gmail.com';
+  -- Without index: Full table scan (O(n))
+  -- With index:    Index lookup (O(log n)) → much faster
+
+COMPOSITE INDEX (Multiple columns):
+  -- Agar frequently filter karo city AND age se
+  CREATE INDEX idx_users_city_age ON users(city, age);
+
+  -- Ye query index use karegi:
+  SELECT * FROM users WHERE city = 'Delhi' AND age > 25;
+
+  -- YE NAHI KAREGI (city column first mein nahi):
+  SELECT * FROM users WHERE age > 25;
+  -- Composite index mein LEFTMOST column zaroori hai
+
+COVERING INDEX:
+  -- Agar SELECT sirf indexed columns hi maange — directly index se answer milega, table hit nahi
+  CREATE INDEX idx_covering ON users(email, name);
+  SELECT name FROM users WHERE email = 'prashant@gmail.com';
+  -- Table pe nahi gaya — index ne hi serve kiya (covering index)
+
+INDEX KI COST (Tradeoffs):
+  BENEFIT: SELECT queries fast
+  COST:    INSERT/UPDATE/DELETE slow (index bhi update karna padta hai)
+           Extra disk space
+           Over-indexing → performance degrade
+
+INDEX KAB USE KAREIN:
+  ✓ WHERE clause mein aane wale columns
+  ✓ JOIN conditions
+  ✓ ORDER BY columns
+  ✓ High cardinality columns (email, id — unique values)
+
+INDEX KAB NAA KAREIN:
+  ✗ Low cardinality columns (gender: M/F — sirf 2 values)
+  ✗ Columns jo rarely query mein use hote hain
+  ✗ Small tables (full scan faster hai)
+  ✗ Columns with heavy write load (index maintenance cost zyada)
+
+EXPLAIN plan use karo — index use ho raha hai ya nahi dekho:
+  EXPLAIN SELECT * FROM orders WHERE user_id = 123;
+  -- type: "ref" → index use ho raha hai ✓
+  -- type: "ALL" → full table scan ✗ → index missing hai
+
+INTERVIEW MEIN BOLO:
+  "Index lagane se pehle EXPLAIN plan check karta hun.
+   Composite indexes mein leftmost prefix rule follow karta hun.
+   Over-indexing se bachta hun — write-heavy tables pe selectively index lagate hain.
+   Database mein slow query log enable karte hain aur regular basis pe review karte hain."
+
+
+==========================================================================================
+  3. ACID vs BASE
+==========================================================================================
+
+---- ACID (SQL Databases) ----
+
+A — ATOMICITY:
+  Transaction ya toh pura hoga ya bilkul nahi.
+  Example: Bank transfer Rs. 1000 from A to B.
+    Step 1: A ka balance -1000
+    Step 2: B ka balance +1000
+  Agar Step 2 fail ho? Step 1 bhi rollback hoga.
+  "All or nothing."
+
+C — CONSISTENCY:
+  Database hamesha valid state mein rahega.
+  Constraints, rules, triggers — sab enforce honge.
+  Example: Balance kabhi negative nahi hoga (CHECK constraint).
+
+I — ISOLATION:
+  Concurrent transactions ek doosre ko affect nahi karein.
+  Example: Ek waqt ek hi transaction seat book kar sake (race condition nahi).
+  Isolation levels: READ UNCOMMITTED < READ COMMITTED < REPEATABLE READ < SERIALIZABLE
+
+D — DURABILITY:
+  Committed transaction permanent hai — power failure bhi nahi mitayega.
+  Disk pe likhna, WAL (Write-Ahead Log) — ensure karta hai.
+
+CODE EXAMPLE:
+  @Transactional   // Spring ensure karega ACID compliance
+  public void transferMoney(int fromId, int toId, double amount) {
+      Account from = accountRepo.findById(fromId);
+      Account to   = accountRepo.findById(toId);
+
+      if (from.getBalance() < amount) throw new InsufficientFundsException();
+
+      from.setBalance(from.getBalance() - amount);
+      to.setBalance(to.getBalance() + amount);
+
+      accountRepo.save(from);
+      accountRepo.save(to);
+      // Dono saves ya toh dono honge ya dono rollback — ATOMICITY ✓
+  }
+
+---- BASE (NoSQL Databases) ----
+
+BA — BASICALLY AVAILABLE:
+  System hamesha available rahega, lekin kabhi kabhi stale data de sakta hai.
+  Example: Amazon product page — price slightly outdated ho sakti hai momentarily.
+
+S — SOFT STATE:
+  System ka state time ke saath change ho sakta hai (even without input).
+  Consistency eventual hai.
+
+E — EVENTUALLY CONSISTENT:
+  Sab nodes eventually consistent ho jaayenge — turant nahi.
+  Example: Twitter pe tweet karo → kuch log 1-2 second baad dekhte hain.
+
+REAL WORLD EXAMPLE:
+  Socho Flipkart pe sale hai.
+  Product ke 100 units hain.
+  Main DB pe write, 5 read replicas hain.
+  Koi unit buy karta hai — main DB update hua.
+  Read replicas 100ms mein sync honge.
+  Is 100ms window mein doosra user purani count dekh sakta hai.
+  Ye "eventually consistent" hai — acceptable hai zyada tar cases mein.
+
+WHEN ACID, WHEN BASE:
+  ACID zaroori:
+  - Money transfer (banking)
+  - Order placement (inventory exact count)
+  - User registration (duplicate email nahi)
+
+  BASE acceptable:
+  - Social media likes/views count (1-2 second delay okay)
+  - Product recommendation
+  - Search index update
+  - Activity logs
+
+INTERVIEW MEIN BOLO:
+  "Main ACID vs BASE ka decision business requirements se karta hun.
+   Financial transactions mein ACID non-negotiable hai —
+   @Transactional use karta hun Spring mein.
+   Social features mein BASE acceptable hai — Redis ya Cassandra use karta hun
+   eventual consistency ke saath.
+   Microservices mein distributed ACID impossible hai practically —
+   isliye Saga pattern use karta hun compensating transactions ke saath."
+
+
+==========================================================================================
+  4. N+1 QUERY PROBLEM
+==========================================================================================
+
+SIMPLE EXPLANATION:
+  Socho tum ek manager ho.
+  Pehle ek baar team list maango (1 query).
+  Phir har team member ke liye separately poochho ki unka project kya hai (N queries).
+  1 + N = N+1 queries — BAHUT inefficient!
+
+PROBLEM EXAMPLE (Hibernate/JPA):
+
+  // Entity classes
+  @Entity
+  public class Author {
+      @Id Long id;
+      String name;
+
+      @OneToMany(mappedBy = "author", fetch = FetchType.LAZY)
+      List<Book> books;   // Lazy loading — tab load hoga jab access karein
+  }
+
+  @Entity
+  public class Book {
+      @Id Long id;
+      String title;
+
+      @ManyToOne
+      Author author;
+  }
+
+  // SERVICE — N+1 PROBLEM YAHAN HAI:
+  public void printAllAuthorsWithBooks() {
+      List<Author> authors = authorRepo.findAll();   // Query 1: SELECT * FROM authors
+
+      for (Author author : authors) {
+          // PROBLEM: Har author ke liye ek naya query!
+          // "SELECT * FROM books WHERE author_id = ?" → N queries!
+          System.out.println(author.getName() + ": " + author.getBooks().size() + " books");
+      }
+      // Total: 1 + N queries (N = number of authors)
+      // 100 authors = 101 queries — SLOW!
+  }
+
+SOLUTION 1 — JOIN FETCH (Best for small-medium data):
+  // JPQL mein JOIN FETCH use karo — single query mein sab laao
+  @Query("SELECT a FROM Author a JOIN FETCH a.books")
+  List<Author> findAllWithBooks();
+
+  // Generated SQL:
+  // SELECT a.*, b.* FROM authors a JOIN books b ON b.author_id = a.id
+  // SINGLE QUERY mein sab! ✓
+
+SOLUTION 2 — @EntityGraph:
+  @EntityGraph(attributePaths = "books")   // "books" bhi saath load karo
+  List<Author> findAll();
+  // Spring Data JPA automatically JOIN lagayega
+
+SOLUTION 3 — Batch Fetching (Large datasets):
+  @OneToMany
+  @BatchSize(size = 20)   // 20 authors ke books ek saath load karo
+  List<Book> books;
+  // 100 authors = 5 queries instead of 100 (batch of 20)
+
+SOLUTION 4 — DTO Projection (Best performance):
+  // Sirf jo chahiye wo lao — JOIN mein
+  @Query("SELECT new com.example.AuthorBookDTO(a.name, COUNT(b)) " +
+         "FROM Author a LEFT JOIN a.books b GROUP BY a.name")
+  List<AuthorBookDTO> findAuthorBookCounts();
+
+HOW TO DETECT N+1:
+  1. Hibernate SQL logging enable karo:
+     spring.jpa.show-sql=true
+     spring.jpa.properties.hibernate.format_sql=true
+     -- Console mein repeated queries dikhengi
+
+  2. Hibernate Statistics:
+     spring.jpa.properties.hibernate.generate_statistics=true
+     -- Total queries count dikhhega
+
+  3. p6spy library → query logging with timing
+
+  4. Spring Boot Admin ya Actuator → DB metrics
+
+INTERVIEW MEIN BOLO:
+  "N+1 problem tab aata hai jab Lazy loading ke saath loop mein associations access karo.
+   Main pehle Hibernate SQL logging enable karta hun — repeated queries detect karta hun.
+   Fix mein JOIN FETCH ya @EntityGraph use karta hun.
+   Large datasets pe DTO projections use karta hun — sirf required columns laao.
+   @BatchSize aur second-level caching bhi options hain specific scenarios mein."
+
+
+==========================================================================================
+  QUICK INTERVIEW ANSWER TEMPLATES
+==========================================================================================
+
+---- DESIGN PATTERNS ----
+
+"Mujhe 6 saal mein jo patterns sabse zyada use aye hain:"
+- Singleton: Spring beans, DB connection pools
+- Factory: Payment processors, notification channels
+- Builder: Complex request/response objects, test data creation
+- Observer: Order events, Spring ApplicationEventPublisher
+- Strategy: Payment methods, discount rules, sorting
+- Decorator: Java I/O, Spring Security filters, caching layer
+- Proxy: @Cacheable, @Transactional, Hibernate lazy loading
+
+---- MICROSERVICES ----
+
+"Hamare system mein:"
+- Circuit Breaker: Resilience4j se downstream failures handle karte hain
+- Saga: Distributed transactions ke liye Kafka-based choreography
+- API Gateway: Spring Cloud Gateway — auth, routing, rate limiting
+- Service Discovery: Eureka + LoadBalanced RestTemplate
+- Sidecar: K8s mein Fluentd sidecar for centralized logging
+
+---- DATABASE ----
+
+"Database decisions:"
+- SQL: Financial data, order management (ACID zaroori)
+- NoSQL: Product catalog (MongoDB), sessions (Redis), logs (Cassandra)
+- Indexing: EXPLAIN plan pehle, composite index leftmost rule
+- N+1: JOIN FETCH ya @EntityGraph, DTO projections for performance
+
+==========================================================================================
+  CHEATSHEET — 1 LINE DEFINITIONS
+==========================================================================================
+
+DESIGN PATTERNS:
+  Singleton    → Ek hi object throughout application
+  Factory      → Object creation logic alag class mein
+  Builder      → Step-by-step complex object banana
+  Observer     → Event pe automatically sab ko notify karo
+  Strategy     → Runtime pe algorithm swap karo
+  Decorator    → Existing object pe dynamically features add karo
+  Proxy        → Original object ke upar wrapper (cache/auth/log)
+
+MICROSERVICES PATTERNS:
+  Circuit Breaker  → Failing service ko temporarily block karo (Resilience4j)
+  Saga             → Distributed transaction = local txns + compensating txns
+  API Gateway      → Single entry point for all microservices
+  Service Discovery → Services khud register karein, naam se dhundho (Eureka)
+  Sidecar          → Helper container alongside main container (K8s)
+  Strangler Fig    → Monolith ko incrementally microservices mein migrate karo
+
+DATABASE:
+  SQL         → ACID, relationships, complex queries (MySQL/PostgreSQL)
+  NoSQL       → Scale, flexible schema, specific patterns (MongoDB/Redis/Cassandra)
+  Index       → Fast lookup, tradeoff with write speed, check with EXPLAIN
+  ACID        → Atomicity, Consistency, Isolation, Durability (SQL guarantee)
+  BASE        → Basically Available, Soft state, Eventually consistent (NoSQL)
+  N+1 Problem → Loop mein lazy loading → N extra queries → fix with JOIN FETCH
+
+==========================================================================================

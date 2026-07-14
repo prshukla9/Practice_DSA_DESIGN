@@ -1,0 +1,332 @@
+JWT auth add karo — har API protected
+consent-rejected Kafka event + notification
+Resilience4j — external FHIR pe circuit breaker
+Flyway migrations — ddl-auto hatao
+Testcontainers — integration test with real Kafka + Postgres
+Consent revoke API — Redis + pgvector purge
+API Gateway (Spring Cloud Gateway) — single entry point
+
+
+Day 1:  common-lib (events, topics)
+Day 2:  patient-service (simplest service — warm up)
+Day 3:  consent-service (DB + Kafka producer)
+Day 4:  integration-service (consumer + FHIR + Redis)
+Day 5:  notification-service (consumer only)
+Day 6:  ai-service (sabse complex — end mein)
+Day 7:  docker-compose + Dockerfile
+Day 8:  k8s yaml + Jenkinsfile
+
+
+Recommended Daily Schedule (8–10 weeks)
+Week 1-2:  Spring Boot + REST + JPA (patient + consent services)
+Week 3:    Kafka deep dive
+Week 4:    FHIR + Integration + Redis
+Week 5:    AI/RAG + pgvector
+Week 6:    Docker compose full stack
+Week 7:    Kubernetes
+Week 8:    AWS + CI/CD + Security
+Week 9:    Interview prep + break/fix exercises
+Daily (2–3 hours):
+
+45 min — concept read/watch
+60 min — project code trace (debugger use karo!)
+30 min — hands-on practice
+15 min — notes + "aaj kya seekha" summary
+
+
+
+----------------------------------------------------------------------------------------------
+PHASES
+PHASES
+PHASES
+PHASE 1: Java 8 + Spring Boot Basics (Week 1)
+Bina strong Spring Boot ke microservices samajh nahi aayengi.
+
+Concepts (order matters)
+#	Concept	Kyun zaroori
+1
+OOP, Collections, Streams (basic)
+DTO/Entity mapping
+2
+Maven multi-module project
+Parent pom.xml samajhna
+3
+@RestController, @Service, @Repository
+Layered architecture
+4
+Dependency Injection
+Constructor injection pattern
+5
+application.yml + env variables
+Docker/K8s config
+6
+JPA + @Entity
+Patient, Consent tables
+7
+@Transactional
+Consent approve = DB + Kafka atomic feel
+Project files padho (in order)
+healthcare-backend/pom.xml — parent + modules
+patient-service/.../PatientController.java
+patient-service/.../PatientService.java
+patient-service/.../Patient.java (entity)
+patient-service/.../application.yml
+Practice exercises
+Exercise 1: patient-service locally run karo (IDE se)
+Exercise 2: POST /api/v1/patients se patient banao — Postman/curl
+Exercise 3: Ek naya field add karo: "dateOfBirth" — entity → DTO → service → API
+Exercise 4: Duplicate email pe error aata hai — intentionally trigger karo
+Mastery check
+Controller vs Service vs Repository ka role explain karo
+@Transactional consent approve mein kyun useful hai — bata sako
+PHASE 2: REST APIs & DTO Pattern (Week 1–2)
+Concepts
+Request DTO vs Response DTO (Entity expose mat karo)
+Validation: @NotBlank, @Email
+HTTP status codes: 201 Created, 400 Bad Request
+API versioning: /api/v1/...
+Project files
+consent-service/.../ConsentController.java
+consent-service/.../ConsentRequestDto.java + ConsentResponseDto.java
+integration-service/.../FetchExternalDataRequest.java
+ai-service/.../AiQueryRequest.java
+Practice
+1. Full flow Postman collection banao:
+   Register → Request Consent → Approve → Fetch → Ask AI
+2. Invalid body bhejo — validation error dekho
+3. Consent approve 2 baar karo — IllegalStateException samjho
+Mastery check
+DTO kyun? Direct Entity return kyun risky?
+Consent APIs ka flow diagram khud draw karo
+PHASE 3: PostgreSQL + JPA (Week 2)
+Concepts
+Schema per service (patient, consent, ai)
+UUID primary keys
+ddl-auto: update (dev only — prod mein Flyway/Liquibase)
+Indexes, relationships (abhi simple tables hain)
+Project files
+patient-service/.../PatientRepository.java
+consent-service/.../Consent.java — Status enum
+scripts/init-pgvector.sql
+Practice
+1. docker compose up postgres — DB connect karo (DBeaver/pgAdmin)
+2. patients, consents tables dekho after API calls
+3. Consent status PENDING → APPROVED transition DB mein verify karo
+4. Query likho: "kitne approved consents hain?"
+Mastery check
+Enum status kyun string se better?
+Service alag schema kyun use karti hai (microservice DB pattern)
+PHASE 4: Event-Driven Architecture + Kafka (Week 3) ⭐ Important
+Ye tumhare project ka dil hai. Isko ache se samjho.
+
+Concepts (ek ek karke)
+Concept	Simple explanation
+Producer
+Event publish karta hai
+Consumer
+Event sunta hai, action leta hai
+Topic
+Channel name (consent-approved)
+Consumer Group
+Kaun sun raha hai (integration-service)
+Async
+Consent approve turant respond; fetch background mein
+Decoupling
+Consent service ko FHIR ki knowledge nahi chahiye
+Flow yaad karo
+Consent Approve → topic: consent-approved → Integration Service fetch karta hai
+Fetch complete  → topic: data-fetched      → Notification Service SMS/log
+Project files (zor se padho)
+common-lib/.../KafkaTopics.java
+common-lib/.../ConsentApprovedEvent.java
+consent-service/.../ConsentEventProducer.java
+consent-service/.../ConsentService.java (approve + publish)
+integration-service/.../ConsentApprovedConsumer.java
+integration-service/.../DataFetchedEventProducer.java
+notification-service/.../NotificationKafkaConsumer.java
+Practice
+1. docker compose up kafka + consent + integration + notification
+2. Consent approve karo — integration logs mein fetch dikhe
+3. Kafka UI tool use karo (Provectus kafka-ui) — messages dekho
+4. BREAK IT: integration-service band karo, consent approve karo
+   → messages queue mein padhenge — phir service start → consume hoga (lag concept)
+5. Apna event banao: consent-rejected topic (stretch goal)
+Mastery check
+Kafka kyun? Direct HTTP call consent → integration kyun worse?
+Consumer group kya hota hai?
+Kafka lag kya hai, kaise fix karte ho?
+PHASE 5: External Integration + FHIR (Week 3–4) ⭐
+Concepts
+FHIR R4 resources: Patient, Observation, MedicationRequest, Condition
+RESTful FHIR: GET /Observation?patient=xyz
+Bearer token (OAuth2) — consent-scoped access
+HAPI FHIR client (Java library)
+Data minimization: sirf zaroori resource fetch karo
+Project files
+integration-service/.../FhirClientFactory.java
+integration-service/.../ExternalDataService.java — consent validate → token → fetch → Redis
+External learning (free)
+HL7 FHIR R4 Overview — 1 hour read
+HAPI FHIR test server: https://hapi.fhir.org/baseR4 — browser se explore karo
+Practice
+1. HAPI FHIR pe Patient search karo browser/Postman se
+2. integration-service logs dekho — bundle kitne entries?
+3. Consent validate fail karo (galat consentId) — error flow samjho
+4. Redis mein cache key dekho: fhir:{patientId}:Observation
+5. TTL expire hone do — AI ko empty context mile (fallback samjho)
+Mastery check
+FHIR Bundle kya hai?
+Token expire ho to kya karna chahiye?
+Raw FHIR RDS mein permanent kyun NAHI store karte?
+PHASE 6: Redis + Temporary Cache (Week 4)
+Concepts
+In-memory key-value store
+TTL (Time To Live) — 30 min auto delete
+Cache key design: fhir:patientId:resourceType
+Ephemeral clinical context — HIPAA-friendly pattern
+Project files
+integration-service/.../ExternalDataService.java (redisTemplate.set with TTL)
+ai-service/.../AiAssistantService.java (redisTemplate.get)
+Practice
+1. redis-cli se key dekho: GET fhir:...
+2. TTL check: TTL fhir:...
+3. Key delete karo manually — AI query bhejo — fallback response aaye
+Mastery check
+Redis vs PostgreSQL — is project mein kya kahan?
+Consent revoke pe cache purge kaise karoge? (design answer)
+PHASE 7: AI + RAG + pgvector (Week 5) ⭐
+Interview mein sabse zyada impress karta hai — lekin step by step.
+
+Concepts (order)
+Step	Concept
+1
+LLM basics — prompt in, text out
+2
+Embeddings — text → number vector
+3
+Vector similarity search
+4
+RAG = Retrieve + Augment + Generate
+5
+Hallucination control
+6
+Medical safety disclaimers
+RAG flow (project ka)
+User query
+  → consent validate
+  → Redis se raw FHIR (optional)
+  → query embed (OpenAI)
+  → pgvector top-5 similar chunks
+  → prompt build
+  → OpenAI chat
+  → sanitize + disclaimer
+Project files
+ai-service/.../OpenAiClient.java
+ai-service/.../MedicalPromptBuilder.java
+ai-service/.../PatientContextEmbeddingRepository.java — vector search query
+ai-service/.../AiAssistantService.java
+scripts/init-pgvector.sql
+Practice
+1. System prompt padho — kya restrictions hain?
+2. Empty context pe AI call nahi hoti — code trace karo
+3. sanitizeAnswer() — diagnosis words block — test karo
+4. Manual embedding row insert karo SQL se — similarity search try karo
+5. OpenAI API key ke bina fallback path trace karo
+Mastery check
+RAG kya hai? 30 sec mein explain
+pgvector kyun? Poora JSON OpenAI ko kyun nahi bhejte?
+Hallucination control ke 3 tareeke batao
+PHASE 8: Docker + docker-compose (Week 5–6)
+Concepts
+Image vs Container
+Dockerfile multi-stage build
+docker-compose networking (service names = hostnames)
+Environment variables injection
+Project files
+Dockerfile
+docker-compose.yml
+Practice
+1. docker compose build — har service ki image
+2. docker compose up -d — poora stack
+3. docker compose logs -f consent-service
+4. Sirf postgres + patient-service run karo
+5. Ek service ka port change karo — break & fix
+Commands yaad karo
+docker compose up -d
+docker compose ps
+docker compose logs -f integration-service
+docker compose down -v
+Mastery check
+KAFKA_BOOTSTRAP=kafka:29092 localhost pe 9092 kyun nahi inside container?
+Multi-stage Dockerfile ka fayda?
+PHASE 9: Kubernetes / EKS (Week 6–7)
+Concepts (ek ek din)
+Day	Topic
+1
+Pod, Deployment, Replica
+2
+Service (ClusterIP), DNS
+3
+ConfigMap vs Secret
+4
+Probes (liveness/readiness)
+5
+Scaling (kubectl scale / HPA)
+Project file
+k8s/healthcare-platform.yaml — poora padho line by line
+Practice (local)
+1. minikube ya kind install karo
+2. Manifest apply karo (images local build karke load karo)
+3. kubectl get pods -n healthcare
+4. kubectl logs deployment/consent-service -n healthcare
+5. Ek pod delete karo — auto recreate dekho
+Mastery check
+Cluster ke andar consent-service:8082 kaise resolve hota hai?
+ConfigMap vs Secret — DB password kahan?
+2 replicas kyun consent-service pe?
+PHASE 10: AWS Production (Week 7–8)
+Learn in order
+ECR — Docker image registry
+EKS — managed Kubernetes
+RDS — managed PostgreSQL
+S3 — audit logs (not PHI warehouse)
+CloudWatch — logs + metrics
+IAM / IRSA — no hardcoded AWS keys
+VPC, Security Groups — RDS sirf EKS se reachable
+Project file
+Jenkinsfile — CI/CD flow
+Practice (free tier careful)
+1. AWS free tier account — ECR repo banao
+2. Ek image push karo
+3. RDS concept paper pe design karo (actual create optional)
+4. Jenkinsfile stages explain karo interview style
+Mastery check
+Build → Test → Docker → ECR → EKS flow bina dekhe bata sako
+RDS publicly accessible kyun NAHI karna chahiye?
+PHASE 11: Security + HIPAA Mindset (Week 8)
+Concepts
+Consent = legal gate (fail-closed)
+JWT at API gateway
+TLS everywhere
+Audit logging
+Minimum necessary data
+BAA with vendors (AWS, OpenAI enterprise)
+Consent revoke → purge cache + embeddings
+Practice
+1. Har API pe consent validate trace karo — kaun call karta hai?
+2. Design doc likho: "Consent revoke hone pe kya hoga" (1 page)
+3. 5 security mistakes list karo jo juniors karte hain
+PHASE 12: Real-World Problems (Week 9)
+Har problem ke liye: symptom → root cause → fix
+
+Problem	Padho / Practice
+Kafka lag
+Consumer band karke messages pile karo
+External API 503
+Timeout + retry design likho
+AI slow
+Async response pattern research karo
+Pod OOM
+Memory limits + FHIR pagination
+Token expiry
+401 handling design karo

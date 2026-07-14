@@ -1,0 +1,2340 @@
+
+================================================================================
+  OOPS + JAVA DEEP DIVE — COMPLETE INTERVIEW PREPARATION (6 YRS EXPERIENCE)
+  Hinglish mein - Simple + Code + Real Interview Answers
+================================================================================
+
+> 16 Sections | 75+ Questions + Design Patterns + JVM
+> Har answer: Concept → Analogy → Code → Interview Tip
+
+================================================================================
+SECTION 1: CORE OOP CONCEPTS
+================================================================================
+
+------------------------------------------------------------------------
+Q1. OOP ke 4 Pillars explain karo
+------------------------------------------------------------------------
+
+--- 1. ENCAPSULATION ---
+CONCEPT: Data aur behavior ek class mein band karo, internal details chhupao
+
+// BAD — sab public, koi control nahi
+class BankAccount {
+    public double balance = 1000; // Koi bhi seedha change kar sakta hai!
+}
+
+// GOOD — Encapsulated
+class BankAccount {
+    private double balance; // Private — direct access band
+
+    public void deposit(double amount) {
+        if (amount <= 0) throw new IllegalArgumentException("Amount must be positive");
+        this.balance += amount; // Controlled modification
+    }
+
+    public void withdraw(double amount) {
+        if (amount > balance) throw new InsufficientFundsException("Insufficient balance");
+        this.balance -= amount;
+    }
+
+    public double getBalance() { return balance; } // Read-only access
+}
+
+--- 2. INHERITANCE ---
+CONCEPT: Parent class ki properties aur methods child mein reuse karo
+
+class Vehicle {
+    protected String brand;
+    protected int speed;
+
+    public void accelerate() { speed += 10; }
+    public void brake() { speed -= 10; }
+}
+
+class Car extends Vehicle { // Car IS-A Vehicle
+    private int numberOfDoors;
+
+    @Override
+    public void accelerate() { speed += 20; } // Override — car faster hai
+}
+
+class ElectricCar extends Car { // ElectricCar IS-A Car IS-A Vehicle
+    private int batteryLevel;
+    public void charge() { batteryLevel = 100; }
+}
+
+--- 3. POLYMORPHISM ---
+CONCEPT: Ek interface, multiple implementations — same method different behavior
+
+// Method Overriding (Runtime Polymorphism)
+List<Vehicle> fleet = Arrays.asList(new Car(), new Truck(), new Motorcycle());
+for (Vehicle v : fleet) {
+    v.accelerate(); // Har vehicle apna accelerate() chalata hai — RUNTIME decision
+}
+
+// Method Overloading (Compile-time Polymorphism)
+class Calculator {
+    int add(int a, int b) { return a + b; }
+    double add(double a, double b) { return a + b; } // COMPILE TIME — signature se decide
+    int add(int a, int b, int c) { return a + b + c; }
+}
+
+--- 4. ABSTRACTION ---
+CONCEPT: "KYA" karna hai batao, "KAISE" karna hai chhupao
+
+// Interface/Abstract class = Contract (kya karna hai)
+interface PaymentProcessor {
+    PaymentResult process(Payment payment); // Contract — details chhupe hain
+}
+
+// Implementations = Details (kaise karna hai — hidden)
+class StripeProcessor implements PaymentProcessor {
+    public PaymentResult process(Payment payment) {
+        // Stripe-specific API calls — client ko pata nahi
+        return stripeApi.charge(payment.getAmount(), payment.getCard());
+    }
+}
+
+// Client sirf interface jaanta hai:
+PaymentProcessor processor = new StripeProcessor();
+processor.process(payment); // "Kaise" chhupa hai — abstraction!
+
+------------------------------------------------------------------------
+Q2. Encapsulation ka real-world use case?
+------------------------------------------------------------------------
+
+// REAL PROJECT EXAMPLE: User password management
+
+@Entity
+public class User {
+    @Id private Long id;
+    private String email;
+    private String passwordHash; // Raw password KABHI store mat karo
+
+    // Public constructor — password seedha store nahi hota
+    public User(String email, String rawPassword) {
+        this.email = email;
+        this.passwordHash = BCrypt.hashpw(rawPassword, BCrypt.gensalt()); // Encapsulated logic
+    }
+
+    // Password check karo — hash compare karo
+    public boolean checkPassword(String rawPassword) {
+        return BCrypt.checkpw(rawPassword, this.passwordHash);
+    }
+
+    // No getPasswordHash() — never expose the hash!
+    // Email read-only after creation:
+    public String getEmail() { return email; }
+}
+
+// Business rule encapsulation:
+public class Order {
+    private OrderStatus status;
+    private LocalDateTime placedAt;
+    private LocalDateTime deliveredAt;
+
+    // Status transition — rules encapsulate karo
+    public void markDelivered() {
+        if (status != OrderStatus.SHIPPED) {
+            throw new IllegalStateException("Can only mark delivered if order is shipped");
+        }
+        this.status = OrderStatus.DELIVERED;
+        this.deliveredAt = LocalDateTime.now(); // Always set together
+    }
+}
+
+------------------------------------------------------------------------
+Q3. Abstraction vs Encapsulation difference?
+------------------------------------------------------------------------
+
+// ABSTRACTION — What to hide (complexity chhupao, simple interface do)
+// ENCAPSULATION — How to hide (data ko access control se protect karo)
+
+// ANALOGY:
+// Car remote start button = Abstraction (press karo, engine start — kaise? pata nahi)
+// Car engine internals under hood = Encapsulation (protected, directly accessible nahi)
+
+// ABSTRACTION EXAMPLE: Interface/Abstract class
+interface DatabaseConnection {
+    void connect();    // Kya karna hai — simple
+    ResultSet query(String sql);
+    void close();
+}
+// Oracle, MySQL, PostgreSQL — implementation chhupa hai
+
+// ENCAPSULATION EXAMPLE: Access modifiers
+class DatabaseConnectionPool {
+    private int maxConnections = 10;          // Hidden data
+    private List<Connection> connections;      // Hidden state
+
+    public Connection getConnection() {        // Controlled access
+        if (connections.isEmpty()) throw new NoConnectionAvailableException();
+        return connections.remove(0);
+    }
+}
+
+------------------------------------------------------------------------
+Q4. Inheritance ke drawbacks?
+------------------------------------------------------------------------
+
+1. TIGHT COUPLING — Parent change karo → child bhi break ho sakta hai
+2. FRAGILE BASE CLASS — Parent ka internal change unexpectedly child ko affect kare
+3. DIAMOND PROBLEM — Multiple inheritance Java mein allowed nahi (interface ne solve kiya)
+4. DEEP HIERARCHY — samajhna mushkil
+5. IS-A relationship chahiye — misuse hota hai HAS-A ke liye
+
+// FRAGILE BASE CLASS EXAMPLE:
+class HashSet extends AbstractHashSet {
+    private int addCount = 0;
+
+    @Override
+    public boolean add(E e) {
+        addCount++;
+        return super.add(e); // Parent ka add() call karo
+    }
+
+    @Override
+    public boolean addAll(Collection<? extends E> c) {
+        addCount += c.size();
+        return super.addAll(c); // Parent ka addAll() → internally add() call karta hai!
+    }
+    // addAll(5 elements) → addCount = 5 + 5 = 10 (wrong! Expected 5)
+    // Parent ki internal implementation pe depend tha
+}
+
+------------------------------------------------------------------------
+Q5. Composition vs Inheritance — kab kya use karoge?
+------------------------------------------------------------------------
+
+RULE: "Prefer composition over inheritance" (Effective Java Item 18)
+
+// INHERITANCE — IS-A relationship (tightly coupled)
+class Animal { void breathe() {} }
+class Dog extends Animal { void bark() {} } // Dog IS-A Animal ✅
+
+// COMPOSITION — HAS-A relationship (loosely coupled)
+class Engine { void start() {} void stop() {} }
+class Car {
+    private Engine engine; // Car HAS-A Engine (not IS-A) ✅
+    public Car(Engine engine) { this.engine = engine; }
+    public void drive() { engine.start(); }
+}
+
+// REAL EXAMPLE — COMPOSITION BETTER HAI:
+// BAD — inheritance misuse:
+class EmailLogger extends Properties { // EmailLogger IS-A Properties?? NO!
+    public void log(String message) { /* ... */ }
+}
+// EmailLogger har koi Properties method inherit karta hai — setProperty(), getProperty() etc.
+
+// GOOD — composition:
+class EmailLogger {
+    private Properties config = new Properties(); // HAS-A ✅
+    public void log(String message) { /* ... */ }
+    public void configure(String key, String value) { config.setProperty(key, value); }
+}
+
+// COMPOSITION BENEFITS:
+// 1. Runtime mein implementation change kar sakte ho
+// 2. Single Responsibility maintain hota hai
+// 3. Testing easy — mock inject karo
+
+------------------------------------------------------------------------
+Q6. Polymorphism types + Runtime polymorphism kaise kaam karta hai?
+------------------------------------------------------------------------
+
+// COMPILE-TIME (Static) — Method Overloading
+class Printer {
+    void print(String s) { System.out.println("String: " + s); }
+    void print(int n) { System.out.println("Int: " + n); }
+    void print(double d) { System.out.println("Double: " + d); }
+    // COMPILER arguments ke type se decide karta hai — compile time
+}
+
+// RUNTIME (Dynamic) — Method Overriding
+class Animal { public String sound() { return "..."; } }
+class Dog extends Animal { @Override public String sound() { return "Woof"; } }
+class Cat extends Animal { @Override public String sound() { return "Meow"; } }
+
+// Runtime polymorphism ka MECHANISM — Virtual Method Table (vtable):
+Animal a = new Dog(); // Reference type = Animal, Actual object = Dog
+a.sound(); // JVM runtime pe Dog ka sound() call karta hai — DYNAMIC DISPATCH
+
+// HOW IT WORKS INTERNALLY:
+// Har class ka vtable hota hai — method pointers ka array
+// Dog vtable: sound → Dog.sound()
+// Cat vtable: sound → Cat.sound()
+// JVM reference ke actual object ka vtable dekh ke method call karta hai
+
+// STATIC METHODS — polymorphism NAHI hota (hiding hota hai, overriding nahi)
+Animal.staticMethod(); // Parent class ka always (reference type se decide hota hai)
+
+================================================================================
+SECTION 2: JAVA OOP DEEP DIVE
+================================================================================
+
+------------------------------------------------------------------------
+Q7. Method Overloading vs Overriding?
+------------------------------------------------------------------------
+
+// OVERLOADING — COMPILE TIME, SAME CLASS
+class MathUtils {
+    int square(int n) { return n * n; }
+    double square(double n) { return n * n; }   // Different parameter type
+    long square(long n) { return n * n; }        // Different parameter type
+
+    // CANNOT overload on return type alone:
+    // int getValue() { } vs double getValue() { } → COMPILE ERROR
+}
+
+// OVERRIDING — RUNTIME, PARENT-CHILD
+class Shape {
+    double area() { return 0; }
+}
+class Circle extends Shape {
+    private double radius;
+    @Override // @Override annotation — compiler check karta hai
+    double area() { return Math.PI * radius * radius; }
+    // Return type COVARIANT ho sakta hai (narrower type)
+    // Access modifier SAME ya WIDER hona chahiye (public override private nahi kar sakta)
+    // Exceptions — sirf unchecked ya narrower checked exceptions
+}
+
+COVARIANT RETURN TYPE (Q47):
+class Animal {
+    public Animal create() { return new Animal(); }
+}
+class Dog extends Animal {
+    @Override
+    public Dog create() { return new Dog(); } // Dog IS-A Animal — covariant, ALLOWED ✅
+}
+
+------------------------------------------------------------------------
+Q8. equals() vs hashCode() contract?
+------------------------------------------------------------------------
+
+CONTRACT (MUST follow — collections depend karte hain):
+1. agar a.equals(b) == true THEN a.hashCode() == b.hashCode() MUST (required)
+2. agar a.hashCode() == b.hashCode() THEN a.equals(b) can be true OR false (OK)
+3. equals() null ke saath false return kare, never NPE
+
+// WITHOUT PROPER equals/hashCode:
+User u1 = new User(1L, "Prashant");
+User u2 = new User(1L, "Prashant");
+System.out.println(u1.equals(u2)); // false (default — reference comparison)
+Set<User> set = new HashSet<>();
+set.add(u1); set.add(u2);
+System.out.println(set.size()); // 2 (WRONG! Same logical user = 2 entries)
+
+// CORRECT IMPLEMENTATION:
+@Entity
+public class User {
+    private Long id;
+    private String email;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;            // Same reference
+        if (!(o instanceof User)) return false; // Null check + type check
+        User user = (User) o;
+        return Objects.equals(id, user.id) &&   // Null-safe comparison
+               Objects.equals(email, user.email);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, email); // Same fields as equals — CONTRACT!
+    }
+}
+
+// LOMBOK @EqualsAndHashCode — automatic generation:
+@EqualsAndHashCode(of = {"id", "email"}) // Specific fields
+
+// JPA ENTITIES special case:
+// Entity ka id initially null hota hai — before persist
+// hashCode id-based mat banao — set mein add karo before save → id null → wrong bucket
+// Better: Natural key (email, username) use karo ya fixed hashCode return karo
+
+------------------------------------------------------------------------
+Q9. final vs finally vs finalize?
+------------------------------------------------------------------------
+
+// FINAL — modifier
+final int CONSTANT = 42;          // Variable — reassign nahi kar sakte
+final class ImmutableClass {}     // Class — extend nahi kar sakte (String, Integer)
+final void sealedMethod() {}      // Method — override nahi kar sakte
+
+// FINALLY — try-catch ke saath guaranteed cleanup
+try {
+    connection = getConnection();
+    doWork(connection);
+} catch (SQLException e) {
+    log.error("DB error", e);
+} finally {
+    // HAMESHA CHALTA HAI — exception ho ya na ho, return ho ya na ho
+    if (connection != null) connection.close(); // Resource cleanup
+}
+
+// EXCEPTION: finally nahi chalta jab:
+// 1. System.exit() call ho
+// 2. JVM crash ho
+// 3. Thread.stop() (deprecated)
+// 4. Infinite loop in try block
+
+// FINALIZE — Garbage Collector se pehle call hota tha (DEPRECATED Java 9+, Removed Java 18+)
+// @Override protected void finalize() — NEVER USE
+// Kyunki: GC kabhi bhi call kare ya na kare — non-deterministic
+// USE INSTEAD: try-with-resources, @PreDestroy, Cleaner API (Java 9+)
+
+------------------------------------------------------------------------
+Q10. Immutable class kaise banate ho?
+------------------------------------------------------------------------
+
+RULES TO CREATE IMMUTABLE CLASS:
+1. class final karo (subclassing band)
+2. Saare fields private aur final karo
+3. No setters
+4. Constructor mein defensive copy karo (mutable objects ke liye)
+5. Getters mein defensive copy return karo
+
+// EXAMPLE:
+public final class ImmutablePerson { // final — extend nahi kar sakte
+    private final String name;        // private + final — never change
+    private final LocalDate birthDate; // Immutable type — safe
+    private final List<String> hobbies; // Mutable — defensive copy needed!
+
+    public ImmutablePerson(String name, LocalDate birthDate, List<String> hobbies) {
+        this.name = name;
+        this.birthDate = birthDate;
+        // DEFENSIVE COPY — original list badal gaya toh affect nahi hoga
+        this.hobbies = Collections.unmodifiableList(new ArrayList<>(hobbies));
+    }
+
+    public String getName() { return name; }
+    public LocalDate getBirthDate() { return birthDate; }
+
+    // DEFENSIVE COPY in getter bhi
+    public List<String> getHobbies() {
+        return Collections.unmodifiableList(hobbies); // Unmodifiable view
+    }
+    // No setters!
+}
+
+// JAVA 14+ RECORD — Immutable by default!
+public record ImmutablePoint(int x, int y) {
+    // Automatically: final fields, constructor, equals, hashCode, toString
+    // No setters
+}
+
+WHY IMMUTABLE:
+- Thread-safe (no synchronization needed)
+- Safe to share and cache
+- Hashable as map keys (hash never changes)
+- Examples: String, Integer, LocalDate, BigDecimal
+
+------------------------------------------------------------------------
+Q11. Java pass-by-value explain karo?
+------------------------------------------------------------------------
+
+IMPORTANT: Java ALWAYS pass-by-value — NO exceptions
+
+// PRIMITIVE — value copy hota hai
+void increment(int x) { x++; } // Local copy — original affect nahi
+int num = 5;
+increment(num);
+System.out.println(num); // 5 — unchanged!
+
+// OBJECT — REFERENCE ki copy hoti hai (not the object itself)
+void changeName(User user) {
+    user.setName("Changed"); // Same object — change visible hai
+}
+void reassign(User user) {
+    user = new User("New User"); // Local reference reassign — original nahi badhla
+}
+
+User u = new User("Original");
+changeName(u);
+System.out.println(u.getName()); // "Changed" — object modified via reference copy
+
+reassign(u);
+System.out.println(u.getName()); // "Changed" — reassignment ka effect nahi
+
+// EXPLANATION:
+// changeName: Method ko u ki reference ki COPY mili — same object point karta hai — change visible
+// reassign: Method ki local copy new object ko point karne lagi — original reference unchanged
+
+------------------------------------------------------------------------
+Q12. Interface vs Abstract class (real scenario)?
+------------------------------------------------------------------------
+
+// ABSTRACT CLASS — WHEN: Common state + partial implementation + IS-A
+abstract class Animal {
+    protected String name; // SHARED STATE
+    protected int age;
+
+    public Animal(String name, int age) { // Constructor possible!
+        this.name = name;
+        this.age = age;
+    }
+
+    public void breathe() { System.out.println("Breathing..."); } // COMMON BEHAVIOR
+
+    public abstract String sound(); // Child MUST implement
+    public abstract void move();
+}
+
+// INTERFACE — WHEN: Contract/capability, unrelated classes, multiple inheritance
+interface Swimmable { void swim(); }
+interface Flyable { void fly(); }
+interface Runnable { void run(); }
+
+class Duck extends Animal implements Swimmable, Flyable { // Multiple capabilities!
+    public String sound() { return "Quack"; }
+    public void move() { walk(); }
+    public void swim() { /* ... */ }
+    public void fly() { /* ... */ }
+}
+
+// REAL PROJECT EXAMPLE:
+// Abstract class: BaseService (common logging, transaction handling)
+// Interface: OrderProcessor (contract — multiple implementations: Standard, Express, International)
+
+abstract class BaseService {
+    protected Logger log = LoggerFactory.getLogger(getClass());
+
+    @Transactional // Common annotation
+    public final void execute(Request request) { // Template method
+        validate(request);
+        log.info("Executing: {}", request.getId());
+        doExecute(request); // Abstract — child implement kare
+        log.info("Done: {}", request.getId());
+    }
+
+    protected abstract void validate(Request request);
+    protected abstract void doExecute(Request request);
+}
+
+| Feature            | Abstract Class           | Interface                    |
+|--------------------|--------------------------|------------------------------|
+| State              | Yes (fields)             | No (only constants)          |
+| Constructor        | Yes                      | No                           |
+| Multiple inherit   | No (only one)            | Yes (multiple)               |
+| Access modifiers   | Any                      | public/default only          |
+| Use when           | IS-A + shared state      | CAN-DO capability            |
+
+------------------------------------------------------------------------
+Q13. Java 8 mein interfaces mein kya changes aaye?
+------------------------------------------------------------------------
+
+// DEFAULT METHODS — implementation with body
+interface Collection {
+    // Default implementation — implementing classes ko override karna optional
+    default void forEach(Consumer<? super E> action) {
+        for (E e : this) action.accept(e);
+    }
+}
+// Backward compatibility — existing classes automatically inherit default behavior
+
+// STATIC METHODS — Interface pe static utility methods
+interface Validator<T> {
+    boolean validate(T value);
+
+    static <T> Validator<T> of(Predicate<T> predicate) {
+        return predicate::test;
+    }
+}
+// Usage: Validator<String> emailValidator = Validator.of(s -> s.contains("@"));
+
+// FUNCTIONAL INTERFACE (@FunctionalInterface) — exactly one abstract method
+@FunctionalInterface
+interface OrderProcessor {
+    void process(Order order); // Single abstract method — Lambda use kar sakte ho
+
+    default void logBefore(Order o) { log.info("Processing: " + o.getId()); }
+    default void logAfter(Order o) { log.info("Done: " + o.getId()); }
+}
+
+// LAMBDA USE:
+OrderProcessor processor = order -> {
+    applyDiscount(order);
+    chargePayment(order);
+};
+
+// PRIVATE METHODS (Java 9+) — internal helper methods in interface
+interface PaymentGateway {
+    default void processWithRetry(Payment p) {
+        for (int i = 0; i < 3; i++) {
+            if (tryProcess(p)) return;
+            waitBeforeRetry(i); // Private helper
+        }
+    }
+
+    private void waitBeforeRetry(int attempt) { // Private — Java 9+
+        Thread.sleep(Math.pow(2, attempt) * 100); // Exponential backoff
+    }
+}
+
+------------------------------------------------------------------------
+Q14. How many ways to make an object?
+------------------------------------------------------------------------
+
+// 1. new keyword (most common)
+User user = new User("Prashant");
+
+// 2. Reflection (Class.newInstance() — deprecated, Constructor.newInstance())
+User user = User.class.getDeclaredConstructor(String.class).newInstance("Prashant");
+
+// 3. Clone (Cloneable interface + clone() method)
+User original = new User("Prashant");
+User clone = (User) original.clone(); // Shallow copy
+
+// 4. Deserialization (ObjectInputStream)
+ObjectInputStream ois = new ObjectInputStream(new FileInputStream("user.ser"));
+User user = (User) ois.readObject(); // Constructor call NAHI hota!
+
+// 5. Factory methods (static factory)
+Optional<String> opt = Optional.of("value");
+List<String> list = List.of("a", "b", "c");
+
+// 6. Builder pattern
+User user = User.builder().name("Prashant").email("p@g.com").build();
+
+INTERVIEW TIP: "Deserialization pe dhyan do — constructor bypass hota hai. Enum serialize safely handle hota hai by JVM. Custom serialization ke liye readResolve() use karte hain."
+
+------------------------------------------------------------------------
+Q15. Shallow vs Deep Copy?
+------------------------------------------------------------------------
+
+// SHALLOW COPY — top-level copy, nested objects SAME reference share karte hain
+class Order implements Cloneable {
+    private String orderId;
+    private List<Item> items; // Mutable — shared reference!
+
+    @Override
+    public Order clone() throws CloneNotSupportedException {
+        return (Order) super.clone(); // SHALLOW — items ka same reference!
+    }
+}
+
+Order original = new Order("ORD-1", new ArrayList<>(List.of(new Item("Book"))));
+Order copy = original.clone();
+copy.getItems().add(new Item("Pen")); // ORIGINAL bhi affect hota hai!
+
+// DEEP COPY — har nested object bhi copy hota hai
+@Override
+public Order clone() throws CloneNotSupportedException {
+    Order copy = (Order) super.clone();
+    copy.items = new ArrayList<>(); // New list banao
+    for (Item item : this.items) {
+        copy.items.add(item.clone()); // Har item bhi copy karo
+    }
+    return copy;
+}
+
+// MODERN APPROACH — Copy constructor / Serialization / Jackson
+// Copy constructor:
+public Order(Order other) {
+    this.orderId = other.orderId;
+    this.items = other.items.stream()
+        .map(Item::new) // Item copy constructor
+        .collect(Collectors.toList());
+}
+
+// Jackson deep copy:
+ObjectMapper mapper = new ObjectMapper();
+Order deepCopy = mapper.readValue(mapper.writeValueAsString(original), Order.class);
+
+------------------------------------------------------------------------
+Q16. Interface vs Abstract class (Java 8 ke baad) — ADDITIONAL
+------------------------------------------------------------------------
+
+// Java 8 ke baad difference blur hua lekin:
+// Abstract class = STATE share karna + IS-A
+// Interface = MULTIPLE inheritance + capability
+
+// DIAMOND PROBLEM — Interfaces mein:
+interface A { default void greet() { System.out.println("Hello from A"); } }
+interface B extends A { default void greet() { System.out.println("Hello from B"); } }
+interface C extends A { default void greet() { System.out.println("Hello from C"); } }
+
+class D implements B, C {
+    @Override
+    public void greet() {
+        B.super.greet(); // Explicitly specify karo — B ya C
+    }
+}
+
+================================================================================
+SECTION 3: DESIGN PRINCIPLES (SOLID + Clean Code)
+================================================================================
+
+------------------------------------------------------------------------
+Q17. SOLID Principles explain karo?
+------------------------------------------------------------------------
+
+--- S: Single Responsibility Principle ---
+"Ek class ka ek aur sirf ek reason hona chahiye change karne ka"
+
+// BAD — Multiple responsibilities
+class OrderService {
+    public void placeOrder(Order order) { /* ... */ }
+    public void sendEmail(Order order) { /* ... */ } // Email responsibility?
+    public void generatePDF(Order order) { /* ... */ } // PDF responsibility?
+    public void saveToDatabase(Order order) { /* ... */ } // DB responsibility?
+}
+
+// GOOD — Each class has one responsibility
+class OrderService { public void placeOrder(Order order) { } }
+class EmailService { public void sendOrderConfirmation(Order order) { } }
+class PDFService { public void generateOrderPDF(Order order) { } }
+class OrderRepository { public void save(Order order) { } }
+
+--- O: Open/Closed Principle ---
+"Open for extension, Closed for modification"
+
+// BAD — Har naya discount type ke liye OrderService modify karna padega
+class DiscountCalculator {
+    public double calculate(Order order, String discountType) {
+        if (discountType.equals("SEASONAL")) return order.getTotal() * 0.1;
+        else if (discountType.equals("PREMIUM")) return order.getTotal() * 0.2;
+        // Naya type add karo → yahi class modify karo → OCP VIOLATION
+    }
+}
+
+// GOOD — New discount type = new class, existing code unchanged
+interface DiscountStrategy {
+    double calculate(Order order);
+}
+class SeasonalDiscount implements DiscountStrategy {
+    public double calculate(Order order) { return order.getTotal() * 0.1; }
+}
+class PremiumDiscount implements DiscountStrategy {
+    public double calculate(Order order) { return order.getTotal() * 0.2; }
+}
+// Naya type: class FlashSaleDiscount implements DiscountStrategy { }
+// OrderService modify nahi karna — OPEN/CLOSED ✅
+
+--- L: Liskov Substitution Principle ---
+"Subclass parent class ki jagah use ho sake bina behavior break kiye"
+
+// BAD — LSP VIOLATION
+class Bird {
+    public void fly() { System.out.println("Flying"); }
+}
+class Penguin extends Bird {
+    @Override
+    public void fly() {
+        throw new UnsupportedOperationException("Penguins can't fly!"); // LSP VIOLATION!
+    }
+}
+// Client code: Bird bird = new Penguin(); bird.fly(); → Exception!
+
+// FIX:
+class Bird { }
+interface Flyable { void fly(); }
+class Sparrow extends Bird implements Flyable {
+    public void fly() { System.out.println("Flying"); }
+}
+class Penguin extends Bird { // Flyable implement nahi karta
+    public void swim() { System.out.println("Swimming"); }
+}
+
+--- I: Interface Segregation Principle ---
+"Client ko wo methods implement karne pe force mat karo jo wo use nahi karta"
+
+// BAD — Fat interface
+interface Worker {
+    void work();
+    void eat();
+    void sleep();
+    void managePeople(); // Robot ye nahi kar sakta!
+}
+
+// GOOD — Segregated interfaces
+interface Workable { void work(); }
+interface Eatable { void eat(); }
+interface Sleepable { void sleep(); }
+interface Manageable { void managePeople(); }
+
+class Human implements Workable, Eatable, Sleepable, Manageable { }
+class Robot implements Workable { } // Sirf jo zaruri ho
+
+--- D: Dependency Inversion Principle ---
+"High-level modules low-level modules pe directly depend mat karo — dono abstraction pe depend karein"
+
+// BAD
+class OrderService {
+    private MySQLOrderRepository repo = new MySQLOrderRepository(); // Direct dependency!
+    // OrderService (high-level) → MySQLOrderRepository (low-level) — BAD
+}
+
+// GOOD
+interface OrderRepository { // Abstraction
+    void save(Order order);
+    Optional<Order> findById(Long id);
+}
+class MySQLOrderRepository implements OrderRepository { /* ... */ }
+class MongoOrderRepository implements OrderRepository { /* ... */ }
+
+class OrderService { // High-level module
+    private final OrderRepository repo; // Abstraction pe depend
+    public OrderService(OrderRepository repo) { this.repo = repo; } // DIP!
+    // DB change karo → OrderService unchanged
+}
+
+INTERVIEW TIP: "SOLID principles are guidelines, not strict rules. Real code mein pragmatic approach: understand principles aur intentionally violate karo jab good reason ho."
+
+------------------------------------------------------------------------
+Q18-Q21: Dependency Injection, Loose Coupling, High Cohesion, Code Smells
+------------------------------------------------------------------------
+
+// LOOSE COUPLING — Components ek doosre pe kam depend karein
+// Interface ke through communicate karo, implementation nahi jaano
+// Spring DI se automatically loose coupling achieve hoti hai
+
+// HIGH COHESION — Class ke methods aur data closely related hain
+// Low cohesion: God class (sab kuch karta hai)
+// High cohesion: OrderValidator — sirf order validation karta hai
+
+// CODE SMELLS (6 yrs exp se expect):
+// 1. Long Method (>20 lines) → Extract Method
+// 2. Large Class (God Class) → Extract Class
+// 3. Long Parameter List (>3-4 params) → Parameter Object / Builder
+// 4. Duplicate Code → Extract common method / Template Method
+// 5. Feature Envy — method zyada doosri class ka data use kare → move method
+// 6. Data Clumps — same data group hamesha saath → Extract Class
+// 7. Primitive Obsession — primitives overuse → Value Object
+// 8. Switch Statements — type-based branching → Polymorphism
+// 9. Dead Code — unused code → Delete
+// 10. Speculative Generality — future ke liye over-engineering → YAGNI
+
+================================================================================
+SECTION 4: DESIGN PATTERNS
+================================================================================
+
+------------------------------------------------------------------------
+Q22. Factory Pattern
+------------------------------------------------------------------------
+
+// PROBLEM: Object creation logic complex hai ya runtime pe decide hota hai
+
+// SIMPLE FACTORY
+class PaymentProcessorFactory {
+    public static PaymentProcessor create(String type) {
+        return switch (type) {
+            case "STRIPE" -> new StripeProcessor();
+            case "PAYPAL" -> new PayPalProcessor();
+            case "RAZORPAY" -> new RazorpayProcessor();
+            default -> throw new IllegalArgumentException("Unknown payment type: " + type);
+        };
+    }
+}
+// Usage: PaymentProcessor p = PaymentProcessorFactory.create("STRIPE");
+
+// FACTORY METHOD PATTERN — subclass decide kare
+abstract class NotificationSender {
+    // Template method
+    public void send(String message) {
+        NotificationChannel channel = createChannel(); // Factory method
+        channel.connect();
+        channel.send(message);
+        channel.disconnect();
+    }
+
+    protected abstract NotificationChannel createChannel(); // Subclass decide kare
+}
+
+class EmailNotificationSender extends NotificationSender {
+    @Override
+    protected NotificationChannel createChannel() { return new EmailChannel(); }
+}
+
+class SMSNotificationSender extends NotificationSender {
+    @Override
+    protected NotificationChannel createChannel() { return new SMSChannel(); }
+}
+
+// ABSTRACT FACTORY — Family of related objects create karo
+interface UIFactory {
+    Button createButton();
+    TextField createTextField();
+    Dialog createDialog();
+}
+
+class DarkThemeFactory implements UIFactory { /* Dark components */ }
+class LightThemeFactory implements UIFactory { /* Light components */ }
+
+------------------------------------------------------------------------
+Q23. Singleton Pattern (pitfalls + thread-safe)
+------------------------------------------------------------------------
+
+// [Already covered in Threads document — quick reference]
+
+// BEST APPROACH: Enum Singleton
+public enum AppConfig {
+    INSTANCE;
+    private final String dbUrl = System.getenv("DATABASE_URL");
+    public String getDbUrl() { return dbUrl; }
+}
+
+// INITIALIZATION-ON-DEMAND HOLDER (lazy + thread-safe without sync)
+public class MetricsRegistry {
+    private MetricsRegistry() {}
+
+    private static class Holder {
+        static final MetricsRegistry INSTANCE = new MetricsRegistry();
+    }
+
+    public static MetricsRegistry getInstance() { return Holder.INSTANCE; }
+}
+
+// PITFALLS:
+// 1. Testing hard (global state) → Use dependency injection instead
+// 2. Multi-classloader environments → multiple instances possible
+// 3. Serialization → readResolve() implement karo
+// 4. Reflection → private constructor check karo
+
+------------------------------------------------------------------------
+Q24. Strategy Pattern
+------------------------------------------------------------------------
+
+// Context ke aadhar pe algorithm/behavior change karo
+
+interface SortStrategy {
+    void sort(int[] array);
+}
+
+class QuickSort implements SortStrategy {
+    public void sort(int[] array) { /* QuickSort algorithm */ }
+}
+
+class MergeSort implements SortStrategy {
+    public void sort(int[] array) { /* MergeSort algorithm */ }
+}
+
+class BubbleSort implements SortStrategy {
+    public void sort(int[] array) { /* BubbleSort algorithm */ }
+}
+
+class DataSorter {
+    private SortStrategy strategy;
+
+    public DataSorter(SortStrategy strategy) { this.strategy = strategy; }
+
+    public void setStrategy(SortStrategy strategy) { // Runtime change
+        this.strategy = strategy;
+    }
+
+    public void sort(int[] data) { strategy.sort(data); }
+}
+
+// REAL USE: Payment processing
+interface FraudDetectionStrategy {
+    boolean isFraudulent(Transaction txn);
+}
+
+class MLBasedFraudDetection implements FraudDetectionStrategy { /* ML model */ }
+class RuleBasedFraudDetection implements FraudDetectionStrategy { /* Business rules */ }
+
+@Service
+class PaymentService {
+    @Autowired private FraudDetectionStrategy fraudDetector; // Strategy injected
+    // application.yml: fraud.detection=ml → Spring injects ML-based
+}
+
+------------------------------------------------------------------------
+Q25. Builder Pattern
+------------------------------------------------------------------------
+
+// PROBLEM: Constructor mein bahut parameters
+
+// BAD:
+User user = new User("Prashant", "prashant@gmail.com", "Pass@123", "MALE",
+    LocalDate.of(1995, 1, 15), "+91-9999999999", true, "ADMIN", null, null);
+// Kaunsa param kya hai? Unreadable!
+
+// BUILDER PATTERN:
+User user = User.builder()
+    .name("Prashant")
+    .email("prashant@gmail.com")
+    .password("Pass@123")
+    .gender("MALE")
+    .birthDate(LocalDate.of(1995, 1, 15))
+    .phone("+91-9999999999")
+    .active(true)
+    .role("ADMIN")
+    .build(); // Clear aur readable!
+
+// IMPLEMENTATION:
+public class User {
+    private final String name;
+    private final String email;
+    // ... other fields
+
+    private User(Builder builder) { // Private constructor
+        this.name = builder.name;
+        this.email = builder.email;
+    }
+
+    public static Builder builder() { return new Builder(); }
+
+    public static class Builder {
+        private String name;
+        private String email;
+
+        public Builder name(String name) { this.name = name; return this; } // Method chaining
+        public Builder email(String email) { this.email = email; return this; }
+
+        public User build() {
+            validate(); // Build se pehle validate karo
+            return new User(this);
+        }
+
+        private void validate() {
+            if (name == null || name.isBlank()) throw new IllegalStateException("Name required");
+            if (email == null || !email.contains("@")) throw new IllegalStateException("Valid email required");
+        }
+    }
+}
+
+// LOMBOK @Builder — code generate karta hai:
+@Builder
+@Data
+public class User {
+    private String name;
+    private String email;
+    @Builder.Default
+    private boolean active = true; // Default value
+}
+
+------------------------------------------------------------------------
+Q26. Observer Pattern → Kafka Events
+------------------------------------------------------------------------
+
+// CLASSIC OBSERVER:
+interface OrderEventListener {
+    void onOrderCreated(Order order);
+}
+
+class OrderEventPublisher {
+    private List<OrderEventListener> listeners = new ArrayList<>();
+
+    public void subscribe(OrderEventListener listener) { listeners.add(listener); }
+
+    public void notifyOrderCreated(Order order) {
+        listeners.forEach(listener -> listener.onOrderCreated(order));
+    }
+}
+
+// SPRING EVENTS (built-in observer):
+class OrderCreatedEvent extends ApplicationEvent {
+    private final Order order;
+    public OrderCreatedEvent(Object source, Order order) {
+        super(source);
+        this.order = order;
+    }
+}
+
+@Service class OrderService {
+    @Autowired ApplicationEventPublisher publisher;
+
+    @Transactional
+    public void placeOrder(Order order) {
+        orderRepository.save(order);
+        publisher.publishEvent(new OrderCreatedEvent(this, order)); // Fire event
+    }
+}
+
+@Component class EmailHandler {
+    @EventListener // Subscribe karo
+    public void handleOrderCreated(OrderCreatedEvent event) {
+        emailService.sendConfirmation(event.getOrder());
+    }
+}
+
+// KAFKA = Distributed Observer Pattern:
+// Producer = Publisher, Consumer group = Subscribers, Topic = Event channel
+
+------------------------------------------------------------------------
+Q27. Adapter Pattern
+------------------------------------------------------------------------
+
+// PROBLEM: Incompatible interfaces ko saath kaam karwana
+
+// Old interface (can't modify):
+class OldPaymentSystem {
+    public void makePayment(int amountInPaisa) { /* old system */ }
+}
+
+// New interface (what client expects):
+interface NewPaymentProcessor {
+    void processPayment(double amountInRupees);
+}
+
+// ADAPTER — bridge between old and new:
+class PaymentAdapter implements NewPaymentProcessor {
+    private final OldPaymentSystem oldSystem;
+
+    public PaymentAdapter(OldPaymentSystem oldSystem) {
+        this.oldSystem = oldSystem;
+    }
+
+    @Override
+    public void processPayment(double amountInRupees) {
+        int paisa = (int) (amountInRupees * 100); // Convert
+        oldSystem.makePayment(paisa); // Delegate to old system
+    }
+}
+
+// REAL EXAMPLE: Third-party library integrate karna
+// AWS SDK, Stripe SDK ko apne interface ke through use karna
+
+------------------------------------------------------------------------
+Q28. Decorator vs Proxy
+------------------------------------------------------------------------
+
+// DECORATOR — Behavior ADD karta hai (same interface)
+interface Coffee { double getCost(); String getDescription(); }
+
+class SimpleCoffee implements Coffee {
+    public double getCost() { return 1.0; }
+    public String getDescription() { return "Simple coffee"; }
+}
+
+class MilkDecorator implements Coffee {
+    private final Coffee coffee; // Wrapped instance
+
+    public MilkDecorator(Coffee coffee) { this.coffee = coffee; }
+
+    @Override
+    public double getCost() { return coffee.getCost() + 0.5; } // ADD milk cost
+    @Override
+    public String getDescription() { return coffee.getDescription() + " + milk"; }
+}
+
+class SugarDecorator implements Coffee {
+    private final Coffee coffee;
+    public double getCost() { return coffee.getCost() + 0.2; }
+    public String getDescription() { return coffee.getDescription() + " + sugar"; }
+}
+
+// Usage: chai chainable hai
+Coffee coffee = new SugarDecorator(new MilkDecorator(new SimpleCoffee()));
+// cost = 1.0 + 0.5 + 0.2 = 1.7, description = "Simple coffee + milk + sugar"
+
+// PROXY — Access CONTROL karta hai (same interface, security/caching/logging)
+interface UserService { User getUser(Long id); }
+
+class UserServiceProxy implements UserService {
+    private final UserService realService;
+    private final Map<Long, User> cache = new ConcurrentHashMap<>();
+
+    public User getUser(Long id) {
+        // CACHING PROXY
+        return cache.computeIfAbsent(id, realService::getUser);
+    }
+}
+
+// DIFFERENCE:
+// Decorator = "Enhancement" — caller ke liye kuch add karo
+// Proxy = "Control" — access, caching, logging, security without changing original
+// Spring AOP = Proxy pattern use karta hai!
+
+------------------------------------------------------------------------
+Q29. Template Method vs Strategy
+------------------------------------------------------------------------
+
+// TEMPLATE METHOD — Algorithm structure fixed, steps vary
+abstract class DataExporter {
+    // Template method — algorithm structure fixed
+    public final void export(List<Data> data) { // final — override nahi kar sakte
+        List<Data> filtered = filter(data);      // Step 1
+        List<Data> transformed = transform(filtered); // Step 2
+        write(transformed);                        // Step 3
+        notifyCompletion();                        // Step 4 (common)
+    }
+
+    protected abstract List<Data> filter(List<Data> data);     // Subclass implement kare
+    protected abstract List<Data> transform(List<Data> data);  // Subclass implement kare
+    protected abstract void write(List<Data> data);            // Subclass implement kare
+
+    // Hook method — optional override
+    protected void notifyCompletion() { log.info("Export complete"); }
+}
+
+class CSVExporter extends DataExporter {
+    protected List<Data> filter(List<Data> data) { return data.stream().filter(/* ... */).collect(...); }
+    protected List<Data> transform(List<Data> data) { return toCSVFormat(data); }
+    protected void write(List<Data> data) { writeToFile(data, "export.csv"); }
+}
+
+// TEMPLATE METHOD = Inheritance (compile time)
+// STRATEGY = Composition (runtime) — more flexible!
+
+// PREFER STRATEGY over TEMPLATE METHOD in modern code
+// Strategy = inject algorithm, Template = inheritance
+
+------------------------------------------------------------------------
+Q30. DRY and KISS
+------------------------------------------------------------------------
+
+// DRY — Don't Repeat Yourself
+// Same code do jagah nahi likhna
+
+// VIOLATION:
+void createUserNotification(User user) {
+    String message = "Dear " + user.getName() + ", Welcome to our platform!";
+    emailService.send(user.getEmail(), "Welcome", message);
+}
+
+void createOrderNotification(User user, Order order) {
+    String message = "Dear " + user.getName() + ", Your order is confirmed!"; // Repeated greeting
+    emailService.send(user.getEmail(), "Order Confirmed", message);
+}
+
+// DRY:
+private String greeting(User user) { return "Dear " + user.getName() + ", "; }
+
+void createUserNotification(User user) {
+    emailService.send(user.getEmail(), "Welcome", greeting(user) + "Welcome!");
+}
+
+// KISS — Keep It Simple, Stupid
+// Simple solution prefer karo
+
+// OVER-ENGINEERED (BAD):
+class GenericEventDrivenObserverPatternBasedEmailSender { }
+
+// SIMPLE (GOOD):
+class EmailService { public void sendEmail(String to, String subject, String body) {} }
+
+================================================================================
+SECTION 5: SCENARIO-BASED QUESTIONS
+================================================================================
+
+------------------------------------------------------------------------
+Q31. God class ko kaise refactor karoge?
+------------------------------------------------------------------------
+
+// GOD CLASS — bahut zyada responsibilities
+
+// BAD:
+class UserManager {
+    // Authentication
+    public void login(String email, String password) { }
+    public void logout(Long userId) { }
+    public String generateToken(User user) { }
+
+    // Profile
+    public void updateProfile(Long userId, ProfileDTO dto) { }
+    public void uploadAvatar(Long userId, MultipartFile file) { }
+
+    // Orders
+    public void placeOrder(Long userId, List<Item> items) { }
+    public List<Order> getOrderHistory(Long userId) { }
+
+    // Payments
+    public void processPayment(Long userId, Payment payment) { }
+    public List<Transaction> getTransactions(Long userId) { }
+
+    // Notifications
+    public void sendEmail(Long userId, String message) { }
+    public void sendSMS(Long userId, String message) { }
+    // 500+ lines!
+}
+
+// REFACTORED:
+class AuthService { /* login, logout, token */ }
+class UserProfileService { /* profile, avatar */ }
+class OrderService { /* placeOrder, history */ }
+class PaymentService { /* process, transactions */ }
+class NotificationService { /* email, sms */ }
+
+// STEPS TO REFACTOR:
+// 1. Responsibilities identify karo (noun-based grouping)
+// 2. New class banao
+// 3. Methods move karo
+// 4. Test karo har step pe
+
+------------------------------------------------------------------------
+Q32. Payment system design (multiple methods)
+------------------------------------------------------------------------
+
+// Strategy + Factory + Open-Closed principle combination:
+
+interface PaymentStrategy {
+    PaymentResult execute(PaymentRequest request);
+    boolean supports(PaymentMethod method);
+}
+
+@Component
+class CreditCardPayment implements PaymentStrategy {
+    public PaymentResult execute(PaymentRequest request) { /* Stripe API */ }
+    public boolean supports(PaymentMethod method) { return method == PaymentMethod.CREDIT_CARD; }
+}
+
+@Component
+class UPIPayment implements PaymentStrategy {
+    public PaymentResult execute(PaymentRequest request) { /* Razorpay API */ }
+    public boolean supports(PaymentMethod method) { return method == PaymentMethod.UPI; }
+}
+
+@Service
+class PaymentService {
+    private final List<PaymentStrategy> strategies; // All injected
+
+    @Autowired
+    public PaymentService(List<PaymentStrategy> strategies) {
+        this.strategies = strategies;
+    }
+
+    public PaymentResult processPayment(PaymentRequest request) {
+        return strategies.stream()
+            .filter(s -> s.supports(request.getMethod()))
+            .findFirst()
+            .orElseThrow(() -> new UnsupportedPaymentMethodException(request.getMethod()))
+            .execute(request);
+    }
+}
+// New payment method: New class implement karo — existing code touch nahi!
+
+================================================================================
+SECTION 6: ADVANCED JAVA CONCEPTS
+================================================================================
+
+------------------------------------------------------------------------
+Q33. Covariant Return Type
+------------------------------------------------------------------------
+
+// Parent method se NARROWER return type override mein allowed hai
+class Animal {
+    public Animal create() { return new Animal(); }
+}
+
+class Dog extends Animal {
+    @Override
+    public Dog create() { return new Dog(); } // Dog IS-A Animal — VALID!
+}
+// Client: Animal a = new Dog(); Animal result = a.create(); // Dog object returned
+
+------------------------------------------------------------------------
+Q34. Static vs Dynamic Binding
+------------------------------------------------------------------------
+
+// STATIC BINDING (Compile time):
+// - private, static, final methods
+// - Method overloading
+// - Compiler decides which method to call
+
+class Calculator {
+    static int add(int a, int b) { return a + b; }
+    static double add(double a, double b) { return a + b; } // STATIC BINDING
+}
+// Calculator.add(1, 2) → int version at compile time
+
+// DYNAMIC BINDING (Runtime):
+// - Non-private, non-static, non-final instance methods (overriding)
+Animal a = new Dog();
+a.sound(); // Dog.sound() — runtime mein decide hota hai via vtable
+
+------------------------------------------------------------------------
+Q35. ClassLoader kya hota hai?
+------------------------------------------------------------------------
+
+// ClassLoader = JVM mein .class files load karta hai memory mein
+
+// 3 TYPES (hierarchy):
+// 1. Bootstrap ClassLoader — JDK core classes (java.lang.*, java.util.*)
+// 2. Extension/Platform ClassLoader — java.ext.dirs
+// 3. Application ClassLoader — Classpath se apni classes
+
+// DELEGATION MODEL (parent-first):
+// AppClassLoader → ExtClassLoader → BootstrapClassLoader
+// Pehle parent se maango, nahi mila toh khud load karo
+
+// CUSTOM CLASSLOADER (hot reload, plugin systems):
+public class PluginClassLoader extends ClassLoader {
+    @Override
+    protected Class<?> findClass(String name) throws ClassNotFoundException {
+        byte[] classData = loadClassFromPlugin(name); // Custom loading
+        return defineClass(name, classData, 0, classData.length);
+    }
+}
+
+INTERVIEW TIP: "Spring Boot uses a custom ClassLoader for handling jar-in-jar (nested jars).
+ClassLoader isolation is key in OSGi/plugin architectures."
+
+================================================================================
+SECTION 7: MEMORY & JVM
+================================================================================
+
+------------------------------------------------------------------------
+Q36. Object Lifecycle explain karo
+------------------------------------------------------------------------
+
+// 1. CLASS LOADING — ClassLoader .class file load kare
+// 2. OBJECT CREATION — new keyword → heap pe memory allocate
+//    a. Memory allocate (Eden space in Young Generation)
+//    b. Default values set (0, null, false)
+//    c. Constructor call
+// 3. USE — References se access
+// 4. UNREACHABLE — Koi reference nahi remaining
+// 5. GC — Garbage collector collect kare
+//    a. Minor GC — Eden full → Survivor spaces
+//    b. Major GC — Old generation collect
+// 6. FINALIZATION — finalize() (deprecated) → Cleaner API
+// 7. MEMORY RELEASE
+
+------------------------------------------------------------------------
+Q37. Garbage Collection kaise kaam karta hai?
+------------------------------------------------------------------------
+
+// HEAP STRUCTURE:
+// Young Generation: Eden, Survivor 0, Survivor 1 (S0, S1)
+// Old Generation (Tenured): Long-lived objects
+// Metaspace: Class metadata (Java 8+ — PermGen removed)
+
+// GC PROCESS:
+// 1. MINOR GC (Young Gen):
+//    - Eden full hone pe trigger
+//    - Reachable objects → Survivor space
+//    - Age counter increment
+//    - Age threshold (default 15) → Old Gen promote
+
+// 2. MAJOR/FULL GC (Old Gen):
+//    - Old Gen full ya explicit System.gc()
+//    - Slower — more objects collect karne hain
+
+// GC ALGORITHMS:
+// Serial GC: Single thread — small apps
+// Parallel GC: Multi-thread — throughput focus
+// G1 GC (Default Java 9+): Region-based, predictable pause times
+// ZGC (Java 15+): Ultra-low latency, <10ms pause
+// Shenandoah: Low pause, concurrent
+
+// JVM FLAGS:
+// -XX:+UseG1GC
+// -Xms512m -Xmx2g
+// -XX:MaxGCPauseMillis=200
+// -XX:+PrintGCDetails
+
+------------------------------------------------------------------------
+Q38. Reference Types
+------------------------------------------------------------------------
+
+import java.lang.ref.*;
+
+// STRONG REFERENCE (default) — GC kabhi collect nahi karega
+Object obj = new Object(); // Strong reference — obj = null karo tabhi eligible
+
+// SOFT REFERENCE — Memory pressure pe collect (cache ke liye)
+SoftReference<byte[]> softRef = new SoftReference<>(new byte[1024 * 1024]);
+byte[] data = softRef.get(); // null ho sakta hai agar GC ne collect kiya
+if (data == null) { /* Reload from source */ }
+
+// WEAK REFERENCE — Next GC cycle pe collect (WeakHashMap)
+WeakReference<User> weakRef = new WeakReference<>(user);
+User u = weakRef.get(); // Quickly null ho sakta hai
+
+// PHANTOM REFERENCE — Object collect hone ke BAAD notification
+ReferenceQueue<Object> queue = new ReferenceQueue<>();
+PhantomReference<Object> phantomRef = new PhantomReference<>(new Object(), queue);
+// get() always returns null
+// Queue pe aata hai jab object finalized ho — cleanup ke liye
+
+// REAL USE CASES:
+// Strong: Normal usage
+// Soft: Memory-sensitive cache (images, large objects)
+// Weak: Canonicalized mappings, metadata
+// Phantom: Resource cleanup (native resources)
+
+------------------------------------------------------------------------
+Q39. Memory Leak Spring Boot mein kaise hota hai?
+------------------------------------------------------------------------
+
+// 1. THREADLOCAL not cleaned
+@Component
+public class RequestFilter implements Filter {
+    private static ThreadLocal<String> userId = new ThreadLocal<>();
+
+    public void doFilter(...) {
+        userId.set(request.getHeader("X-User-Id"));
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            userId.remove(); // ← Must! Warna thread pool mein stale data stays
+        }
+    }
+}
+
+// 2. STATIC COLLECTIONS grow unboundedly
+class MetricsService {
+    private static final List<Metric> ALL_METRICS = new ArrayList<>(); // Never cleared!
+    // Fix: Use Caffeine/Guava cache with eviction
+}
+
+// 3. UNCLOSED STREAMS / CONNECTIONS
+// Fix: try-with-resources ALWAYS use karo
+
+// 4. LISTENERS not removed
+eventBus.register(listener); // Register
+// Fix: Unregister in @PreDestroy
+
+// 5. HIBERNATE SESSION cache
+// Long transaction + large result set → session cache bloat
+// Fix: entityManager.clear() for batch processing
+
+// DETECT:
+// jmap -heap <pid>
+// jstack <pid>
+// VisualVM / YourKit
+// Spring Actuator: /actuator/metrics/jvm.memory.used
+
+------------------------------------------------------------------------
+Q40. String Pool kya hota hai?
+------------------------------------------------------------------------
+
+// String Pool = JVM heap mein special area jahan string literals store hote hain
+// Purpose: Memory save — same string ek baar store
+
+String s1 = "Hello"; // String pool mein create
+String s2 = "Hello"; // Same reference — pool se milta hai!
+System.out.println(s1 == s2); // true — SAME object!
+
+String s3 = new String("Hello"); // Heap pe naya object
+System.out.println(s1 == s3); // false — different objects!
+System.out.println(s1.equals(s3)); // true — same content
+
+String s4 = s3.intern(); // Pool mein add karo / existing return karo
+System.out.println(s1 == s4); // true — pool se mila
+
+// JAVA 7+: String pool HEAP mein shift hua (pehle PermGen mein tha)
+// JAVA 8: PermGen → Metaspace
+
+// IMMUTABILITY important hai:
+// Agar String mutable hoti aur pool use karta → s1 change karo → s2 bhi change
+
+================================================================================
+SECTION 8: EDGE CASES & TRICKY
+================================================================================
+
+------------------------------------------------------------------------
+Q41-Q46. Tricky Questions
+------------------------------------------------------------------------
+
+// Q41: Constructor override possible hai?
+// NO! Constructor inherit nahi hote, isliye override possible nahi
+// Har class apna constructor khud define karta hai
+
+// Q42: Private method override possible hai?
+// NO! Private methods subclass ko visible nahi — overriding possible nahi
+// Subclass same naam ka method define kar sakta hai — yeh HIDING hai, overriding nahi
+class Parent {
+    private void display() { System.out.println("Parent"); }
+}
+class Child extends Parent {
+    private void display() { System.out.println("Child"); } // NEW method, not override
+}
+Parent p = new Child();
+p.display(); // → Parent! (compile error actually — private not visible)
+
+// Q43: Static method polymorphism?
+// NO — Static methods are HIDDEN, not overridden
+// Method hiding = compile-time decision based on reference type
+Animal.staticSound(); // Parent's method — always (reference type based)
+
+// Q44: Functional Interface
+@FunctionalInterface
+interface Predicate<T> {
+    boolean test(T t); // SINGLE abstract method
+    // Default methods allowed
+    // Static methods allowed
+    // Other abstract methods → NOT functional interface
+}
+// Lambda expression = anonymous implementation of functional interface
+Predicate<String> isEmpty = s -> s.isEmpty();
+// Common: Runnable, Callable, Comparator, Consumer, Supplier, Function, Predicate
+
+// Q45: Marker Interface
+// Koi method nahi — sirf "tagging" karta hai
+interface Serializable { } // JVM ko batata hai — serialize kar sakte ho
+interface Cloneable { }    // clone() allow karo
+
+// Modern alternative: Annotations
+@Retention(RetentionPolicy.RUNTIME)
+@interface Serializable { } // Annotation better hai — metadata add kar sakte ho
+
+================================================================================
+SECTION 9: EXPERT-LEVEL DESIGN THINKING
+================================================================================
+
+------------------------------------------------------------------------
+Q47. LSP Violation example? Fix karo
+------------------------------------------------------------------------
+
+// CLASSIC LSP VIOLATION: Rectangle-Square
+class Rectangle {
+    protected int width, height;
+    public void setWidth(int w) { this.width = w; }
+    public void setHeight(int h) { this.height = h; }
+    public int area() { return width * height; }
+}
+
+class Square extends Rectangle {
+    @Override
+    public void setWidth(int w) {
+        this.width = w;
+        this.height = w; // Square — sides equal
+    }
+    @Override
+    public void setHeight(int h) {
+        this.height = h;
+        this.width = h; // Square — sides equal
+    }
+}
+
+// CLIENT CODE:
+void testRectangle(Rectangle r) {
+    r.setWidth(5);
+    r.setHeight(10);
+    assert r.area() == 50; // Square ke saath FAILS! area = 100 (10*10)
+}
+// Square behaves differently from Rectangle — LSP VIOLATION!
+
+// FIX: Don't extend — use interface
+interface Shape { int area(); }
+class Rectangle implements Shape { /* width, height */ }
+class Square implements Shape { /* side */ }
+
+------------------------------------------------------------------------
+Q48. OCP Real Project Example
+------------------------------------------------------------------------
+
+// Notification system:
+// BAD — Har naya channel add karo → NotificationService modify karo (OCP violation):
+void notify(User user, String type) {
+    if (type.equals("EMAIL")) { emailService.send(user.getEmail()); }
+    else if (type.equals("SMS")) { smsService.send(user.getPhone()); }
+    // WhatsApp add karo → yahan if-else add karo — OCP VIOLATION
+}
+
+// GOOD — OCP compliant:
+interface NotificationChannel {
+    void notify(User user, String message);
+    String channelType();
+}
+@Component class EmailChannel implements NotificationChannel { ... }
+@Component class SMSChannel implements NotificationChannel { ... }
+// WhatsApp add karo: new class — existing code unchanged ✅
+
+------------------------------------------------------------------------
+Q49. Circular Dependency Spring mein kaise solve karo?
+------------------------------------------------------------------------
+// (Spring section mein covered — same concept)
+// Quick: Refactor common logic to third class, or @Lazy, or event-driven approach
+
+------------------------------------------------------------------------
+Q50. Plugin Architecture kaise design karo?
+------------------------------------------------------------------------
+
+// PLUGIN ARCHITECTURE = Runtime pe new functionality add karo without restart
+
+// COMPONENTS:
+// 1. Plugin Interface — Contract
+// 2. Plugin Registry — Discovery + Registration
+// 3. Plugin Loader — ClassLoader-based dynamic loading
+
+interface Plugin {
+    String getName();
+    String getVersion();
+    void initialize(ApplicationContext ctx);
+    void execute(PluginRequest request, PluginResponse response);
+}
+
+@Component
+class PluginRegistry {
+    private final Map<String, Plugin> plugins = new ConcurrentHashMap<>();
+
+    @Autowired
+    public PluginRegistry(List<Plugin> discoveredPlugins) {
+        discoveredPlugins.forEach(p -> plugins.put(p.getName(), p));
+    }
+
+    public Plugin getPlugin(String name) {
+        return Optional.ofNullable(plugins.get(name))
+            .orElseThrow(() -> new PluginNotFoundException(name));
+    }
+}
+
+// Spring @ConditionalOnProperty — runtime enable/disable plugins
+@Plugin
+@ConditionalOnProperty("plugins.analytics.enabled")
+class AnalyticsPlugin implements Plugin { ... }
+
+================================================================================
+SECTION 10: OOP + CONCURRENCY
+================================================================================
+
+------------------------------------------------------------------------
+Q51. Thread safety OOP design mein kaise ensure karo?
+------------------------------------------------------------------------
+
+// 1. IMMUTABLE OBJECTS (Best) — String, LocalDate, BigDecimal
+final class Money {
+    private final BigDecimal amount;
+    private final Currency currency;
+    public Money add(Money other) {
+        return new Money(this.amount.add(other.amount), currency); // New object return
+    }
+}
+
+// 2. SYNCHRONIZED METHODS / BLOCKS
+class Counter {
+    private int count = 0;
+    public synchronized void increment() { count++; }
+}
+
+// 3. CONCURRENT COLLECTIONS
+ConcurrentHashMap<String, Integer> safeMap = new ConcurrentHashMap<>();
+CopyOnWriteArrayList<String> safeList = new CopyOnWriteArrayList<>();
+
+// 4. ATOMIC CLASSES
+AtomicInteger atomicCounter = new AtomicInteger(0);
+atomicCounter.incrementAndGet(); // Lock-free thread safety
+
+// 5. VOLATILE (visibility only — simple flags)
+volatile boolean running = true;
+
+// 6. STATELESS DESIGN (no instance state)
+@Service class StatelessService { /* all local variables */ }
+
+------------------------------------------------------------------------
+Q52. Immutable objects concurrency mein kyun useful?
+------------------------------------------------------------------------
+
+// IMMUTABLE = state change nahi ho sakta = no synchronization needed
+
+// WITHOUT IMMUTABLE — Race condition
+class UserSession {
+    private String userId;       // Mutable — concurrent write = race condition
+    private List<String> roles;  // Mutable — concurrent modification possible
+}
+
+// WITH IMMUTABLE — Thread-safe by design
+final class UserSession {
+    private final String userId;
+    private final List<String> roles; // Unmodifiable!
+
+    public UserSession(String userId, List<String> roles) {
+        this.userId = userId;
+        this.roles = List.copyOf(roles); // Immutable copy
+    }
+    // No setters — no mutation possible — no synchronization needed!
+}
+
+// Multiple threads share UserSession safely — no lock needed!
+
+================================================================================
+SECTION 11: COLLECTIONS + OOP DESIGN
+================================================================================
+
+------------------------------------------------------------------------
+Q53. HashMap Internal Working?
+------------------------------------------------------------------------
+
+// STRUCTURE: Array of buckets (Node[]) — default 16 buckets
+// HASH FUNCTION: index = hash(key) & (n-1)
+
+// PUT OPERATION:
+// 1. key.hashCode() call karo
+// 2. hash calculate karo: (h = key.hashCode()) ^ (h >>> 16) — XOR upper bits
+// 3. Bucket index: hash % capacity
+// 4. Bucket empty → new Node
+// 5. Bucket mein element → equals() check
+//    a. equals true → UPDATE
+//    b. equals false → CHAIN (Linked List, Java 8+: Red-Black Tree if >8 nodes)
+// 6. Load factor (0.75) exceed → RESIZE (double capacity + rehash)
+
+// KEY POINTS:
+// - hashCode() same bucket pe jaata hai
+// - equals() same key identify karta hai within bucket
+// - Java 8+: 8+ nodes in bucket → Red-Black Tree → O(n) to O(log n)
+
+// NULL KEYS: HashMap allows ONE null key (bucket 0)
+
+// CUSTOM KEY — hashCode + equals ZAROOR override karo:
+class Point {
+    int x, y;
+    @Override
+    public int hashCode() { return Objects.hash(x, y); }
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof Point)) return false;
+        Point p = (Point) o;
+        return x == p.x && y == p.y;
+    }
+}
+
+------------------------------------------------------------------------
+Q54. ArrayList vs LinkedList?
+------------------------------------------------------------------------
+
+| Operation        | ArrayList           | LinkedList              |
+|------------------|---------------------|-------------------------|
+| Access (get)     | O(1) - random       | O(n) - sequential       |
+| Add (end)        | O(1) amortized      | O(1)                    |
+| Add (middle)     | O(n) - shift needed | O(1) if node known      |
+| Remove (middle)  | O(n) - shift        | O(1) if node known      |
+| Memory           | Less (array)        | More (node + pointers)  |
+| Cache friendly   | YES (contiguous)    | NO (scattered memory)   |
+
+// USE ArrayList: Most cases — random access needed
+// USE LinkedList: Frequent insert/delete at beginning/middle + no random access
+// REAL WORLD: ArrayList wins 95% cases — cache locality is huge
+
+------------------------------------------------------------------------
+Q55. Comparable vs Comparator?
+------------------------------------------------------------------------
+
+// COMPARABLE — Natural ordering (class khud implement kare)
+class Student implements Comparable<Student> {
+    private String name;
+    private double gpa;
+
+    @Override
+    public int compareTo(Student other) {
+        return Double.compare(this.gpa, other.gpa); // By GPA naturally
+    }
+}
+// Collections.sort(students); // Natural order use karta hai
+
+// COMPARATOR — Custom ordering (external, runtime mein)
+Comparator<Student> byName = Comparator.comparing(Student::getName);
+Comparator<Student> byGpaDesc = Comparator.comparingDouble(Student::getGpa).reversed();
+Comparator<Student> complex = Comparator.comparing(Student::getName)
+    .thenComparingDouble(Student::getGpa);
+
+students.sort(byGpaDesc); // Custom sort
+students.stream().sorted(complex).collect(...);
+
+// WHEN WHICH:
+// Comparable: Class has ONE natural ordering (Integer, String, LocalDate)
+// Comparator: Multiple ways to sort, external class (can't modify), runtime ordering
+
+================================================================================
+SECTION 12: EXCEPTION HANDLING DESIGN
+================================================================================
+
+------------------------------------------------------------------------
+Q56. Checked vs Unchecked Exceptions?
+------------------------------------------------------------------------
+
+// CHECKED — Compiler force karta hai handle karo (catch ya declare)
+// Java ki checked exception policy — controversial
+class FileService {
+    public String readFile(String path) throws IOException { // MUST declare
+        return Files.readString(Path.of(path));
+    }
+}
+// Caller MUST handle: try-catch ya throws declaration
+
+// UNCHECKED (RuntimeException) — Optional handling
+class UserService {
+    public User findUser(Long id) {
+        return userRepository.findById(id)
+            .orElseThrow(() -> new UserNotFoundException(id)); // No throws declaration
+    }
+}
+
+// MODERN BEST PRACTICE (6 yrs exp):
+// 1. Business exceptions = UNCHECKED (extend RuntimeException)
+// 2. Technical exceptions = wrap in unchecked
+// 3. @ControllerAdvice se globally handle karo
+
+// WHY UNCHECKED PREFERRED IN MODERN JAVA:
+// Checked exceptions break abstraction (caller knows implementation detail)
+// Lambda expressions — checked exceptions awkward
+// Spring, Hibernate — RuntimeException based
+
+------------------------------------------------------------------------
+Q57. Custom Exception Design
+------------------------------------------------------------------------
+
+// BASE EXCEPTION:
+public class AppException extends RuntimeException {
+    private final String errorCode;
+    private final HttpStatus httpStatus;
+
+    public AppException(String errorCode, String message, HttpStatus httpStatus) {
+        super(message);
+        this.errorCode = errorCode;
+        this.httpStatus = httpStatus;
+    }
+
+    public AppException(String errorCode, String message, HttpStatus httpStatus, Throwable cause) {
+        super(message, cause);
+        this.errorCode = errorCode;
+        this.httpStatus = httpStatus;
+    }
+}
+
+// SPECIFIC EXCEPTIONS:
+public class UserNotFoundException extends AppException {
+    public UserNotFoundException(Long id) {
+        super("USER_NOT_FOUND", "User not found with id: " + id, HttpStatus.NOT_FOUND);
+    }
+}
+
+public class InsufficientFundsException extends AppException {
+    public InsufficientFundsException(double balance, double amount) {
+        super("INSUFFICIENT_FUNDS",
+            String.format("Insufficient balance: %.2f, required: %.2f", balance, amount),
+            HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+}
+
+// EXCEPTION HIERARCHY:
+// AppException (base)
+//   ├── NotFoundException (404)
+//   │     ├── UserNotFoundException
+//   │     ├── OrderNotFoundException
+//   ├── ConflictException (409)
+//   │     └── UserAlreadyExistsException
+//   ├── ValidationException (400)
+//   └── ServiceUnavailableException (503)
+
+------------------------------------------------------------------------
+Q58. Finally block kab nahi chalta?
+------------------------------------------------------------------------
+
+// 1. System.exit() called
+try { System.exit(0); }
+finally { System.out.println("This never runs!"); }
+
+// 2. JVM crash
+// 3. Thread.stop() (deprecated)
+// 4. Infinite loop / deadlock in try block
+
+// SPECIAL CASE: Return in try + finally
+int getValue() {
+    try {
+        return 1;
+    } finally {
+        return 2; // Finally ka return try ka override karta hai!
+    }
+}
+// Returns 2! Finally ka return statement try ka return override karta hai
+
+------------------------------------------------------------------------
+Q59. Try-with-resources
+------------------------------------------------------------------------
+
+// Pre-Java 7: Manual finally
+Connection conn = null;
+PreparedStatement stmt = null;
+try {
+    conn = getConnection();
+    stmt = conn.prepareStatement(sql);
+    return stmt.executeQuery();
+} finally {
+    if (stmt != null) try { stmt.close(); } catch (Exception e) {}
+    if (conn != null) try { conn.close(); } catch (Exception e) {}
+}
+
+// Java 7+ Try-with-resources: AutoCloseable implement karo
+try (Connection conn = getConnection();
+     PreparedStatement stmt = conn.prepareStatement(sql)) {
+    return stmt.executeQuery();
+    // close() automatically called in REVERSE ORDER — stmt first, then conn
+    // Exception hone pe bhi close() guaranteed
+}
+
+// CUSTOM AUTOCLOSEABLE:
+class DatabaseSession implements AutoCloseable {
+    public DatabaseSession() { System.out.println("Session opened"); }
+
+    @Override
+    public void close() {
+        System.out.println("Session closed"); // Automatically called
+    }
+}
+
+try (DatabaseSession session = new DatabaseSession()) {
+    session.doWork();
+} // close() automatic
+
+================================================================================
+SECTION 13: REAL ARCHITECTURE THINKING
+================================================================================
+
+------------------------------------------------------------------------
+Q60. DTO vs Entity difference?
+------------------------------------------------------------------------
+
+// ENTITY — Database ka representation (JPA managed)
+@Entity @Table(name = "users")
+class UserEntity {
+    @Id @GeneratedValue private Long id;
+    private String name;
+    private String email;
+    private String passwordHash; // NEVER expose in API!
+    @OneToMany private List<OrderEntity> orders;
+    @Column(name = "created_at") private LocalDateTime createdAt;
+}
+
+// DTO — API ka representation (no persistence)
+// REQUEST DTO:
+@Data
+class CreateUserRequest {
+    @NotBlank @Size(min=2, max=50) private String name;
+    @Email @NotBlank private String email;
+    @NotBlank @Size(min=8) private String password; // Raw password — hash before saving
+}
+
+// RESPONSE DTO:
+@Data
+class UserResponse {
+    private Long id;
+    private String name;
+    private String email;
+    // NO passwordHash — security!
+    // NO orders (lazy loading avoid)
+    private LocalDateTime createdAt;
+}
+
+// MAPPING (MapStruct — compile-time, fast):
+@Mapper(componentModel = "spring")
+interface UserMapper {
+    UserResponse toResponse(UserEntity entity);
+    UserEntity toEntity(CreateUserRequest request);
+}
+
+WHY DTO:
+1. Security — internal fields hide karo
+2. API stability — entity change karo → DTO same reh sakta hai
+3. Performance — sirf zaruri fields return karo
+4. Validation — request/response alag validation rules
+
+------------------------------------------------------------------------
+Q61. Idempotency OOP design mein kaise?
+------------------------------------------------------------------------
+
+// IDEMPOTENCY = Same operation multiple times karo → same result (no side effects)
+
+// PATTERN: Idempotency Key
+@Service
+class PaymentService {
+    @Autowired private PaymentRepository paymentRepo;
+
+    public PaymentResult processPayment(PaymentRequest request) {
+        String idempotencyKey = request.getIdempotencyKey(); // Client se aata hai
+
+        // Check if already processed:
+        return paymentRepo.findByIdempotencyKey(idempotencyKey)
+            .map(existing -> {
+                log.info("Duplicate request, returning cached result: {}", idempotencyKey);
+                return existing.toResult(); // Cached result return karo
+            })
+            .orElseGet(() -> {
+                // First time — actually process karo
+                PaymentResult result = doProcessPayment(request);
+                paymentRepo.saveWithIdempotencyKey(idempotencyKey, result); // Save karo
+                return result;
+            });
+    }
+}
+
+================================================================================
+SECTION 14: SPRING + OOP (Highly Asked)
+================================================================================
+// IOC, Bean lifecycle, Singleton/Prototype, AOP, @Transactional, Circular dependency
+// → Sab Spring section mein covered hai with deep explanations
+// Cross-reference: 29Q_Spring_Springboot_answers.txt
+
+================================================================================
+SECTION 15: REAL-WORLD DEBUGGING
+================================================================================
+
+------------------------------------------------------------------------
+Q62. Memory issue kaise debug karte ho?
+------------------------------------------------------------------------
+
+// STEP 1: Symptom identify karo
+// - OutOfMemoryError: Java heap space → Heap full
+// - OutOfMemoryError: Metaspace → Class loading issue
+// - GC overhead limit exceeded → GC 98% time spend kar raha hai
+
+// STEP 2: Heap dump lo
+// -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heap.hprof
+// jmap -dump:live,format=b,file=heap.hprof <pid>
+
+// STEP 3: Analyze
+// Eclipse MAT (Memory Analyzer Tool)
+// VisualVM
+// Dominators tree dekho — kaunsa object zyada memory hold kar raha hai
+
+// COMMON CAUSES:
+// - Unbounded cache
+// - EventListeners not removed
+// - ThreadLocal not cleaned
+// - Static fields growing
+
+------------------------------------------------------------------------
+Q63. Legacy Code kaise refactor karte ho?
+------------------------------------------------------------------------
+
+// STEP BY STEP APPROACH:
+// 1. Tests likhte jao FIRST (characterization tests — current behavior capture)
+// 2. Small, safe changes (Extract Method, Rename, Move)
+// 3. Each change ke baad tests run karo
+// 4. Gradually improve
+
+// BOY SCOUT RULE: "Leave the code better than you found it"
+// Refactor as you go — dedicated refactoring sprints nahi
+
+================================================================================
+SECTION 16: ULTRA-TRICKY (SENIOR LEVEL)
+================================================================================
+
+------------------------------------------------------------------------
+Q64. Multiple Inheritance Java mein?
+------------------------------------------------------------------------
+
+// CLASS level: NOT ALLOWED (Diamond problem)
+// INTERFACE level: ALLOWED
+
+// DIAMOND PROBLEM SOLUTION (if same default method):
+interface A { default void greet() { System.out.println("A"); } }
+interface B extends A { default void greet() { System.out.println("B"); } }
+
+class C implements A, B {
+    @Override
+    public void greet() {
+        B.super.greet(); // Explicitly resolve — B ka use karo
+    }
+}
+
+------------------------------------------------------------------------
+Q65. Static Blocks Execution Order?
+------------------------------------------------------------------------
+
+// ORDER: Static blocks → Instance blocks → Constructor
+// Parent pehle, Child baad mein
+
+class Parent {
+    static { System.out.println("1. Parent static block"); }
+    { System.out.println("3. Parent instance block"); }
+    Parent() { System.out.println("4. Parent constructor"); }
+}
+
+class Child extends Parent {
+    static { System.out.println("2. Child static block"); }
+    { System.out.println("5. Child instance block"); }
+    Child() { System.out.println("6. Child constructor"); }
+}
+
+// new Child() OUTPUT:
+// 1. Parent static block (class load pe once)
+// 2. Child static block (class load pe once)
+// 3. Parent instance block
+// 4. Parent constructor
+// 5. Child instance block
+// 6. Child constructor
+
+------------------------------------------------------------------------
+Q66. Interface mein Constructor possible hai?
+------------------------------------------------------------------------
+
+// NO — Interface ka no instance state hoti, constructor ka koi kaam nahi
+// Interface ek contract hai, objects create nahi karta
+// Default/static methods hain but constructor allowed nahi
+
+------------------------------------------------------------------------
+Q67. Reflection kya hota hai?
+------------------------------------------------------------------------
+
+// REFLECTION = Runtime pe class ka structure inspect karo aur manipulate karo
+
+import java.lang.reflect.*;
+
+Class<?> clazz = User.class;
+
+// Fields inspect karo:
+Field[] fields = clazz.getDeclaredFields();
+for (Field field : fields) {
+    System.out.println(field.getName() + ": " + field.getType());
+}
+
+// Private field access karo:
+Field nameField = clazz.getDeclaredField("name");
+nameField.setAccessible(true); // Private bypass karo
+User user = new User("Prashant");
+String name = (String) nameField.get(user); // Read private field!
+
+// Method invoke karo:
+Method method = clazz.getDeclaredMethod("privateMethod", String.class);
+method.setAccessible(true);
+Object result = method.invoke(user, "arg"); // Call private method
+
+// USES:
+// Spring: Dependency injection, AOP
+// JUnit: Test framework (private method access)
+// JSON libraries: Jackson object serialization/deserialization
+// ORM: Hibernate entity mapping
+
+// DRAWBACKS:
+// Performance (slower than direct call)
+// Security (private bypass)
+// Compile-time safety gone
+// IDE refactoring breaks it
+
+------------------------------------------------------------------------
+Q68. Serialization vs Externalizable?
+------------------------------------------------------------------------
+
+// SERIALIZATION (java.io.Serializable):
+// - JVM automatically serialize/deserialize karta hai
+// - Private fields bhi serialize hote hain (unless transient)
+// - serialVersionUID define karo — compatibility
+
+@Entity
+public class User implements Serializable {
+    private static final long serialVersionUID = 1L; // Version control!
+    private Long id;
+    private String name;
+    private transient String password; // EXCLUDE from serialization — sensitive!
+    // transient = not serialized
+}
+
+// EXTERNALIZABLE (implements Externalizable):
+// - Manual control over serialization — tum decide karo kya serialize karo
+// - Constructor call hota hai deserialization pe (Serializable mein nahi)
+// - Better performance (sirf zaruri fields)
+
+class Config implements Externalizable {
+    private String key;
+    private String value;
+    private String secretKey; // Don't serialize
+
+    @Override
+    public void writeExternal(ObjectOutput out) throws IOException {
+        out.writeObject(key);   // Manually write what you want
+        out.writeObject(value);
+        // secretKey deliberately skipped
+    }
+
+    @Override
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        this.key = (String) in.readObject();
+        this.value = (String) in.readObject();
+    }
+}
+
+// transient keyword:
+// - Serialization se exclude karo
+// - Common: passwords, connections, loggers, caches
+
+------------------------------------------------------------------------
+Q69. transient keyword
+------------------------------------------------------------------------
+
+class UserSession implements Serializable {
+    private String userId;
+    private transient String authToken;     // Sensitive — serialize mat karo
+    private transient Connection dbConn;    // Connection — recreate after deserialization
+    private transient Logger log = LoggerFactory.getLogger(getClass()); // Logger
+
+    // After deserialization — transient fields null/default honge
+    // readObject() implement karo agar re-initialize karna ho:
+    private void readObject(ObjectInputStream ois) throws Exception {
+        ois.defaultReadObject(); // Default deserialization
+        this.log = LoggerFactory.getLogger(getClass()); // Reinitialize logger
+    }
+}
+
+================================================================================
+WHAT'S MISSING — OOP (6 YRS EXP)
+================================================================================
+
+1. RECORDS (Java 14+) — Immutable data carriers
+   record Point(int x, int y) {}
+
+2. SEALED CLASSES (Java 17) — Controlled inheritance
+   sealed interface Shape permits Circle, Rectangle, Triangle {}
+
+3. PATTERN MATCHING (Java 16+)
+   if (obj instanceof String s) { /* use s directly */ }
+   switch (shape) { case Circle c -> ...; case Rectangle r -> ...; }
+
+4. TEXT BLOCKS (Java 15+)
+   String json = """
+       {"name": "Prashant"}
+       """;
+
+5. VAR (Java 10+) — Local type inference
+   var list = new ArrayList<String>(); // Type inferred
+
+6. OPTIONAL best practices
+   Optional.of(), Optional.empty(), flatMap, orElseGet vs orElse
+
+7. STREAM API deep dive
+   reduce, flatMap, Collectors, parallel streams
+
+// OPTIONAL BEST PRACTICES:
+Optional<User> user = userRepo.findById(id);
+
+// BAD:
+if (user.isPresent()) { user.get().getName(); } // Anti-pattern — isPresent + get
+
+// GOOD:
+String name = user.map(User::getName).orElse("Unknown");
+user.ifPresent(u -> emailService.sendWelcome(u));
+User u = user.orElseThrow(() -> new UserNotFoundException(id));
+
+// Sealed classes example (Java 17):
+sealed interface PaymentResult permits SuccessResult, FailureResult, PendingResult {}
+record SuccessResult(String transactionId) implements PaymentResult {}
+record FailureResult(String reason) implements PaymentResult {}
+
+// Pattern matching:
+String message = switch(result) {
+    case SuccessResult s -> "Paid: " + s.transactionId();
+    case FailureResult f -> "Failed: " + f.reason();
+    case PendingResult p -> "Processing...";
+};
+
+================================================================================
+QUICK CHEAT SHEET — OOP
+================================================================================
+
+CONCEPT                         → KEY POINT
+------------------------------    -----------------------------------------------
+4 Pillars                       → Encapsulation, Inheritance, Polymorphism, Abstraction
+Encapsulation                   → Private fields + controlled access
+Abstraction                     → Interface/Abstract class — "what" not "how"
+Runtime polymorphism            → vtable → dynamic dispatch
+Composition vs Inheritance      → Prefer composition (HAS-A > IS-A mostly)
+equals + hashCode               → Same fields, both or neither override
+Immutable class                 → final class + final fields + defensive copy
+Pass by value                   → Always — object reference copy, not object
+SOLID — S                       → One class, one responsibility
+SOLID — O                       → Extend without modify
+SOLID — L                       → Subclass = safe substitution for parent
+SOLID — I                       → Small specific interfaces
+SOLID — D                       → Depend on abstractions
+Strategy                        → Runtime algorithm swap (composition)
+Template Method                 → Fixed algorithm, variable steps (inheritance)
+Builder                         → Complex object construction
+Observer                        → Event-driven (Kafka = distributed observer)
+Decorator                       → Add behavior (wrapping)
+Proxy                           → Control access (Spring AOP)
+HashMap                         → hashCode → bucket, equals → key, tree @8+
+Checked vs Unchecked            → Unchecked preferred in modern Java
+DTO vs Entity                   → Separate concerns, security, stability
+LSP                             → No UnsupportedOperationException in subclass
+God class                       → Extract multiple classes (SRP)
+
+================================================================================
+END OF DOCUMENT
+Written for: 6 Years Java Backend Developer — OOP + Java Deep Dive + Design Patterns
+================================================================================

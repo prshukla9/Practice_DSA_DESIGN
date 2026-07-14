@@ -1,0 +1,272 @@
+Software Developer | Nov 2025 - Present
+EPAM | Bengaluru
+Designing and developing scalable healthcare microservices for patient and doctor workflows, integrating FHIR-based interoperable data exchange and AI-driven capabilities for intelligent query handling and decision support.
+â— Designed and developed Spring Boot-based microservices for patient management and doctor availability in a distributed architecture
+â— Implemented FHIR-based interoperable data exchange to enable secure and standardized sharing of patient health records across systems
+â— Developed HIPAA-compliant patient consent management workflows for secure access to sensitive healthcare data
+â— Designed and implemented Kafka-based event-driven architecture for real-time updates and notifications
+â— Built AI-powered assistant using OpenAI APIs to handle patient and doctor queries with natural language interaction
+â— Implemented semantic search using pgvector and designed context-aware prompt pipelines to improve response accuracy and relevance
+â— Optimized high-traffic APIs, reducing latency by 200ms and improving response time by 30%
+
+
+
+Software Developer | Apr 2024 â€“ Oct 2025
+Blue Yonder | Bengaluru
+â— Developed and deployed RESTful microservices using Spring Boot, ensuring modularity, scalability, and ease of maintenance across multiple components.
+â— Implemented Kafka-based asynchronous communication between services to handle high-volume event-driven data processing and ensure real-time data consistency.
+â— Enhanced API functionality to improve system performance and ensure seamless integration with client-facing applications. Resolved P1 production issues, improving system reliability and, and ensuring a smooth user experience.
+â— Conducted JMeter and PSR load testing, optimizing server performance by identifying and resolving bottlenecks.
+â— Collaborated on the materialization process, significantly improving data processing speed and efficiency.
+â— Designed event-driven architecture using Kafka.
+â— Handled async processing and data consistency.
+
+
+--------------------------------------------------------------------------------
+NOTE â€” Project scope (questions isi basis pe):
+  EPAM: FHIR document exchange + Consent + AI search + Kafka
+  BY:   order / inventory / materialization + Kafka + async consistency
+  âŒ No appointment / scheduling / doctor availability in answers
+--------------------------------------------------------------------------------
+
+
+SECTION 1: Microservices Design (Project Based â€” 6 YOE)
+Tumne microservices ka breakdown kaise kiya? (consent, fhir-sync, ai-assistant, notification)
+Service boundaries decide kaise kiye? (DDD / bounded context)
+Kaunsa service kis data ka owner hai? Database-per-service follow kiya?
+Microservices ke beech communication kaise hota hai?
+Sync vs async calls kaha use kiye aur kyun?
+Tight coupling avoid kaise kiya system me?
+Ek service deploy karo bina doosri ko break kiye â€” kaise ensure kiya?
+Shared library vs independent services â€” tumne kya approach liya?
+ðŸ‘‰ Killer: "Agar consent-service down ho jaye to FHIR document access ka kya hoga?"
+ðŸ‘‰ Killer: "Microservices me distributed transaction kaise handle kiya?"
+
+
+âš™ï¸ SECTION 2: API & Workflow Design (6 YOE)
+FHIR document sharing flow explain karo end-to-end (request â†’ consent â†’ fetch â†’ deliver)
+FHIR document receiving flow explain karo (external system se data aana)
+REST API design kaise kiya? (REST best practices, resource naming)
+Kaunse APIs develop kiye? Example endpoints batao
+Versioning kaise handle ki?
+Validation aur error handling kaise implement ki?
+Idempotent APIs kaise design ki? (document share / FHIR sync)
+Consent check har API pe kaise enforce kiya?
+
+
+ðŸ”¥ SECTION 3: Kafka (MOST IMPORTANT ðŸ’¥)
+Apache Kafka ka use kaha aur kyun kiya?
+Real event flow explain karo (consent-revoked / document-received example)
+Producer-consumer design kaise kiya?
+Topic aur partition kaise decide kiye?
+Message ordering kaise maintain ki?
+Kaunse topics use kiye? (consent-events, document-events, fhir-sync-events)
+
+
+âš¡ SECTION 4: Kafka Advanced (6 YOE level)
+Duplicate message processing kaise handle kiya?
+Consumer lag kaise monitor kiya?
+Offset management kaise kiya (auto vs manual)?
+Exactly-once vs at-least-once â€” tumne kya use kiya?
+Kafka failure scenario (broker down) me system kaise behave karta hai?
+Outbox pattern use kiya? Explain karo
+Dead Letter Queue (DLQ) kaise implement kiya?
+Kafka payload me PHI / sensitive data kaise handle kiya?
+
+
+ðŸ§© SECTION 5: Event-Driven Architecture
+Event-driven architecture ka benefit kya mila?
+Direct REST vs Kafka â€” kab kya use kiya?
+Retry mechanism kaise implement kiya?
+Event schema change ho jaye to kaise handle kiya?
+Kafka + DB consistency kaise maintain ki?
+
+
+ðŸ¥ SECTION 6: Healthcare Use Case (EPAM USP ðŸ’¥)
+FHIR document exchange me Kafka ka role kya tha?
+Naya FHIR document receive hone par system me kya flow hota hai?
+Consent revoke hone par downstream services ka kya behavior hota hai?
+Data consistency kaise maintain ki across services?
+External FHIR system unavailable ho to retry / fallback strategy?
+
+
+ðŸ­ SECTION 7: Blue Yonder â€” Microservices + Kafka (6 YOE)
+Blue Yonder me microservices ka breakdown? (order, inventory, materialization, notification)
+Service boundaries supply chain domain me kaise decide kiye?
+REST sync kab use kiya? Kafka async kab? Real example batao
+Kaunse events publish hote the? (order-created, inventory-updated, materialization-trigger)
+Materialization flow me Kafka ka role?
+At-least-once delivery â€” duplicate handle kaise kiya?
+Kafka down ho jaye to Blue Yonder system ka behavior?
+Real-time data consistency async flow me kaise ensure ki?
+
+
+ðŸš€ SECTION 8: Real Production Scenarios
+Kafka delay ho jaye to system kaise handle karega?
+Consumer slow ho jaye to kya karoge?
+High load me message backlog kaise handle kiya?
+P1 issue ka example batao (Kafka / microservices / FHIR sync)
+End-to-end latency kaise measure ki (API â†’ Kafka â†’ consumer)?
+
+
+ðŸ’£ Interviewer Killer Questions (Pakke aayenge)
+
+ðŸ‘‰ "Agar same consent-revoked event multiple baar process ho jaye to?"
+ðŸ‘‰ "Kafka hata ke REST use karte to FHIR sync me kya hota?"
+ðŸ‘‰ "FHIR data inconsistent ho jaye to kaise fix karoge?"
+ðŸ‘‰ "Consent revoke + running FHIR fetch â€” race condition kaise handle kiya?"
+ðŸ‘‰ "Blue Yonder me Kafka hata ke sirf REST â€” kya problem aati?"
+ðŸ‘‰ "High volume event burst aaye â€” Kafka + consumers kaise handle karenge?"
+
+
+ðŸ’¡ Perfect Example Answer (Use this ðŸ’¥)
+
+ðŸ‘‰
+"Humne Kafka use kiya loosely coupled communication ke liye, jahan consent-revoked aur document-received
+ events publish hote the aur downstream services jaise fhir-sync, ai-assistant aur notification asynchronously
+ consume karti thi. Idempotent consumers use karke duplicate processing avoid kiya aur lag monitor karke
+ scaling decisions liye."
+
+
+------------------------------------------------------------------------------
+
+Additional questions â€” Kafka (Project-Based Interview Q&A)
+
+1. Kafka use kyun kiya?
+
+ðŸ‘‰
+"FHIR document sync, consent propagation aur notifications ke liye async decoupling. External FHIR calls
+ slow/unreliable â€” Kafka buffer karta hai, retry aur replay possible."
+
+2. Real event flow â€” Consent Revoked
+
+ðŸ‘‰
+"Patient consent revoke karta hai â†’ consent-service DB update â†’ Kafka consent-events topic â†’
+ fhir-sync active syncs stop + cache clear â†’ ai-assistant context remove â†’ notification audit alert."
+
+3. Real event flow â€” Document Received
+
+ðŸ‘‰
+"fhir-sync external se DocumentReference fetch â†’ DB + S3 save â†’ Kafka document-events â†’
+ ai-assistant chunk + embed + pgvector store â†’ notification 'New lab results available'."
+
+4. Topic aur partition kaise decide kiye?
+
+ðŸ‘‰
+High throughput (document-events) â†’ more partitions (12)
+Ordering per patient â†’ partition key = patientId
+Consumer count â‰¤ partition count
+Replication factor 3 for production
+
+5. Duplicate messages kaise handle kiye?
+
+ðŸ‘‰
+Idempotent consumer
+processed_event_id store kiya (DB/Redis)
+Same eventId aaye â†’ skip, commit offset
+
+6. Exactly-once vs At-least-once
+
+ðŸ‘‰
+"Humne at-least-once use kiya kyunki exactly-once costly hai. Idempotency se duplicate safe end state."
+
+7. Kafka + DB consistency kaise handle ki?
+
+ðŸ‘‰ BEST ANSWER ðŸ’¥
+Outbox pattern â€” consent update + event same DB transaction me
+Outbox worker Kafka publish karta hai
+Retry + DLQ for failures
+
+8. Consumer lag kaise monitor kiya?
+
+ðŸ‘‰
+CloudWatch MSK metrics (EstimatedMaxTimeLag)
+Lag > 5 min â†’ alarm â†’ scale consumers (max = partitions)
+
+9. Kafka delay ho jaye to impact?
+
+ðŸ‘‰
+consent-revoked delayed â†’ security risk (P1 monitor)
+FHIR sync delayed â†’ stale documents (short-term OK)
+Notification delayed â†’ low impact
+
+10. Broker fail ho jaye to?
+
+ðŸ‘‰
+Replication factor 3 â†’ leader election â†’ auto reconnect â†’ no data loss
+
+11. Retry + DLQ kaise implement kiya?
+
+ðŸ‘‰
+3 retries exponential backoff (2s, 5s, 15s)
+Fail â†’ DLQ topic â†’ manual reprocess after fix
+
+12. Real production scenario (IMPORTANT ðŸ’£)
+
+ðŸ‘‰
+"Consumer lag spike on document-events â€” large PDF indexing OOM. Fixed stream processing +
+ chunk limit, scaled consumers 2â†’6, backlog cleared in 2 hours."
+
+13. Kafka vs REST kab use kiya?
+
+ðŸ‘‰
+Sync REST â†’ consent check, FHIR fetch response to user waiting on UI
+Async Kafka â†’ consent propagate, document indexing, notifications, bulk sync
+
+14. Real project summary answer ðŸ’¥
+
+ðŸ‘‰
+"Kafka use kiya FHIR document sync aur consent event propagation ke liye. Consent-revoked events
+ downstream services ko instantly inform karti hain. Idempotent consumers + outbox + lag monitoring
+ se system reliable aur HIPAA-compliant raha."
+
+
+------------------------------------------------------------------------------
+
+Additional â€” Blue Yonder Kafka Q&A
+
+1. BY me Kafka kahan?
+
+ðŸ‘‰
+"Order create â†’ inventory update â†’ materialization-trigger. High-volume decoupled processing."
+
+2. Materialization event flow?
+
+ðŸ‘‰
+"order-created â†’ inventory-service deduct stock â†’ materialization-trigger â†’ materialization-service
+ compute snapshot â†’ Redis cache â†’ client GET /inventory/snapshot fast response."
+
+3. Duplicate inventory update?
+
+ðŸ‘‰
+"Idempotent consumer â€” eventId check before stock deduct."
+
+4. Kafka vs REST at BY?
+
+ðŸ‘‰
+"REST for order validation sync response. Kafka for inventory update + materialization â€” peak load absorb."
+"}},{"type":"tool_use","name":"Write","input":{"path":"d:\RR_OPenToRelocate\LoveInThings\Practice_DSA_DESIGN\InterviewReady\29Q_Project_related_AI.txt","contents":"Software Developer | Nov 2025 - Present
+EPAM | Bengaluru
+Designing and developing scalable healthcare microservices for patient and doctor workflows, integrating FHIR-based interoperable data exchange and AI-driven capabilities for intelligent query handling and decision support.
+â— Designed and developed Spring Boot-based microservices for patient management and doctor availability in a distributed architecture
+â— Implemented FHIR-based interoperable data exchange to enable secure and standardized sharing of patient health records across systems
+â— Developed HIPAA-compliant patient consent management workflows for secure access to sensitive healthcare data
+â— Designed and implemented Kafka-based event-driven architecture for real-time updates and notifications
+â— Built AI-powered assistant using OpenAI APIs to handle patient and doctor queries with natural language interaction
+â— Implemented semantic search using pgvector and designed context-aware prompt pipelines to improve response accuracy and relevance
+â— Optimized high-traffic APIs, reducing latency by 200ms and improving response time by 30%
+
+
+
+Software Developer | Apr 2024 â€“ Oct 2025
+Blue Yonder | Bengaluru
+â— Developed and deployed RESTful microservices using Spring Boot, ensuring modularity, scalability, and ease of maintenance across multiple components.
+â— Implemented Kafka-based asynchronous communication between services to handle high-volume event-driven data processing and ensure real-time data consistency.
+â— Enhanced API functionality to improve system performance and ensure seamless integration with client-facing applications. Resolved P1 production issues, improving system reliability and, and ensuring a smooth user experience.
+â— Conducted JMeter and PSR load testing, optimizing server performance by identifying and resolving bottlenecks.
+â— Collaborated on the materialization process, significantly improving data processing speed and efficiency.
+â— Designed event-driven architecture using Kafka.
+â— Handled async processing and data consistency.
+
+
+--------------------------------------------------------------------------------

@@ -1,0 +1,894 @@
+================================================================================
+  PROJECT Q&A — CODE FOCUS | EPAM HEALTHCARE + BLUE YONDER
+  6 Years Java Backend | Interview-Ready Implementations
+  Hinglish + Full Code + Comment Every Line
+================================================================================
+
+PRIORITY GUIDE:
+  🔥🔥🔥 MOST IMPORTANT  — Har interview mein aayega, yaad karo
+  🔥🔥   IMPORTANT       — 60-70% interviews mein aata hai
+  🔥     READ ME         — Deep dive ya niche companies
+
+================================================================================
+SECTION A: 🔥🔥🔥 MOST IMPORTANT — PEHLE YEH PAKAO
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A1. PROJECT INTRODUCTION SCRIPTS (30-60 sec — mukhzabaani yaad karo)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EPAM (Current):
+"EPAM mein ek healthcare platform pe kaam kar raha hoon — patients aur doctors ke
+workflows. Architecture Spring Boot microservices hai — patient management, doctor
+availability, AI query service — sab Kafka ke through communicate karte hain.
+Interesting challenge: AI assistant banaya OpenAI + pgvector se — patient apne medical
+records ke baare mein natural language mein pooch sakta hai, RAG pipeline use karke
+accurate answers milte hain. APIs optimize ki — 200ms latency reduce aur 30% response
+improvement achieve kiya."
+
+BLUE YONDER (Previous):
+"Blue Yonder mein supply chain microservices — Spring Boot REST APIs, Kafka event-driven
+architecture for high-volume data processing. Key work: Materialization process —
+pre-computed aggregates for fast query performance. JMeter + PSR load testing kiya —
+bottlenecks identify aur fix kiye. Ek P1 production incident resolve kiya — idempotency
+bug tha jo duplicate order allocations create kar raha tha."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A2. KAFKA PRODUCER CONFIG — YEH CODE HAMESHA PUCHA JAATA HAI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@Configuration
+public class KafkaProducerConfig {
+
+    @Bean
+    public ProducerFactory<String, Object> producerFactory() {
+        Map<String, Object> config = new HashMap<>();
+
+        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrap);
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+
+        // acks=all → Leader + ALL in-sync replicas acknowledge karo tabhi success
+        // acks=0 → fire and forget (data loss possible)
+        // acks=1 → sirf leader (replica lag mein data loss possible)
+        // Healthcare mein HIPAA compliance → acks=all mandatory
+        config.put(ProducerConfig.ACKS_CONFIG, "all");
+
+        // Idempotent producer = network retry pe duplicate message nahi banega
+        // Producer sequence number maintain karta hai → Kafka duplicate detect karta hai
+        config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+
+        // Transient failure pe retry karo (network blip, leader election)
+        config.put(ProducerConfig.RETRIES_CONFIG, 3);
+        config.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 1000); // 1 second gap
+
+        // Batching: 16KB ya 5ms — jo pehle ho uske baad batch flush
+        // Multiple messages = 1 network call → throughput improve
+        config.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);
+        config.put(ProducerConfig.LINGER_MS_CONFIG, 5);
+
+        // Snappy compression: CPU-efficient, ~30-40% size reduction
+        config.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "snappy");
+
+        return new DefaultKafkaProducerFactory<>(config);
+    }
+
+    @Bean
+    public KafkaTemplate<String, Object> kafkaTemplate() {
+        return new KafkaTemplate<>(producerFactory());
+    }
+}
+
+// HOW TO SEND with partition key (patient ordering guarantee):
+@Service
+public class EventPublisher {
+
+    @Autowired KafkaTemplate<String, Object> kafkaTemplate;
+
+    public void publishLabReport(String patientId, LabReportCreatedEvent event) {
+        // KEY = patientId → Same patient ke events hamesha same partition mein jaayenge
+        // Same partition → Same consumer → ORDER GUARANTEE for this patient!
+        kafkaTemplate.send("lab-report-created", patientId, event)
+            .whenComplete((result, ex) -> {
+                if (ex != null) {
+                    log.error("Failed to publish event for patient: {}", patientId, ex);
+                    // TODO: Outbox table mein mark karo for retry
+                } else {
+                    log.info("Published to partition: {}, offset: {}",
+                        result.getRecordMetadata().partition(),
+                        result.getRecordMetadata().offset());
+                }
+            });
+    }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A3. KAFKA CONSUMER CONFIG + MANUAL COMMIT + DLQ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@Configuration
+public class KafkaConsumerConfig {
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, Object>
+            kafkaListenerContainerFactory(
+                ConsumerFactory<String, Object> cf,
+                KafkaTemplate<String, Object> kt) {
+
+        var factory = new ConcurrentKafkaListenerContainerFactory<String, Object>();
+        factory.setConsumerFactory(cf);
+
+        // 4 concurrent consumers in this JVM (match partition count ideally)
+        factory.setConcurrency(4);
+
+        // MANUAL_IMMEDIATE: ack.acknowledge() call karo explicitly
+        // AUTO commit mat karo — processing fail hone pe message wapas aana chahiye
+        factory.getContainerProperties().setAckMode(
+            ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+
+        // Dead Letter Queue: 3 retries fail hone pe DLQ topic mein bhejo
+        // FixedBackOff: 2 second gap, max 3 attempts
+        factory.setCommonErrorHandler(new DefaultErrorHandler(
+            new DeadLetterPublishingRecoverer(kt,
+                (record, ex) -> new TopicPartition(
+                    record.topic() + ".DLT", record.partition())),
+            new FixedBackOff(2000L, 3)
+        ));
+
+        return factory;
+    }
+}
+
+// application.yml consumer settings:
+// spring.kafka.consumer.enable-auto-commit: false
+// spring.kafka.consumer.auto-offset-reset: earliest
+// spring.kafka.consumer.max-poll-records: 10
+// spring.kafka.consumer.max-poll-interval-ms: 300000   # 5 min for AI embedding
+// spring.kafka.consumer.session-timeout-ms: 30000
+// spring.kafka.consumer.heartbeat-interval-ms: 10000
+
+// CONSUMER WITH IDEMPOTENCY + MANUAL ACK:
+@Service
+public class LabReportConsumer {
+
+    @KafkaListener(
+        topics = "lab-report-created",
+        groupId = "ai-indexing-group",
+        containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void handleLabReport(
+            LabReportCreatedEvent event,
+            Acknowledgment ack,                        // Manual ack inject
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset) {
+
+        log.info("Received event: {}, partition: {}, offset: {}",
+            event.getEventId(), partition, offset);
+
+        // IDEMPOTENCY: Duplicate event check karo
+        if (processedEventRepo.existsByEventId(event.getEventId())) {
+            log.info("Duplicate event skipped: {}", event.getEventId());
+            ack.acknowledge(); // Offset commit karo — dobara mat process karo
+            return;
+        }
+
+        try {
+            // ACTUAL WORK: Lab report embed + index in pgvector
+            indexingService.indexLabReport(event.getReportId());
+
+            // Mark as processed (before ack — idempotent)
+            processedEventRepo.save(new ProcessedEvent(event.getEventId()));
+
+            // SUCCESS: Commit offset — message processed successfully
+            ack.acknowledge();
+
+        } catch (Exception e) {
+            log.error("Processing failed for: {}", event.getEventId(), e);
+            // DON'T call ack → Kafka will retry
+            // After 3 retries → DefaultErrorHandler sends to DLQ
+            throw e;
+        }
+    }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A4. IDEMPOTENT CONSUMER — FULL PATTERN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// Processed events table — idempotency store
+@Entity
+@Table(name = "processed_events",
+    uniqueConstraints = @UniqueConstraint(columnNames = "event_id")) // UNIQUE!
+public class ProcessedEvent {
+    @Id @GeneratedValue private Long id;
+
+    @Column(name = "event_id", nullable = false, unique = true)
+    private String eventId;          // UUID from Kafka message
+
+    private String topic;
+    private Instant processedAt;
+    private String consumerGroup;
+}
+
+// Blue Yonder P1 fix — idempotency for order allocation:
+@Service
+public class OrderAllocationService {
+
+    @KafkaListener(topics = "order-allocation-requested")
+    @Transactional
+    public void processOrderAllocation(OrderAllocationEvent event, Acknowledgment ack) {
+        String idempotencyKey = event.getOrderId() + "_" + event.getAllocationId();
+
+        // PREVENT DUPLICATE ALLOCATION — database unique constraint
+        if (allocationRepo.existsByIdempotencyKey(idempotencyKey)) {
+            log.warn("Duplicate allocation ignored. Key: {}", idempotencyKey);
+            ack.acknowledge();
+            return;
+        }
+
+        // Process allocation
+        Allocation allocation = Allocation.builder()
+            .orderId(event.getOrderId())
+            .warehouseId(event.getWarehouseId())
+            .quantity(event.getQuantity())
+            .idempotencyKey(idempotencyKey)  // Store key
+            .build();
+
+        allocationRepo.save(allocation);  // Unique constraint prevents duplicate
+        inventoryService.reserve(event.getWarehouseId(), event.getQuantity());
+
+        ack.acknowledge();
+    }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A5. OUTBOX PATTERN — DB + KAFKA CONSISTENCY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// WITHOUT OUTBOX — PROBLEM:
+// DB save ho gaya, Kafka publish fail → DATA INCONSISTENCY!
+@Transactional
+public void createAppointment(AppointmentRequest req) {
+    appointmentRepo.save(appointment);         // DB save ✅
+    kafkaTemplate.send("appointment-created"); // Kafka fail ❌ → INCONSISTENCY!
+}
+
+// WITH OUTBOX PATTERN — SOLUTION:
+@Entity
+public class OutboxEvent {
+    @Id private String id = UUID.randomUUID().toString();
+    private String topic;       // Kafka topic name
+    private String messageKey;  // Partition key
+    private String payload;     // JSON serialized event
+    private String status;      // PENDING, PUBLISHED, FAILED
+    private Instant createdAt = Instant.now();
+    private int retryCount = 0;
+}
+
+@Service
+public class AppointmentService {
+
+    @Transactional // ONE TRANSACTION for both saves!
+    public Appointment createAppointment(AppointmentRequest req) {
+        Appointment appt = appointmentRepo.save(buildAppointment(req));
+
+        // Save Kafka event in SAME DB transaction — atomic!
+        // If DB commits → outbox event also committed → Kafka publish guaranteed
+        // If DB rollbacks → outbox also rolls back → No phantom events
+        outboxRepo.save(OutboxEvent.builder()
+            .topic("appointment-created")
+            .messageKey(req.getPatientId())
+            .payload(objectMapper.writeValueAsString(
+                AppointmentCreatedEvent.from(appt)))
+            .status("PENDING")
+            .build());
+
+        return appt;
+    }
+}
+
+// Outbox publisher — separate scheduled process:
+@Component
+public class OutboxPublisher {
+
+    @Scheduled(fixedDelay = 1000) // Every second poll
+    @Transactional
+    public void publishPendingEvents() {
+        // Fetch PENDING events — max 50 at a time
+        List<OutboxEvent> pending = outboxRepo
+            .findTop50ByStatusOrderByCreatedAtAsc("PENDING");
+
+        for (OutboxEvent event : pending) {
+            try {
+                // Publish to Kafka
+                kafkaTemplate.send(
+                    event.getTopic(),
+                    event.getMessageKey(),
+                    event.getPayload()
+                ).get(5, TimeUnit.SECONDS); // Wait for ack
+
+                event.setStatus("PUBLISHED");
+
+            } catch (Exception e) {
+                event.setRetryCount(event.getRetryCount() + 1);
+                if (event.getRetryCount() >= 5) {
+                    event.setStatus("FAILED"); // Alert ops team
+                }
+                log.error("Failed to publish outbox event: {}", event.getId(), e);
+            }
+            outboxRepo.save(event);
+        }
+    }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A6. CIRCUIT BREAKER — RESILIENCE4J
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// application.yml:
+resilience4j:
+  circuitbreaker:
+    instances:
+      doctor-service:
+        slidingWindowSize: 10           # Last 10 calls monitor karo
+        failureRateThreshold: 50        # 50% failure → OPEN state
+        waitDurationInOpenState: 30s    # 30s baad HALF-OPEN try karo
+        permittedNumberOfCallsInHalfOpenState: 3  # 3 test calls
+        slowCallDurationThreshold: 3s   # 3s+ = slow call
+        slowCallRateThreshold: 80       # 80% slow → also OPEN
+  retry:
+    instances:
+      openai-service:
+        maxAttempts: 3
+        waitDuration: 2s
+        retryExceptions:
+          - java.net.SocketTimeoutException
+          - org.springframework.web.client.ResourceAccessException
+
+@Service
+public class DoctorAvailabilityService {
+
+    @CircuitBreaker(name = "doctor-service", fallbackMethod = "fallbackAvailability")
+    @Retry(name = "doctor-service")
+    public DoctorAvailability getDoctorAvailability(String doctorId) {
+        return doctorServiceClient.getAvailability(doctorId); // Feign call
+    }
+
+    // FALLBACK: Doctor service DOWN hone pe cached data return karo
+    // Method signature same hona chahiye + Exception parameter
+    public DoctorAvailability fallbackAvailability(String doctorId, Exception ex) {
+        log.warn("Doctor service unavailable. Returning cached data for: {}", doctorId);
+        return redisCache.get("doctor:availability:" + doctorId)
+            .orElse(DoctorAvailability.unavailable("Service temporarily unavailable"));
+    }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A7. HIPAA AOP AUDIT LOGGING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// Custom annotation:
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface HipaaAudit {
+    String action();
+    String resource();
+}
+
+// AOP Aspect — cross-cutting concern:
+@Aspect
+@Component
+public class HipaaAuditAspect {
+
+    @Around("@annotation(hipaaAudit)")
+    public Object audit(ProceedingJoinPoint pjp, HipaaAudit hipaaAudit)
+            throws Throwable {
+
+        // Who is accessing? From Spring Security context
+        String userId = SecurityContextHolder.getContext()
+            .getAuthentication().getName();
+
+        AuditLog auditLog = AuditLog.builder()
+            .userId(userId)
+            .action(hipaaAudit.action())      // "READ_PATIENT_RECORD"
+            .resource(hipaaAudit.resource())  // "Patient"
+            .timestamp(Instant.now())
+            .ipAddress(getClientIp())
+            .build();
+
+        try {
+            Object result = pjp.proceed();  // Actual method execute
+            auditLog.setSuccess(true);
+            return result;
+        } catch (Exception e) {
+            auditLog.setSuccess(false);
+            auditLog.setErrorMessage(e.getClass().getSimpleName()); // No PHI in error!
+            throw e;
+        } finally {
+            // ALWAYS log — success aur failure dono
+            // Async save — don't block main request
+            CompletableFuture.runAsync(() -> auditLogRepo.save(auditLog));
+
+            // Also publish to Kafka → S3 archival for 7 year HIPAA retention
+            kafkaTemplate.send("audit-events", userId, auditLog);
+        }
+    }
+}
+
+// Usage — sirf annotation lagao:
+@Service
+public class PatientService {
+
+    @HipaaAudit(action = "READ_PATIENT_RECORD", resource = "Patient")
+    public PatientDTO getPatient(String patientId) {
+        return patientRepo.findById(patientId).orElseThrow();
+    }
+
+    @HipaaAudit(action = "UPDATE_PATIENT_CONSENT", resource = "PatientConsent")
+    public void updateConsent(String patientId, ConsentRequest req) {
+        // Consent update logic...
+    }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A8. N+1 QUERY FIX — 200ms LATENCY IMPROVEMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// PROBLEM — N+1:
+// patients = SELECT * FROM patients WHERE active=true    → 1 query
+// for each patient: SELECT * FROM specializations WHERE patient_id=?  → N queries
+// Total: N+1 queries → 200+ queries for 20 patients → 2 seconds!
+
+// FIX 1: JOIN FETCH (most common)
+@Query("SELECT p FROM Patient p JOIN FETCH p.appointments " +
+       "JOIN FETCH p.prescriptions WHERE p.id = :patientId")
+Optional<Patient> findWithRelations(@Param("patientId") String patientId);
+
+// FIX 2: @EntityGraph (cleaner syntax)
+@EntityGraph(attributePaths = {"appointments", "prescriptions", "labReports"})
+@Query("SELECT p FROM Patient p WHERE p.active = true")
+List<Patient> findAllActiveWithRelations();
+
+// FIX 3: Separate batch query (for large collections)
+@BatchSize(size = 25) // Hibernate batch-fetches 25 at a time instead of 1 by 1
+@OneToMany(mappedBy = "patient", fetch = FetchType.LAZY)
+private List<Appointment> appointments;
+
+// FIX 4: CompletableFuture parallel calls for independent data
+public PatientDashboard getPatientDashboard(String patientId) {
+
+    // Start all 3 queries PARALLEL — not sequential!
+    CompletableFuture<Patient> patientFuture =
+        CompletableFuture.supplyAsync(() -> patientRepo.findById(patientId).orElseThrow());
+
+    CompletableFuture<List<Appointment>> apptFuture =
+        CompletableFuture.supplyAsync(() -> appointmentRepo.findByPatientId(patientId));
+
+    CompletableFuture<List<LabReport>> labFuture =
+        CompletableFuture.supplyAsync(() -> labReportRepo.findByPatientId(patientId));
+
+    // Wait for all 3 to complete
+    CompletableFuture.allOf(patientFuture, apptFuture, labFuture).join();
+
+    // Result: 530ms (sequential) → 200ms (parallel) — 62% improvement!
+    return PatientDashboard.builder()
+        .patient(patientFuture.join())
+        .appointments(apptFuture.join())
+        .labReports(labFuture.join())
+        .build();
+}
+
+================================================================================
+SECTION B: 🔥🔥 IMPORTANT — COMMONLY ASKED
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+B1. FHIR IMPLEMENTATION — HAPI FHIR LIBRARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// pom.xml:
+// <dependency>
+//   <groupId>ca.uhn.hapi.fhir</groupId>
+//   <artifactId>hapi-fhir-structures-r4</artifactId>
+// </dependency>
+
+@Service
+public class FhirPatientService {
+
+    // FhirContext is expensive — create once (singleton!)
+    private final FhirContext fhirContext = FhirContext.forR4();
+
+    // Internal Patient entity → FHIR Patient resource → JSON string
+    public String toFhirJson(PatientEntity entity) {
+        Patient fhirPatient = new Patient();
+
+        fhirPatient.setId(entity.getId());
+
+        fhirPatient.addIdentifier()
+            .setSystem("https://healthcare-platform.com/patients")
+            .setValue(entity.getPatientId());
+
+        fhirPatient.addName()
+            .setFamily(entity.getLastName())
+            .addGiven(entity.getFirstName())
+            .setUse(HumanName.NameUse.OFFICIAL);
+
+        fhirPatient.setBirthDate(entity.getDob());
+        fhirPatient.setGender(
+            "M".equals(entity.getGender())
+                ? Enumerations.AdministrativeGender.MALE
+                : Enumerations.AdministrativeGender.FEMALE
+        );
+
+        // Serialize to FHIR JSON format
+        return fhirContext.newJsonParser()
+            .setPrettyPrint(true)
+            .encodeResourceToString(fhirPatient);
+    }
+
+    // FHIR JSON → internal entity
+    public PatientEntity fromFhirJson(String fhirJson) {
+        Patient fhirPatient = fhirContext.newJsonParser()
+            .parseResource(Patient.class, fhirJson);
+
+        return PatientEntity.builder()
+            .patientId(fhirPatient.getIdentifierFirstRep().getValue())
+            .firstName(fhirPatient.getNameFirstRep().getGivenAsSingleString())
+            .lastName(fhirPatient.getNameFirstRep().getFamily())
+            .dob(fhirPatient.getBirthDate())
+            .build();
+    }
+}
+
+// FHIR REST Controller (standard endpoints):
+@RestController
+@RequestMapping("/fhir/r4")
+public class FhirController {
+
+    @GetMapping(value = "/Patient/{id}",
+                produces = "application/fhir+json") // FHIR media type
+    public ResponseEntity<String> getPatient(@PathVariable String id) {
+        return ResponseEntity.ok(fhirService.toFhirJson(
+            patientRepo.findById(id).orElseThrow()));
+    }
+
+    @GetMapping("/Observation")
+    public ResponseEntity<String> getObservations(
+            @RequestParam("subject") String subjectRef) {
+        // subject = "Patient/PAT-123"
+        String patientId = subjectRef.replace("Patient/", "");
+        return ResponseEntity.ok(
+            fhirObservationService.getForPatient(patientId));
+    }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+B2. SAGA PATTERN — CHOREOGRAPHY BASED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// STEP 1: Patient books appointment → Event published
+@Service
+public class AppointmentBookingService {
+
+    @Transactional
+    public Appointment bookAppointment(BookingRequest req) {
+        Appointment appt = appointmentRepo.save(
+            Appointment.builder()
+                .patientId(req.getPatientId())
+                .doctorId(req.getDoctorId())
+                .slotId(req.getSlotId())
+                .status(AppointmentStatus.PENDING)
+                .build()
+        );
+
+        // Outbox pattern for consistency
+        outboxRepo.save(OutboxEvent.of("appointment-booking-started",
+            req.getPatientId(), appt));
+        return appt;
+    }
+}
+
+// STEP 2: Doctor service listens → Blocks slot
+@KafkaListener(topics = "appointment-booking-started", groupId = "doctor-saga")
+@Transactional
+public void blockSlot(AppointmentBookingStartedEvent event, Acknowledgment ack) {
+    try {
+        slotService.blockSlot(event.getSlotId(), event.getAppointmentId());
+        kafkaTemplate.send("appointment-slot-blocked",
+            event.getPatientId(), new SlotBlockedEvent(event.getAppointmentId()));
+        ack.acknowledge();
+    } catch (SlotAlreadyBlockedException e) {
+        // Compensate: Appointment cancel karo
+        kafkaTemplate.send("appointment-booking-failed",
+            event.getPatientId(),
+            new BookingFailedEvent(event.getAppointmentId(), "Slot unavailable"));
+        ack.acknowledge();
+    }
+}
+
+// STEP 3: Payment service listens → Charges card
+@KafkaListener(topics = "appointment-slot-blocked", groupId = "payment-saga")
+public void processPayment(SlotBlockedEvent event, Acknowledgment ack) {
+    try {
+        paymentService.charge(event.getPatientId(), event.getAppointmentFee());
+        kafkaTemplate.send("payment-processed", event.getPatientId(),
+            new PaymentProcessedEvent(event.getAppointmentId()));
+        ack.acknowledge();
+    } catch (PaymentFailedException e) {
+        // COMPENSATING TRANSACTION: Release the slot!
+        kafkaTemplate.send("payment-failed", event.getPatientId(),
+            new PaymentFailedEvent(event.getAppointmentId()));
+        ack.acknowledge();
+    }
+}
+
+// COMPENSATING TRANSACTION: payment failed → slot release
+@KafkaListener(topics = "payment-failed", groupId = "doctor-compensation")
+public void releaseSlot(PaymentFailedEvent event, Acknowledgment ack) {
+    slotService.releaseSlot(event.getAppointmentId()); // UNDO slot block
+    appointmentRepo.updateStatus(event.getAppointmentId(), AppointmentStatus.CANCELLED);
+    notificationService.notifyPaymentFailed(event.getPatientId());
+    ack.acknowledge();
+    log.info("Slot released + appointment cancelled: {}", event.getAppointmentId());
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+B3. MATERIALIZATION — BLUE YONDER IMPLEMENTATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// Materialization = Pre-computed aggregates for fast queries
+// Problem: 50 tables JOIN → 10 sec query. Solution: Pre-compute → 10ms read!
+
+@Entity
+@Table(name = "inventory_materialization",
+    indexes = @Index(columnList = "sku_id, warehouse_id"))
+public class InventoryMaterialization {
+    @Id private String id;
+    private String skuId;
+    private String warehouseId;
+    private int availableQuantity;
+    private int reservedQuantity;
+    private int onOrderQuantity;
+    private Instant lastUpdated;
+    private long version; // Optimistic locking
+}
+
+@Service
+public class InventoryMaterializationService {
+
+    // Real-time incremental update via Kafka
+    @KafkaListener(topics = "inventory-updated", groupId = "materialization-group")
+    @Transactional
+    public void handleInventoryUpdate(InventoryUpdatedEvent event, Acknowledgment ack) {
+
+        InventoryMaterialization mat = materializationRepo
+            .findBySkuIdAndWarehouseId(event.getSkuId(), event.getWarehouseId())
+            .orElseGet(() -> new InventoryMaterialization(event.getSkuId(), event.getWarehouseId()));
+
+        // Incremental delta update (NOT full recalculation)
+        switch (event.getEventType()) {
+            case "RECEIVED"   -> mat.setAvailableQuantity(mat.getAvailableQuantity() + event.getDelta());
+            case "SOLD"       -> mat.setAvailableQuantity(mat.getAvailableQuantity() - event.getDelta());
+            case "RESERVED"   -> {
+                mat.setAvailableQuantity(mat.getAvailableQuantity() - event.getDelta());
+                mat.setReservedQuantity(mat.getReservedQuantity() + event.getDelta());
+            }
+        }
+        mat.setLastUpdated(Instant.now());
+        materializationRepo.save(mat);
+        ack.acknowledge();
+    }
+
+    // Nightly full reconciliation — drift correction
+    @Scheduled(cron = "0 2 * * *") // 2 AM every night
+    @Transactional
+    public void fullReconciliation() {
+        log.info("Starting nightly materialization reconciliation");
+        List<String> warehouses = warehouseRepo.findAllActiveIds();
+
+        warehouses.parallelStream().forEach(warehouseId -> {
+            // Recompute from source of truth
+            List<InventoryMaterialization> computed =
+                inventoryRepo.computeAggregates(warehouseId);
+
+            // Upsert into materialization table
+            materializationRepo.saveAll(computed);
+        });
+        log.info("Reconciliation complete");
+    }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+B4. DLQ MONITOR + RE-PROCESS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@Service
+public class DLQMonitorService {
+
+    // DLQ topic monitor — ops team ko alert karo
+    @KafkaListener(
+        topics = "lab-report-created.DLT",
+        groupId = "dlq-monitor-group"
+    )
+    public void monitorDLQ(
+            ConsumerRecord<String, Object> record,
+            @Header(KafkaHeaders.EXCEPTION_MESSAGE) String errorMsg,
+            @Header(KafkaHeaders.EXCEPTION_FQCN) String exceptionClass) {
+
+        // Alert ops team via Slack/PagerDuty
+        alertService.sendCritical(String.format(
+            "DLQ Alert | Topic: %s | Key: %s | Error: %s | Class: %s",
+            record.topic(), record.key(), errorMsg, exceptionClass));
+
+        // Store for manual review + reprocessing
+        dlqEventRepo.save(DLQEvent.builder()
+            .topic(record.topic())
+            .messageKey(record.key())
+            .payload(record.value().toString())
+            .errorMessage(errorMsg)
+            .exceptionClass(exceptionClass)
+            .receivedAt(Instant.now())
+            .status("PENDING_REVIEW")
+            .build());
+    }
+
+    // Manual re-process endpoint for ops team
+    @Transactional
+    public void reprocess(String dlqEventId) {
+        DLQEvent event = dlqEventRepo.findById(dlqEventId).orElseThrow();
+
+        String originalTopic = event.getTopic().replace(".DLT", "");
+        kafkaTemplate.send(originalTopic, event.getMessageKey(), event.getPayload());
+
+        event.setStatus("REPROCESSED");
+        event.setReprocessedAt(Instant.now());
+        dlqEventRepo.save(event);
+
+        log.info("DLQ event reprocessed: {} → topic: {}", dlqEventId, originalTopic);
+    }
+}
+
+================================================================================
+SECTION C: 🔥 READ ME — DEEP DIVE TOPICS
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C1. RAG PIPELINE — AI QUERY SERVICE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@Service
+public class RAGPipelineService {
+
+    @Autowired private EmbeddingService embeddingService;
+    @Autowired private MedicalRecordRepository vectorRepo;
+    @Autowired private OpenAiService openAiService;
+
+    public RAGResponse answer(String patientId, String question) {
+
+        // STEP 1: Question → embedding vector (1536 floats)
+        float[] questionVector = embeddingService.embed(question);
+
+        // STEP 2: pgvector cosine similarity search
+        // <=> operator = cosine distance (low = similar)
+        List<SimilarRecord> context = vectorRepo.findSimilarWithThreshold(
+            patientId, questionVector, 0.72, 5);
+
+        if (context.isEmpty()) {
+            return RAGResponse.noData("No relevant records found.");
+        }
+
+        // STEP 3: Build prompt (System + Context + User Question)
+        String systemPrompt = """
+            You are a healthcare assistant. Answer ONLY from provided records.
+            If not in records → say "I don't have that information."
+            Never diagnose or recommend medications.
+            Always end with: "Please consult your doctor for medical advice."
+            """;
+
+        String userPrompt = buildContextPrompt(context, question);
+
+        // STEP 4: OpenAI GPT-4 call
+        ChatCompletionRequest req = ChatCompletionRequest.builder()
+            .model("gpt-4-turbo-preview")
+            .messages(List.of(
+                new ChatMessage("system", systemPrompt),
+                new ChatMessage("user", userPrompt)
+            ))
+            .temperature(0.1)  // Low = factual, deterministic
+            .maxTokens(600)    // Cost control
+            .build();
+
+        String answer = openAiService.createChatCompletion(req)
+            .getChoices().get(0).getMessage().getContent();
+
+        // STEP 5: Validate (no dangerous medical advice)
+        validateResponse(answer);
+
+        return RAGResponse.of(answer, context.get(0).getSimilarityScore());
+    }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C2. CONSUMER OFFSET REPLAY — MESSAGE REPLAY COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// SCENARIO: AI embedding bug fix → Replay all lab-report events from last 2 days
+
+// Command 1: Reset to earliest (ALL messages from beginning)
+// kafka-consumer-groups.sh \
+//   --bootstrap-server kafka:9092 \
+//   --group ai-indexing-group \
+//   --topic lab-report-created \
+//   --reset-offsets --to-earliest --execute
+
+// Command 2: Reset to specific timestamp (safer!)
+// kafka-consumer-groups.sh \
+//   --bootstrap-server kafka:9092 \
+//   --group ai-indexing-group \
+//   --topic lab-report-created \
+//   --reset-offsets --to-datetime "2025-01-14T00:00:00.000" --execute
+
+// NOTE: Consumer group must be stopped before reset!
+// kubectl scale deployment ai-indexing-service --replicas=0
+// [reset offsets]
+// kubectl scale deployment ai-indexing-service --replicas=4
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C3. HIPAA FIELD ENCRYPTION — JPA ATTRIBUTE CONVERTER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// AES-256 encryption for sensitive fields (SSN, DOB)
+@Converter
+public class PhiEncryptionConverter implements AttributeConverter<String, String> {
+
+    @Value("${encryption.key}")
+    private String encryptionKey;
+
+    @Override
+    public String convertToDatabaseColumn(String plaintext) {
+        if (plaintext == null) return null;
+        // AES-256 encrypt → Base64 encode → Store in DB
+        return aesEncrypt(plaintext, encryptionKey);
+    }
+
+    @Override
+    public String convertToEntityAttribute(String ciphertext) {
+        if (ciphertext == null) return null;
+        return aesDecrypt(ciphertext, encryptionKey); // Decrypt when reading
+    }
+}
+
+// Usage in Entity:
+@Entity
+public class Patient {
+    @Id private String id;
+
+    @Convert(converter = PhiEncryptionConverter.class) // Auto encrypt/decrypt!
+    @Column(name = "ssn")
+    private String ssn;  // Stored encrypted, accessed as plaintext
+
+    @Convert(converter = PhiEncryptionConverter.class)
+    @Column(name = "diagnosis_notes")
+    private String diagnosisNotes;
+}
+
+================================================================================
+QUICK CHEAT SHEET — CODE PATTERNS
+================================================================================
+
+PATTERN               CODE CLUE
+--------------------  ---------------------------------------------------------
+Idempotency           processedEventRepo.existsByEventId() → skip if exists
+Outbox                Save DB + outbox table in @Transactional same transaction
+Saga compensate       @KafkaListener(payment-failed) → releaseSlot()
+Circuit Breaker       @CircuitBreaker + fallbackMethod
+Manual Kafka ack      ack.acknowledge() after success, throw on failure
+N+1 fix               JOIN FETCH / @EntityGraph / CompletableFuture parallel
+HIPAA Audit           @Around("@annotation(hipaaAudit)") → save + Kafka event
+DLQ setup             DefaultErrorHandler + DeadLetterPublishingRecoverer
+Partition key         kafkaTemplate.send(topic, patientId, event) → ordering
+CooperativeRebalance  partition.assignment.strategy=CooperativeStickyAssignor
+
+================================================================================
+END — Q29_Project_related_questions_answers.txt
+================================================================================

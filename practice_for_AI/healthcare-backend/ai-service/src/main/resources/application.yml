@@ -1,0 +1,27 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: ai-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:healthcare}
+    username: ${DB_USER:healthcare}
+    password: ${DB_PASSWORD:healthcare}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        default_schema: ai
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+
+openai:
+  api-key: ${OPENAI_API_KEY:changeme}
+  chat-model: gpt-4o-mini
+  embedding-model: text-embedding-3-small
+
+services:
+  consent-url: ${CONSENT_SERVICE_URL:http://localhost:8082}

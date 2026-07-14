@@ -1,0 +1,844 @@
+================================================================================
+  PROJECT THEORY + SCENARIOS + JMETER — EPAM + BLUE YONDER
+  6 Years Java Backend | Interview-Ready Explanations
+  Hinglish + Stories + Concept Clarity + Real Scenarios
+================================================================================
+
+PRIORITY GUIDE:
+  🔥🔥🔥 MOST IMPORTANT  — Har interview mein, clear hona chahiye
+  🔥🔥   IMPORTANT       — 60-70% interviews
+  🔥     READ ME         — Deep dive / niche questions
+
+================================================================================
+SECTION A: 🔥🔥🔥 MOST IMPORTANT THEORY
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A1. KAFKA KYA HAI? KYU USE KIYA? (Foundation question)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STORY — WhatsApp group analogy:
+  REST call = Phone call: Ek call, dono online hone chahiye, ek baar hi baat
+  Kafka = WhatsApp Group:
+    - Message daalo → Group mein rehta hai
+    - Jo bhi member join kare, apne time pe padhe
+    - Message history hai — replay kar sako
+    - Sender ko nahi pata kitne log padhenge
+
+KAFKA KYU USE KIYA — 3 Strong Reasons:
+  1. DECOUPLING: Patient service ko AI service ke baare mein kuch nahi pata
+     Patient service bas "lab-report-created" event fire karta hai
+     Kaun consume karta hai — AI, Notification, Analytics — patient service ki ZIMMEDARI NAHI
+
+  2. RESILIENCE: AI service down ho jaaye → Events Kafka mein safe rahenge
+     Service wapas aaye → Jahan chhoda wahan se shuru karo
+     REST call mein: Service down → Data GONE!
+
+  3. BUFFER / BACKPRESSURE: 50,000 lab reports ek saath create ho jaayein →
+     AI service apni capacity (100/min) pe process kare → Kafka buffer karta hai
+     System kabhi overwhelm nahi hoga
+
+INTERVIEW ANSWER TEMPLATE:
+"Hum Kafka isliye use karte hain kyunki REST call synchronous tight coupling create
+karta hai. Lab report create hone ke baad multiple services ko notify karna tha —
+AI indexing, patient notifications, HIPAA audit. Agar REST use karte toh patient-service
+ko har downstream service ka URL, status, retry logic manage karna padta. Kafka se:
+event publish karo, baaki services independently consume karein, decoupled architecture."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A2. KAFKA ARCHITECTURE — BROKER, TOPIC, PARTITION, OFFSET
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BROKER = Kafka server jo messages store karta hai
+  - Production mein 3+ brokers deploy karte hain (cluster)
+  - Ek broker leader hota hai ek partition ka
+  - AWS MSK = 3 brokers, 3 AZs mein → ek AZ fail bhi ho toh chalta hai
+
+TOPIC = Messages ka category/folder
+  - "lab-report-created" — ek dedicated topic for lab events
+  - "notification-events" — ek alag topic for notifications
+  - Topics ke beech complete isolation
+
+PARTITION = Topic ke andar parallel lanes
+  ANALOGY: Super market mein 8 checkout lanes
+    1 lane (1 partition)  → 1 customer at a time → slow
+    8 lanes (8 partitions) → 8 customers parallel → fast!
+
+  KEY PROPERTIES:
+    - Messages within partition are ORDERED (offset 0, 1, 2, 3...)
+    - Messages across partitions: NO ORDER guarantee
+    - Ek partition → Ek consumer group mein sirf EK consumer
+    - Consumers > Partitions → Extra consumers IDLE rehte hain
+
+PARTITION KEY:
+  - Producer decides kaunse partition mein jaayega message
+  - No key → Round-robin (random partition)
+  - With key → hash(key) % partitions = consistent partition
+
+  OUR CHOICE: patientId as key
+  → Same patient ke saare events SAME partition mein
+  → Same partition = same consumer = ORDERING guaranteed for one patient
+  → Different patients pe parallel processing still possible
+
+OFFSET:
+  - Har message ka sequential number within partition
+  - Consumer commit karta hai "main offset 100 tak process kar chuka hoon"
+  - Restart pe: offset 101 se shuru karo
+  - Manual commit (hamara choice) = processing ke BAAD commit karo
+
+CONSUMER GROUP:
+  ANALOGY: 8 postal workers ek team (group)
+    16 mailboxes (partitions) → 8 workers → har worker 2 mailboxes handle karta hai
+    Ek naya worker join kiya → Rebalancing → Redistribute mailboxes
+
+  SAME TOPIC, DIFFERENT GROUPS:
+    ai-indexing-group → Independently reads and processes
+    notification-group → Also reads same topic, independently
+    audit-group → Also reads
+    EACH GROUP has its OWN offset! No interference.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A3. AT-LEAST-ONCE vs EXACTLY-ONCE vs AT-MOST-ONCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STORY — Delivery guarantee analogy:
+  AT-MOST-ONCE:   Courier ne ek baar try kiya. Ghar pe nahi tha? Package lost!
+                  → Fire and forget. Data loss possible. (acks=0)
+
+  AT-LEAST-ONCE:  Courier baar baar try karta hai jab tak deliver na ho.
+                  → Possible: 2 packages deliver ho jaayein (duplicate).
+                  → Hamara choice for healthcare. (acks=all + manual commit)
+
+  EXACTLY-ONCE:   Perfect delivery — exactly ek baar, no duplicates, no loss.
+                  → Most complex, Kafka Transactions use karna padta hai.
+                  → External DB (PostgreSQL) ke saath impossible natively.
+                  → 30-40% throughput reduction.
+
+OUR DECISION — At-least-once + Idempotent Consumer:
+  WHY: Healthcare mein data loss unacceptable (HIPAA).
+  Duplicate possible? YES — but handled with idempotency check:
+    "Lab report embed hua tha already? Skip kar."
+  Result: Effectively exactly-once behavior without Kafka transaction complexity.
+
+INTERVIEWER: "Exactly-once kyon nahi use kiya?"
+ANSWER: "Exactly-once Kafka ke through sirf Kafka-to-Kafka transactions mein kaam
+karta hai. Hum PostgreSQL mein data save karte hain — wahan native exactly-once
+nahi hai. To humne at-least-once choose kiya with idempotency table. Same event
+baar baar aaye to UUID check karke skip kar dete hain. Effectively same result
+with simpler architecture."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A4. CONSUMER LAG — PRODUCTION CRITICAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DEFINITION: Consumer Lag = (Latest offset on topic) - (Consumer's committed offset)
+  Example:
+    Topic mein messages: 0 to 10,000 (latest offset = 10,000)
+    Consumer ne process kiya: 0 to 9,000 (committed = 9,000)
+    LAG = 10,000 - 9,000 = 1,000 messages behind
+
+WHY LAG HAPPENS:
+  1. Consumer processing SLOW — External API call, heavy DB query
+  2. Consumer CRASHED — No one processing
+  3. SUDDEN SPIKE in messages — More produced than consumed
+  4. GC Pause — JVM garbage collection freezing consumer
+
+BLUE YONDER REAL INCIDENT:
+  "Suddenly consumer lag went to 50,000. Notifications were 15-20 min delayed.
+   Investigation: SMS provider API was slow (5s per call).
+   10 consumer threads × 5s each = 2 notifications/sec.
+   But 1000 messages/min were being produced.
+   Math: 1000/min produced, 120/min consumed → LAG GROWING!
+
+   Short-term fix: Scale consumers 2 → 8 (reduced lag temporarily)
+   Long-term fix: Async WebClient (non-blocking) + batch SMS API calls
+                  100 notifications → 1 API call → 10x throughput
+
+   Alert added: CloudWatch Alarm → Lag > 10,000 → PagerDuty"
+
+DEBUG STEPS when consumer lag high:
+  Step 1: Consumer alive hai? kubectl get pods — CrashLoopBackOff?
+  Step 2: Lag kahan hai? kafka-consumer-groups.sh --describe
+  Step 3: Processing slow kyon? Thread dump, external API latency
+  Step 4: Kafka max.poll.interval.ms exceed? → Consumer kicked out by Kafka
+  Step 5: Memory issue? kubectl top pod → OOMKilled?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A5. DLQ — DEAD LETTER QUEUE (Poison Pill Prevention)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STORY — Conveyor belt analogy:
+  Factory: A, B, C, D, E, F items pe belt pe hain.
+  B = broken item (malformed JSON).
+  Machine B process nahi kar sakti → Stuck!
+  Without DLQ: SARI BELT ruk jaati hai — C, D, E, F bhi nahi process hote!
+
+  WITH DLQ: Broken B ko side mein rakh do (Dead Letter Queue/Topic)
+            Belt continue karta hai — C, D, E, F normally process
+            Maintenance team baad mein B ko fix karte hain → Belt pe wapas!
+
+HEALTHCARE TOPICS:
+  lab-report-created       → lab-report-created.DLT
+  prescription-created     → prescription-created.DLT
+  audit-events             → audit-events.DLT (rare — should never fail)
+
+WHAT GOES TO DLQ:
+  - Malformed JSON (deserialization fail)
+  - Business logic exception (patient not found?)
+  - External service unavailable after max retries
+  - Anything that fails 3 times consecutively
+
+DLQ WORKFLOW:
+  1. Consumer fails → Retry (2s, 2s, 2s = 3 retries)
+  2. Still fails → DeadLetterPublishingRecoverer sends to .DLT topic
+  3. DLQ Monitor consumer → Ops team ko alert + Store in DB for review
+  4. Developer investigates: Was it a bug? Data issue? External service?
+  5. Fix karo → Manually reprocess from DLQ to original topic
+
+PRODUCTION TIP: DLQ pe ek dedicated consumer hona chahiye jo:
+  - Metrics count kare (DLQ messages per hour)
+  - Alert kare agar DLQ suddenly bhar raha ho (producer bug?)
+  - API expose kare for manual reprocessing (ops team use)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A6. OUTBOX PATTERN — DB + EVENT CONSISTENCY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+THE PROBLEM (2-phase commit nightmare):
+  Appointment create karo → DB mein save karo → Kafka event bhejo
+  Scenario 1: DB save SUCCESS, Kafka publish FAIL
+    → DB mein appointment hai, lekin event gaya nahi
+    → AI service, Notification service ko pata hi nahi!
+    → DATA INCONSISTENCY
+
+  Scenario 2: Kafka publish SUCCESS, DB save FAIL (transaction rollback)
+    → Event gaya lekin DB mein appointment nahi
+    → Consumers will look for non-existent data → Error cascade!
+
+THE SOLUTION — OUTBOX PATTERN:
+  INSIGHT: Ek hi DB transaction mein dono kaam karo!
+    1. Appointment DB table mein save
+    2. Outbox table mein event save (same transaction!)
+
+  Same transaction → ATOMIC:
+    Both succeed OR both rollback — consistency guaranteed!
+
+  Separate publisher process (not part of request):
+    Every second → outbox table scan → PENDING events Kafka pe publish karo
+    Published? → Status = PUBLISHED
+    Fail? → Retry count badhao, eventually FAILED → Alert
+
+WHY THIS IS BETTER:
+  - No distributed transaction needed (no 2-phase commit)
+  - DB ACID guarantees handle consistency
+  - Publisher fail ho jaaye → Events DB mein safe hain, retry hoga
+  - Perfect for healthcare where data loss = HIPAA violation
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A7. REBALANCING + COOPERATIVESTICKYASSIGNOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHAT IS REBALANCING:
+  Partitions ko consumers mein redistribute karna.
+
+WHEN IT TRIGGERS:
+  1. New consumer joins group (new pod deployed)
+  2. Consumer dies (pod crash, OOM kill)
+  3. Consumer timeout (max.poll.interval.ms exceed)
+  4. New partitions added to topic
+
+OLD BEHAVIOR (EagerAssignor — default):
+  "STOP THE WORLD":
+    1. Sab consumers ki sari partition assignments REVOKE ho jaati hain
+    2. New assignment calculate hota hai (2-3 seconds)
+    3. Sab consumers naya assignment lete hain
+    4. Processing resume hota hai
+  PROBLEM: 2-3 second complete processing freeze! Healthcare mein noticeable.
+
+NEW BEHAVIOR (CooperativeStickyAssignor):
+  Incremental rebalancing:
+    1. Sirf AFFECTED partitions revoke hoti hain
+    2. Unaffected consumers continue processing
+    3. Only the new/leaving consumer's partitions get reassigned
+  RESULT: 2-3 second freeze → Milliseconds impact!
+  STICKY: Already assigned partitions zyada reassign nahi hote (cache warm rehti hai)
+
+SCENARIO: "New consumer pod deploy hua → Rebalancing kab kab hoga?"
+  "EKS pe new pod join karta hai ai-indexing group mein.
+   CooperativeStickyAssignor ke saath:
+   Existing 4 consumers process karte rehte hain.
+   Sirf 2 partitions new consumer ko jaati hain.
+   0 downtime for existing consumers.
+   Pehle lagbhag 5-6 deployment pe baar baar rebalancing hota tha.
+   CooperativeStickyAssignor ke baad seamless deployments."
+
+================================================================================
+SECTION B: 🔥🔥 IMPORTANT THEORY
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+B1. SAGA PATTERN — DISTRIBUTED TRANSACTIONS WITHOUT 2PC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PROBLEM: Microservices mein ek business transaction mein multiple services involved hain.
+  Patient appointment book karo:
+    Service A: Doctor ka slot block karo
+    Service B: Payment process karo
+    Service C: Confirmation SMS bhejo
+
+  Agar B fail ho jaaye, A undo karna padega!
+  Normal DB ROLLBACK kaam nahi karta — different services, different DBs!
+
+SAGA SOLUTION — Choreography (Event-driven):
+  "Koi central coordinator nahi. Har service apne kaam ke baad event fire karta hai.
+   Agle service ko trigger karta hai. Failure pe COMPENSATING TRANSACTION."
+
+COMPENSATING TRANSACTION:
+  Normal: Block slot → Charge payment → Send SMS
+  Failure: Payment fail → "Release slot" event → Doctor service slot free karta hai
+  Not a rollback — ek new "undo" action hai!
+
+2 TYPES OF SAGA:
+  Choreography (hamara choice): Each service reacts to events (Kafka)
+    Pros: No single point of failure, loosely coupled
+    Cons: Complex to track flow, debugging hard
+
+  Orchestration: Central orchestrator service sab kuch direct karta hai
+    Pros: Easy to track flow, easy to debug
+    Cons: Orchestrator = single point of failure, tight coupling
+
+WHEN TO USE SAGA:
+  "Koi bhi operation jahan multiple microservices ke across atomicity chahiye
+   but tight coupling nahi chahiye — appointment booking, order placement, etc."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+B2. CIRCUIT BREAKER PATTERN — FAILURE ISOLATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STORY — Electric circuit breaker:
+  Ghar mein short circuit → Circuit breaker trip → Current stop → Fire prevented.
+  Problem fix karo → Reset karo → Normal.
+
+SOFTWARE:
+  Doctor service DOWN hai.
+  Patient service 1000 requests/sec kar raha hai.
+  Har request 30 second timeout tak wait karta hai.
+  Result: 30 × 1000 = 30,000 threads blocked → Patient service bhi CRASH!
+
+  CASCADING FAILURE: One service down → Multiple services down!
+
+WITH CIRCUIT BREAKER:
+  CLOSED state: Normal calls ho rahe hain.
+  5 consecutive failures → OPEN state:
+    "Fast fail" — Doctor service ko call hi mat karo
+    Immediately return fallback response
+    Thread pool free!
+  30 seconds baad → HALF-OPEN:
+    3 test calls karo
+    Succeed? → CLOSED wapas
+    Fail? → OPEN again
+
+3 STATES:
+  CLOSED   → Normal operation
+  OPEN     → Fast fail (no calls to downstream)
+  HALF-OPEN → Testing if downstream recovered
+
+FALLBACK STRATEGY (Healthcare):
+  Doctor service down → Cached doctor availability return karo
+  Cache bhi nahi hai? → "Currently unavailable, try later" message
+  Don't fail patient's request completely — degrade gracefully!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+B3. KAFKA vs RABBITMQ — DECISION FRAMEWORK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+KAFKA CHOOSE KARO JAB:
+  1. High throughput: Millions of messages/second
+  2. Message replay zaruri ho: HIPAA audit, debugging
+  3. Multiple consumers same data: AI + Notifications + Analytics sab consume karein
+  4. Ordered processing: Partition key se ordering guarantee
+  5. Event sourcing: Full history maintain karo
+  OUR CASE: HIPAA requires 7-year audit trail → Kafka retention + S3 archival
+
+RABBITMQ CHOOSE KARO JAB:
+  1. Complex routing: Exchange types (direct, fanout, topic, headers)
+  2. Priority queues: Critical tasks pehle process karo
+  3. Short-lived messages: Consume ho jaayein toh delete (no replay needed)
+  4. Request/Reply pattern: Easy RPC-style messaging
+  5. Small scale: Startup, simple task queues
+
+WHY KAFKA FOR HEALTHCARE:
+  "Healthcare mein message replay critical hai — HIPAA audit ke liye.
+   Multiple consumers chahiye — AI, notifications, audit — sab independently read karein.
+   High volume — thousands of events daily.
+   Kafka in all aspects better suited tha RabbitMQ se."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+B4. FHIR + HIPAA — HEALTHCARE SPECIFIC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FHIR (Fast Healthcare Interoperability Resources):
+  PROBLEM: Har hospital apna format use karta tha.
+    Hospital A: CSV with custom columns
+    Hospital B: Proprietary JSON
+    Lab System: XML with different field names
+    RESULT: Integration = Custom parser for EVERY system → Nightmare!
+
+  SOLUTION: FHIR = Common language for healthcare.
+    GET /Patient/123 → Standard JSON every system understands
+    GET /Observation?subject=Patient/123 → Lab results in standard format
+    Different hospitals, labs, pharmacies — sab same FHIR format follow karte hain
+
+  RESOURCES: Patient, Observation (lab results), Appointment, Condition, Medication
+  LIBRARY: HAPI FHIR (Java) — most popular FHIR implementation
+
+HIPAA:
+  US law protecting patient health information (PHI).
+  PHI: Name, DOB, SSN, medical records, insurance info.
+
+  TECHNICAL REQUIREMENTS (jo humne implement kiye):
+    1. ACCESS CONTROL: JWT + Role-based (Doctor sees doctor's patients only)
+    2. AUDIT LOGS: Har PHI access → AOP se automatic logging → Kafka → S3
+    3. ENCRYPTION at rest: RDS encryption ON, S3 SSE-AES256
+    4. ENCRYPTION in transit: HTTPS everywhere, MSK SASL_SSL
+    5. MINIMUM NECESSARY: API sirf zaruri fields return kare (no full PHI dump)
+    6. CONSENT MANAGEMENT: Patient explicitly control kare kaun dekhe
+
+AUDIT QUESTION: "HIPAA audit ke time kya dikhaya?"
+  1. CloudTrail: AWS API calls — who accessed what when
+  2. Application audit logs: Patient record access → Kafka → S3
+  3. Encryption confirmation: RDS, S3 encryption enabled
+  4. Access control matrix: Role to permission mapping
+  5. Kafka retention policy: PHI 7 days max in Kafka, then S3
+
+================================================================================
+SECTION C: 🔥🔥🔥 JMETER — BLUE YONDER LOAD TESTING
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C1. JMETER KYA HAI? KYU USE KIYA?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+JMETER = Apache JMeter — Open source performance testing tool.
+  Java-based tool jo real user traffic simulate karta hai.
+  100 virtual users, 1000 requests/sec, 30 minute soak test — sab possible.
+
+BLUE YONDER MEIN KYU:
+  "Supply chain system peak hours pe heavy load dekhta tha —
+   Retailers early morning mein sab ek saath inventory check karte the.
+   Before production scale, humein performance issues identify karne the.
+   JMeter se: 500 virtual users, 30 min load test → Bottlenecks mila
+   (DB connection pool exhaustion + slow SQL query without index)"
+
+TYPES OF PERFORMANCE TESTS:
+  Load Testing:      Normal peak load simulate karo (e.g., 500 users)
+                     "Does system handle expected traffic?"
+
+  Stress Testing:    System ki limits dhundo — tab tak badhao jab tak fail na ho
+                     "What's the breaking point?"
+
+  Spike Testing:     Sudden traffic burst (200 → 2000 users instantly)
+                     "Black Friday flash sale — kya handle kar paayenge?"
+
+  Soak Testing:      Long duration (2-4 hours at sustained load)
+                     "Memory leak, resource exhaustion dhundho"
+
+  PSR Testing (Blue Yonder specific):
+                     Performance, Scalability, Reliability testing
+                     Combined suite — all 3 aspects together
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C2. JMETER COMPONENTS — KYA KYA HOTA HAI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TEST PLAN (Root):
+  Sab kuch yahan hota hai. Test ki complete configuration.
+
+THREAD GROUP (Users):
+  = Virtual users ki team
+  Number of Threads = 500         (500 virtual users)
+  Ramp-up Period   = 60 seconds   (0 se 500 pe ek saath nahi — gradually!)
+  Loop Count       = 10           (Har user 10 baar repeat karega)
+  Duration         = 1800 sec     (30 min run karo)
+
+  RAMP-UP KYU? → Ek saath 500 users nahi lagate — yeh unrealistic hai.
+                 60 sec mein gradually 500 → Realistic user behavior.
+
+HTTP SAMPLER (Actual API call):
+  Protocol: HTTPS
+  Server: api.blueyonder.com
+  Port: 443
+  Method: GET / POST / PUT
+  Path: /api/v1/inventory/check
+
+CONFIG ELEMENT:
+  HTTP Header Manager: Authorization token inject karo
+    Header: Authorization → Value: Bearer ${ACCESS_TOKEN}
+  HTTP Cookie Manager: Session cookies handle karo
+  CSV Data Set Config: Test data file se read karo (different SKUs, warehouse IDs)
+
+TIMER:
+  Constant Timer: Har request ke beech N milliseconds wait karo
+  Uniform Random Timer: 500ms to 1500ms random wait — realistic human behavior!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C3. JMETER SCRIPTING — BLUE YONDER API CALLS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 1: LOGIN + TOKEN EXTRACTION
+
+HTTP Request Sampler 1: POST /api/auth/login
+  Body:
+  {
+    "username": "testuser@blueyonder.com",
+    "password": "testpassword"
+  }
+
+Regular Expression Extractor (post-processor):
+  Name: ACCESS_TOKEN
+  Regular Expression: "accessToken":"(.+?)"
+  Template: $1$
+  → Automatically "accessToken" field value extract ho jaata hai response se
+  → ${ACCESS_TOKEN} variable mein store ho jaata hai
+
+STEP 2: USE TOKEN IN SUBSEQUENT REQUESTS
+
+HTTP Header Manager (Thread Group level):
+  Header Name:  Authorization
+  Header Value: Bearer ${ACCESS_TOKEN}    ← Extracted token auto-inject!
+
+HTTP Request Sampler 2: GET /api/v1/inventory/check
+  Parameters:
+    skuId      → ${SKU_ID}        (CSV se)
+    warehouseId → ${WAREHOUSE_ID} (CSV se)
+    quantity   → 100
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C4. CSV DATA FEEDING — REALISTIC TEST DATA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PROBLEM WITHOUT CSV:
+  Sab 500 users ek hi SKU "SKU-001" test karte hain
+  → DB cache hit hoga → Unrealistic fast response
+  → Real load simulate nahi hoga
+
+SOLUTION: CSV Data Set Config
+
+test_data.csv (file create karo):
+  SKU_ID,WAREHOUSE_ID,QUANTITY
+  SKU-001,WH-101,50
+  SKU-002,WH-102,25
+  SKU-003,WH-103,100
+  SKU-004,WH-101,75
+  SKU-005,WH-104,200
+  ... (thousands of rows)
+
+JMeter CSV Data Set Config:
+  Filename:     test_data.csv
+  Variable Names: SKU_ID,WAREHOUSE_ID,QUANTITY
+  Delimiter:    ,
+  Recycle on EOF: True    (End hone pe beginning se start)
+  Stop Thread:  False     (Stop nahi karo — loop karo)
+  Sharing Mode: All Threads (Sab threads ek hi file share karein, sequential)
+
+Usage in Request: ${SKU_ID}, ${WAREHOUSE_ID}
+Result: Har virtual user alag-alag SKU test karta hai → Realistic!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C5. ASSERTIONS — PASS/FAIL VALIDATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+RESPONSE ASSERTION:
+  HTTP Status: 200 (not 500, not 429)
+  Response contains: "available": true (check karo field exist karta hai)
+  Response does not contain: "error"
+
+DURATION ASSERTION:
+  Max response time: 2000ms (2 seconds)
+  If > 2s → FAIL mark karo
+  Blue Yonder SLA: P95 < 1.5 seconds
+
+JSON PATH ASSERTION:
+  JSON Path: $.data.availableQuantity
+  Expected Value: >= 0 (negative nahi hona chahiye)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C6. JMETER RESULTS + METRICS — KYA DEKHNA HAI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+LISTENERS (Reports):
+  Aggregate Report: Summary table — most important!
+  View Results Tree: Individual request/response (debugging mein use)
+  Response Time Over Time Graph: Latency trend
+  Active Threads Over Time: User ramp visualization
+
+AGGREGATE REPORT COLUMNS:
+  Label:         API endpoint name
+  Samples:       Total requests made
+  Average:       Average response time (ms)
+  Median:        50th percentile (P50)
+  90% Line:      P90 — 90% requests is time ke andar
+  95% Line:      P95 — SLA check karo! (Blue Yonder: P95 < 1.5s)
+  99% Line:      P99 — Worst cases
+  Min/Max:       Best and worst individual responses
+  Error %:       % failed requests (target: < 1%)
+  Throughput:    Requests per second (how much load server handled)
+
+WHAT WE FOUND IN BLUE YONDER:
+  Baseline test (100 users): P95 = 800ms ✅ OK
+  Load test (500 users): P95 = 4200ms ❌ FAIL!
+
+  Investigation:
+    Throughput: 85 req/sec (expected 500)
+    Error%: 15% (DB connection pool exhausted)
+    Stack trace: HikariCP connection pool timeout
+
+  Fixes Applied:
+    1. HikariCP: max-pool-size 10 → 50
+    2. Found slow SQL query (missing index) → Added composite index
+    3. Redis caching for frequent inventory checks
+    After fixes: P95 = 750ms at 500 users ✅
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C7. JMETER CLI/HEADLESS — PRODUCTION USE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHY HEADLESS:
+  JMeter GUI = GUI overhead → Less accurate results, high JMeter memory
+  Production testing = Headless command line = More accurate!
+
+COMMAND:
+  jmeter -n -t test_plan.jmx -l results.jtl -e -o /reports/html
+
+  -n           = Non-GUI mode (headless)
+  -t           = Test plan file (.jmx)
+  -l           = Log results file (.jtl)
+  -e -o        = HTML report generate karo in /reports/html folder
+
+JENKINS INTEGRATION (Blue Yonder CI/CD):
+  stage('Performance Test') {
+      steps {
+          sh '''
+              jmeter -n \
+              -t performance-tests/inventory-api.jmx \
+              -l results/inventory-${BUILD_NUMBER}.jtl \
+              -Jthreads=500 \        # Override thread count
+              -Jrampup=60 \          # Override ramp-up
+              -Jduration=1800 \      # 30 min test
+              -e -o results/html-report
+          '''
+      }
+      post {
+          always {
+              // JMeter Plugin for Jenkins — publish HTML report
+              publishHTML([
+                  reportDir: 'results/html-report',
+                  reportFiles: 'index.html',
+                  reportName: 'JMeter Performance Report'
+              ])
+          }
+          failure {
+              // P95 > SLA threshold? → Fail the build!
+              echo "Performance test failed! Check JMeter report."
+          }
+      }
+  }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C8. JMETER SCENARIO QUESTIONS — INTERVIEW MEIN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Q. "JMeter mein login token kaise handle kiya sab users ke liye?"
+A. "Pehle ek HTTP Sampler for login API rakha.
+   Regular Expression Extractor se response body se 'accessToken' extract kiya.
+   Variable ${ACCESS_TOKEN} mein store hua.
+   HTTP Header Manager ne har subsequent request mein
+   'Authorization: Bearer ${ACCESS_TOKEN}' inject kiya.
+   Thread group level pe rakha — sab requests automatically authenticated."
+
+Q. "500 users test kiya — sab same API hit kar rahe the, realistic nahi tha?"
+A. "CSV Data Set Config use kiya.
+   5000 rows ki CSV file with different SKU IDs, warehouse IDs.
+   Sharing Mode: All Threads — Sab users sequentially CSV rows consume karte hain.
+   Har user alag row uthata hai → Different SKU, different warehouse → Realistic!
+   Cache thrash hota hai — real production-like behavior."
+
+Q. "Test results mein P99 bahut high tha (10 seconds) — kya kiya?"
+A. "P99 = 1% requests worst case.
+   View Results Tree se un slow requests ki details dekhi.
+   Common pattern: Database lock wait.
+   Slow query log (pg_stat_statements) enable kiya → Culprit query find kiya.
+   Missing index on warehouse_id column.
+   Index add kiya → P99 10s → 1.2s.
+   P95 SLA 1.5s ke andar aa gaya."
+
+Q. "Connection pool exhausted — JMeter ne kaise pata chala?"
+A. "Aggregate Report mein Error% column dekha → 15% errors.
+   View Results Tree → Failed requests → Response body: 'HikariPool connection timeout'.
+   Server logs (kubectl logs) → HikariCP: Unable to acquire connection within 30s.
+   Solution: hikari.maximum-pool-size: 10 → 50.
+   But permanent fix: Query optimization + Redis caching reduce DB load overall."
+
+Q. "Spike test kya tha? Blue Yonder mein kaise use kiya?"
+A. "Spike test: Suddenly traffic 100 → 1000 users instantly.
+   Supply chain mein: Retailer ne bada order diya → Inventory system pe sudden spike.
+   Test: 100 users → 5 second mein 1000 users.
+   Finding: Auto-scaling EKS pe 2 minute lag tha (HPA scale karne mein time).
+   Fix: Min replicas 2 → 4 rakhe — always ready for base load.
+        HPA scale-up cooldown reduce kiya 5 min → 90 sec."
+
+Q. "Soak test result mein kya paya?"
+A. "2 hour soak test (200 users constant):
+   First 30 min: P95 = 800ms ✅
+   After 90 min: P95 = 2.5s ❌ — Memory leak!
+   JVM heap usage increasing continuously (heap dump analysis).
+   Root cause: Cache mein items add ho rahe the, eviction policy set nahi tha.
+   Fix: Redis TTL set kiya, Caffeine cache max-size set kiya.
+   After fix: 2 hour soak test — P95 stable at 900ms ✅"
+
+================================================================================
+SECTION D: 🔥 READ ME — PRODUCTION SCENARIOS + DEBUGGING
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+D1. P1 INCIDENT — BLUE YONDER (IDEMPOTENCY BUG)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+INCIDENT STORY:
+  "Production pe customers complain kar rahe the — same order ke liye double deduction.
+   Warehouse pe inventory 2x decrement ho raha tha.
+
+   Investigation:
+   1. Kafka consumer logs check kiye — same message 2 baar consume hua!
+   2. Root cause: Consumer mein enable.auto.commit=true tha (default)
+      Processing slow tha (external API call) → Auto-commit happen ho gaya
+      BEFORE processing complete hua.
+      Consumer restart hua → Offset nahi badha (from consumer's perspective)
+      → Same message dobara process hua!
+
+   Short-term fix: Consumer restart + manual deduplication script run kiya.
+
+   Long-term fix:
+   1. enable.auto.commit=false → Manual commit
+   2. Idempotency table: order_allocation table mein unique constraint
+      (order_id, allocation_id) → Duplicate insert = Exception → Skip
+
+   LEARNING: Auto-commit KABHI mat use karo production Kafka consumers mein.
+              Always manual commit after successful processing."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+D2. API SLOW — SYSTEMATIC DEBUG APPROACH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SCENARIO: Patient dashboard API 2 seconds → 5 seconds suddenly.
+
+SYSTEMATIC APPROACH:
+  Step 1: WHEN started? — Deploy hone ke baad? Data grow ke baad? Traffic spike?
+          → Git log → Last deploy kya tha?
+          → CloudWatch metrics → Traffic normal hai?
+
+  Step 2: WHICH endpoint? — Sab slow hain ya sirf dashboard?
+          → CloudWatch → API latency per endpoint
+          → Agar sirf dashboard → Dashboard-specific issue
+
+  Step 3: DB QUERIES — Most common culprit
+          → pg_stat_statements ON karo
+          → SELECT query, mean_exec_time FROM pg_stat_statements ORDER BY mean_exec_time DESC LIMIT 10
+          → N+1 query? Missing index? Table scan?
+
+  Step 4: EXTERNAL CALLS — OpenAI, SMS, third-party APIs
+          → Distributed trace (Micrometer + Zipkin)
+          → Agar OpenAI slow → Circuit breaker check, timeout adjust
+
+  Step 5: JAVA PROFILING — Thread contention, GC pressure
+          → kubectl top pod → CPU ya memory spike?
+          → jstack → Thread dump → Lock contention?
+          → Heap dump → Memory leak?
+
+  Step 6: INFRA — RDS, Redis, Network
+          → RDS CPU, connection count, IOPS
+          → ElastiCache hit rate low? → Cache invalidation issue?
+
+HEALTHCARE SPECIFIC CAUSES WE SAW:
+  "pgvector query slow after 500K vectors — IVFFlat index rebuild needed (lists=316)
+   OpenAI API p99 latency spike — added circuit breaker + local LLM fallback
+   N+1 from new JOIN in patient dashboard — JOIN FETCH added"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+D3. KAFKA PARTITION COUNT DECISION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HOW TO DECIDE:
+  1. Consumer count se match karo: 4 consumers → 4 partitions minimum
+  2. Future growth: 2x to 3x consumer count → Partitions = 8-12
+  3. Throughput formula: Required/sec ÷ throughput per partition
+
+  Healthcare: Start with 8 partitions (4 AI consumers × 2 for growth)
+  Blue Yonder: 12 partitions (inventory service expected to scale to 12 consumers)
+
+IMPORTANT WARNING:
+  Partitions BADHA sakte hain (add more) → Existing messages unaffected
+  Partitions NAHI ghata sakte → Topic delete + recreate only!
+  So: thoda zyada partition rakhna better than bahut kam.
+
+  Zyada partitions ka downside:
+  - Each partition = ek file on broker → More file handles
+  - More partitions = More leader election overhead
+  - JVM mein more threads
+  "8-12 partitions for most use cases at our scale. 100+ only for extreme throughput."
+
+================================================================================
+QUICK REFERENCE — SCENARIO ANSWER TEMPLATE
+================================================================================
+
+FOR ANY PRODUCTION ISSUE QUESTION:
+  "First, symptoms identify karta hoon — kya exactly wrong hai.
+   Phir metrics check karta hoon — CloudWatch, Kafka lag, DB slow queries.
+   Root cause find karta hoon — logs, distributed traces, profiling.
+   Short-term fix apply karta hoon to stop bleeding.
+   Long-term fix implement karta hoon to prevent recurrence.
+   Monitoring + alerting add karta hoon so we catch it earlier next time."
+
+FOR ANY KAFKA QUESTION:
+  Start with: What problem it solves (decoupling, resilience, scale)
+  Then: How you configured it (acks, manual commit, idempotency)
+  Then: Failure handling (DLQ, retry, circuit breaker)
+  End with: Real incident or optimization story from your project
+
+FOR JMETER QUESTION:
+  Start with: Why we needed it (performance SLAs, bottleneck finding)
+  Then: How test was set up (thread groups, CSV data, auth)
+  Then: What we found (specific metric, root cause)
+  End with: What fix was applied + result (P95 before/after)
+
+================================================================================
+JMETER CHEAT SHEET
+================================================================================
+
+TERM              MEANING
+--------------    ---------------------------------------------------------------
+Thread Group      Virtual users configuration (count, ramp-up, duration)
+Sampler           Actual API call (HTTP Sampler)
+Config Element    Common config (headers, cookies, CSV data)
+Timer             Wait between requests (realistic user behavior)
+Assertion         Pass/Fail validation (status code, response time)
+Listener          Reports (Aggregate Report, Graph, View Results Tree)
+Ramp-up Period    Time to gradually increase to max users (don't spike instantly)
+Throughput        Requests per second server handled successfully
+P50/P95/P99       50th/95th/99th percentile response time
+Correlation       Extract dynamic value (token) → Reuse in next request
+CSV Data Set      Test data file → Different values per virtual user
+Headless (-n)     Command-line mode (more accurate, CI/CD friendly)
+JTL file          Raw results file → Used to generate HTML report
+.jmx file         Test plan file (XML format, version-controllable)
+
+BLUE YONDER NUMBERS:
+  Load test: 500 users, 60s ramp-up, 30 min duration
+  SLA target: P95 < 1500ms
+  Bottleneck found: DB connection pool (10 → 50) + missing index
+  Result: P95 800ms at 500 users (from 4200ms before fix)
+  Soak test: 200 users, 2 hours → Memory leak found + fixed
+
+================================================================================
+END — Q29_Project_related_questions_answers_theory.txt
+================================================================================

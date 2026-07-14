@@ -11,6 +11,7 @@ public class ArraysPractice {
         System.out.println(missingNUmber);
     }
 
+//    date -> 16/06/2026  5-7 questions of array
 //    Question 1 is 1,2,4,5,6,1 -> print 3 :::: 1,2,3 -> print 4
 //    and else case for - values return 1;
 
@@ -36,4 +37,17 @@ public class ArraysPractice {
         return num.length+1;
 //        return num2.length+1;
     }
+
+//    date -> 18/06/2026  5-7 questions of array
+
+
+//    date -> 18/06/2026  5-7 questions of array
+
+//    date -> 19/06/2026  5-7 questions of array
+
+//    date -> 20/06/2026  5-7 questions of array
+
+//    date -> 21/06/2026  5-7 questions of array
+
+//    date -> 22/06/2026  5-7 questions of array
 }

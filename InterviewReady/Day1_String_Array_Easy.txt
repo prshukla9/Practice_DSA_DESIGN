@@ -1,0 +1,869 @@
+==========================================================================================
+  DAY 1 — STRING (EASY) + ARRAY (EASY)
+  Total: 18 Questions | Java Solutions with Line-by-Line Comments
+==========================================================================================
+
+
+==========================================================================================
+  PART 1: STRINGS — EASY (10 Questions)
+==========================================================================================
+
+------------------------------------------------------------------------------------------
+Q1. Reverse a String
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - String ko char array mein convert karo
+  - Do pointers lagao: left = 0, right = end
+  - Dono ko swap karo aur andar aao jab tak left < right
+
+CODE:
+  public String reverseString(String s) {
+      char[] ch = s.toCharArray();   // String → char array (easier to swap)
+      int left = 0;
+      int right = ch.length - 1;
+
+      while (left < right) {         // Jab tak dono pointers cross nahi karte
+          char temp = ch[left];      // temp mein left wala character save karo
+          ch[left] = ch[right];      // left pe right wala daal do
+          ch[right] = temp;          // right pe temp (pehla left) daal do
+          left++;                    // left pointer ek aage
+          right--;                   // right pointer ek peeche
+      }
+
+      return new String(ch);         // char array wapas String bana ke return karo
+  }
+
+EXAMPLE:
+  Input:  "hello"
+  ch =    ['h','e','l','l','o']
+  Step1:  swap h,o → ['o','e','l','l','h']
+  Step2:  swap e,l → ['o','l','l','e','h']
+  Output: "olleh"
+
+TIME: O(n)  |  SPACE: O(n) for char array
+
+INTERVIEW TIP:
+  StringBuilder use karke bhi ho sakta hai: new StringBuilder(s).reverse().toString()
+  But manually karna interviewer ko zyada impress karta hai.
+
+------------------------------------------------------------------------------------------
+Q2. Check Palindrome
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - Same as reverse — two pointers from both ends
+  - Agar koi bhi character match nahi kiya → palindrome nahi hai
+  - Agar saare match kiye → palindrome hai
+
+CODE:
+  public boolean isPalindrome(String s) {
+      int left = 0;
+      int right = s.length() - 1;
+
+      while (left < right) {                        // Dono pointers meet hone tak
+          if (s.charAt(left) != s.charAt(right)) {  // Agar koi match fail hua
+              return false;                          // Palindrome nahi hai
+          }
+          left++;   // Dono ko andar lao
+          right--;
+      }
+
+      return true;  // Sab match ho gaye → palindrome hai
+  }
+
+EXAMPLE:
+  Input: "racecar"
+  r == r ✓ | a == a ✓ | c == c ✓ | middle 'e' bache (odd length, skip)
+  Output: true
+
+  Input: "hello"
+  h == o ✗
+  Output: false
+
+TIME: O(n)  |  SPACE: O(1)
+
+INTERVIEW TIP:
+  Agar "alphanumeric only" condition ho (e.g. "A man, a plan") toh:
+  Character.isLetterOrDigit(ch) aur Character.toLowerCase(ch) use karo.
+
+------------------------------------------------------------------------------------------
+Q3. Valid Anagram
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - Anagram = same characters, same frequency, different order
+  - Ek int array [26] banao (for a-z)
+  - s ke har char ke liye count++ karo
+  - t ke har char ke liye count-- karo
+  - Agar koi bhi count != 0 → anagram nahi
+
+CODE:
+  public boolean isAnagram(String s, String t) {
+      if (s.length() != t.length()) return false;  // Length alag hai toh anagram possible hi nahi
+
+      int[] count = new int[26];   // 26 letters ke liye frequency array (a=0, b=1 ... z=25)
+
+      for (int i = 0; i < s.length(); i++) {
+          count[s.charAt(i) - 'a']++;   // s ke char ki frequency badhao
+          count[t.charAt(i) - 'a']--;   // t ke char ki frequency ghataao
+      }
+
+      for (int c : count) {
+          if (c != 0) return false;   // Koi bhi count 0 nahi → mismatch hai
+      }
+
+      return true;
+  }
+
+EXAMPLE:
+  s = "anagram", t = "nagaram"
+  count after loop: all zeros → true
+
+  s = "rat", t = "car"
+  count['r'-'a']++ then count['c'-'a']-- → mismatch → false
+
+TIME: O(n)  |  SPACE: O(1) — fixed 26 size array
+
+INTERVIEW TIP:
+  Agar Unicode characters ho toh HashMap<Character, Integer> use karo.
+  'a' se subtract karna sirf lowercase English letters ke liye kaam karta hai.
+
+------------------------------------------------------------------------------------------
+Q4. First Non-Repeating Character
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - Pehle ek pass mein har character ki frequency count karo
+  - Doosre pass mein pehla character dhundo jiska count == 1
+
+CODE:
+  public char firstNonRepeating(String s) {
+      int[] freq = new int[26];   // Frequency array
+
+      // Pass 1: Har character count karo
+      for (char c : s.toCharArray()) {
+          freq[c - 'a']++;   // Us character ki frequency badhao
+      }
+
+      // Pass 2: Left se right, pehla find karo jiska freq == 1
+      for (char c : s.toCharArray()) {
+          if (freq[c - 'a'] == 1) {   // Yeh character sirf ek baar aaya hai
+              return c;               // Yahi answer hai
+          }
+      }
+
+      return '_';   // Agar koi non-repeating nahi mila
+  }
+
+EXAMPLE:
+  Input: "leetcode"
+  freq: l=1, e=2, t=1, c=1, o=1, d=1
+  Second pass: 'l' → freq=1 → return 'l'
+
+  Input: "aabb"
+  freq: a=2, b=2 → koi freq=1 nahi → return '_'
+
+TIME: O(n)  |  SPACE: O(1)
+
+INTERVIEW TIP:
+  LinkedHashMap bhi use kar sakte ho — insertion order maintain hoti hai.
+  But array approach faster hai aur preferred hai.
+
+------------------------------------------------------------------------------------------
+Q5. Character Frequency Count
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - HashMap ya int array use karo
+  - Har character ke liye count track karo
+
+CODE:
+  public Map<Character, Integer> charFrequency(String s) {
+      Map<Character, Integer> map = new LinkedHashMap<>();   // Order maintain karne ke liye
+
+      for (char c : s.toCharArray()) {
+          // Agar character pehle se map mein hai toh count+1, warna 0+1 = 1
+          map.put(c, map.getOrDefault(c, 0) + 1);
+      }
+
+      return map;
+  }
+
+EXAMPLE:
+  Input: "abracadabra"
+  Output: {a=5, b=2, r=2, c=1, d=1}
+
+TIME: O(n)  |  SPACE: O(k) where k = unique characters
+
+INTERVIEW TIP:
+  getOrDefault(key, defaultValue) — agar key exist nahi karta toh default return karta hai.
+  Yeh line bohot common hai, yaad rakho.
+
+------------------------------------------------------------------------------------------
+Q6. Remove Duplicate Characters
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - LinkedHashSet use karo — duplicates remove karta hai, order maintain karta hai
+  - Ya manually ek seen[] boolean array use karo
+
+CODE:
+  // Method 1: LinkedHashSet (clean & simple)
+  public String removeDuplicates(String s) {
+      Set<Character> seen = new LinkedHashSet<>();   // Order maintain + no duplicates
+
+      for (char c : s.toCharArray()) {
+          seen.add(c);   // Duplicate automatically ignore hoga
+      }
+
+      StringBuilder sb = new StringBuilder();
+      for (char c : seen) {
+          sb.append(c);   // Set ke characters string mein daal do
+      }
+
+      return sb.toString();
+  }
+
+  // Method 2: Boolean array (faster, only lowercase)
+  public String removeDuplicates2(String s) {
+      boolean[] seen = new boolean[26];   // 26 letters track karne ke liye
+      StringBuilder sb = new StringBuilder();
+
+      for (char c : s.toCharArray()) {
+          if (!seen[c - 'a']) {        // Agar pehli baar aa raha hai
+              seen[c - 'a'] = true;    // Mark as seen
+              sb.append(c);            // Result mein add karo
+          }
+          // Agar pehle dekha hua hai toh skip
+      }
+
+      return sb.toString();
+  }
+
+EXAMPLE:
+  Input: "programming"
+  Output: "progamin"  (first occurrence of each char)
+
+TIME: O(n)  |  SPACE: O(1)
+
+------------------------------------------------------------------------------------------
+Q7. Capitalize First Letter of Each Word
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - Space se split karo
+  - Har word ka pehla character uppercase karo, baaki lowercase
+  - Wapas join karo
+
+CODE:
+  public String capitalizeWords(String s) {
+      String[] words = s.trim().split("\\s+");   // Extra spaces handle karte hue split karo
+      StringBuilder result = new StringBuilder();
+
+      for (String word : words) {
+          if (word.isEmpty()) continue;   // Empty string skip karo
+
+          // Character.toUpperCase(word.charAt(0)) → pehla char uppercase
+          // word.substring(1).toLowerCase() → baaki sab lowercase
+          result.append(Character.toUpperCase(word.charAt(0)))
+                .append(word.substring(1).toLowerCase());
+
+          result.append(" ");   // Words ke beech space
+      }
+
+      return result.toString().trim();   // End mein extra space remove karo
+  }
+
+EXAMPLE:
+  Input: "hello world from java"
+  Output: "Hello World From Java"
+
+TIME: O(n)  |  SPACE: O(n)
+
+INTERVIEW TIP:
+  "\\s+" means ek ya zyada spaces — yeh multiple spaces bhi handle karta hai.
+  Sirf " " use karne se multiple spaces pe problem aata hai.
+
+------------------------------------------------------------------------------------------
+Q8. Sum of Digits in a String
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - String ke har character ko iterate karo
+  - Agar character digit hai (Character.isDigit) toh sum mein add karo
+  - '5' - '0' = 5 (char to int conversion trick)
+
+CODE:
+  public int sumOfDigits(String s) {
+      int sum = 0;
+
+      for (char c : s.toCharArray()) {
+          if (Character.isDigit(c)) {   // Sirf digits consider karo (letters ignore)
+              sum += c - '0';           // '5' - '0' = 53 - 48 = 5 (ASCII trick)
+          }
+      }
+
+      return sum;
+  }
+
+EXAMPLE:
+  Input: "ab12c3d"
+  Digits: 1, 2, 3
+  Output: 6
+
+  Input: "hello123"
+  Output: 1+2+3 = 6
+
+TIME: O(n)  |  SPACE: O(1)
+
+INTERVIEW TIP:
+  c - '0' trick yaad rakho — char digit ko int mein convert karta hai.
+  Character.getNumericValue(c) bhi use kar sakte ho lekin c-'0' zyada common hai.
+
+------------------------------------------------------------------------------------------
+Q9. Check Pangram (Find Missing Letters)
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - Pangram = sentence mein a-z ke saare 26 letters hone chahiye
+  - Ek boolean[26] array banao
+  - Har letter ko mark karo
+  - Check karo koi false toh nahi hai
+
+CODE:
+  public boolean isPangram(String s) {
+      boolean[] present = new boolean[26];   // 26 letters, sab false se start
+
+      for (char c : s.toLowerCase().toCharArray()) {
+          if (c >= 'a' && c <= 'z') {       // Sirf letters consider karo (spaces, punctuation skip)
+              present[c - 'a'] = true;       // Is letter ko mark karo as present
+          }
+      }
+
+      for (boolean b : present) {
+          if (!b) return false;   // Koi bhi letter missing hai toh pangram nahi
+      }
+
+      return true;   // Saare 26 letters present hain
+  }
+
+  // Bonus: Missing letters print karo
+  public String missingLetters(String s) {
+      boolean[] present = new boolean[26];
+
+      for (char c : s.toLowerCase().toCharArray()) {
+          if (c >= 'a' && c <= 'z') {
+              present[c - 'a'] = true;
+          }
+      }
+
+      StringBuilder missing = new StringBuilder();
+      for (int i = 0; i < 26; i++) {
+          if (!present[i]) {
+              missing.append((char)('a' + i));   // Index wapas letter mein convert karo
+          }
+      }
+
+      return missing.toString();   // Missing letters return karo
+  }
+
+EXAMPLE:
+  Input: "The quick brown fox jumps over the lazy dog"
+  All 26 letters present → isPangram = true, missingLetters = ""
+
+  Input: "Hello World"
+  missingLetters = "abcdfgijkmnpqrsuvxyz"
+
+TIME: O(n)  |  SPACE: O(1)
+
+------------------------------------------------------------------------------------------
+Q10. Longest Common Prefix
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - Pehli string ko prefix maano
+  - Baaki strings se compare karo
+  - Jab tak prefix match ho, usi prefix ko shorten karte jao
+
+CODE:
+  public String longestCommonPrefix(String[] strs) {
+      if (strs == null || strs.length == 0) return "";   // Edge case
+
+      String prefix = strs[0];   // Pehli string ko starting prefix maano
+
+      for (int i = 1; i < strs.length; i++) {
+          // Jab tak current string prefix se start nahi hoti, prefix ek char chhoti karo
+          while (!strs[i].startsWith(prefix)) {
+              prefix = prefix.substring(0, prefix.length() - 1);   // Last char remove karo
+              if (prefix.isEmpty()) return "";   // Koi common prefix nahi
+          }
+      }
+
+      return prefix;
+  }
+
+EXAMPLE:
+  Input: ["flower", "flow", "flight"]
+
+  prefix = "flower"
+  "flow".startsWith("flower")? No → prefix = "flowe"
+  "flow".startsWith("flowe")? No → prefix = "flow"
+  "flow".startsWith("flow")? Yes ✓
+
+  "flight".startsWith("flow")? No → prefix = "flo"
+  "flight".startsWith("flo")? No → prefix = "fl"
+  "flight".startsWith("fl")? Yes ✓
+
+  Output: "fl"
+
+TIME: O(n * m) where m = length of shortest string  |  SPACE: O(1)
+
+INTERVIEW TIP:
+  Trie data structure se bhi solve hota hai — agar interviewer advanced pooche.
+  But is approach se O(n*m) mein kaam ho jaata hai.
+
+
+==========================================================================================
+  PART 2: ARRAYS — EASY (8 Questions)
+==========================================================================================
+
+------------------------------------------------------------------------------------------
+Q11. Missing Number (1 to n)
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - Array mein 0 to n tak ke numbers hain, ek missing hai
+  - Expected sum = n*(n+1)/2
+  - Actual sum = array ke saare numbers ka sum
+  - Missing = Expected - Actual
+
+CODE:
+  public int missingNumber(int[] nums) {
+      int n = nums.length;
+      int expectedSum = n * (n + 1) / 2;   // 0 to n ka expected sum formula
+
+      int actualSum = 0;
+      for (int num : nums) {
+          actualSum += num;   // Array ke actual numbers ka sum
+      }
+
+      return expectedSum - actualSum;   // Difference = missing number
+  }
+
+  // XOR Method (no overflow risk for large n)
+  public int missingNumberXOR(int[] nums) {
+      int xor = nums.length;   // n se start karo
+
+      for (int i = 0; i < nums.length; i++) {
+          xor ^= i ^ nums[i];   // i aur nums[i] dono XOR karo
+          // Same number do baar XOR ho toh cancel ho jaata hai (a^a = 0)
+      }
+
+      return xor;   // Jo cancel nahi hua wo missing number hai
+  }
+
+EXAMPLE:
+  Input: [3, 0, 1]  (n = 3)
+  Expected sum = 3*4/2 = 6
+  Actual sum = 3+0+1 = 4
+  Missing = 6-4 = 2 ✓
+
+TIME: O(n)  |  SPACE: O(1)
+
+INTERVIEW TIP:
+  Sum formula simple aur clean hai — zyada tar yahi poochhhte hain.
+  XOR method advanced follow-up mein kaam aata hai.
+
+------------------------------------------------------------------------------------------
+Q12. Move Zeroes to End
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - Two pointer: insertPos = 0 (jahan next non-zero element aayega)
+  - Array iterate karo, non-zero milne pe insertPos pe rakh do
+  - End mein baaki sab positions zero kar do
+
+CODE:
+  public void moveZeroes(int[] nums) {
+      int insertPos = 0;   // Yahan next non-zero element daalna hai
+
+      // Pass 1: Saare non-zero elements aage lao (order maintain karo)
+      for (int num : nums) {
+          if (num != 0) {               // Sirf non-zero elements
+              nums[insertPos] = num;    // insertPos pe rakh do
+              insertPos++;              // Agle position pe jao
+          }
+      }
+
+      // Pass 2: Remaining positions zero se fill karo
+      while (insertPos < nums.length) {
+          nums[insertPos] = 0;   // Remaining positions zero karo
+          insertPos++;
+      }
+  }
+
+EXAMPLE:
+  Input: [0, 1, 0, 3, 12]
+
+  Pass 1 (non-zeros aage lao):
+  num=0 → skip
+  num=1 → nums[0]=1, insertPos=1
+  num=0 → skip
+  num=3 → nums[1]=3, insertPos=2
+  num=12 → nums[2]=12, insertPos=3
+
+  After Pass 1: [1, 3, 12, 3, 12]
+
+  Pass 2 (zeros fill karo from insertPos=3):
+  nums[3]=0, nums[4]=0
+
+  Output: [1, 3, 12, 0, 0] ✓
+
+TIME: O(n)  |  SPACE: O(1)
+
+INTERVIEW TIP:
+  "In-place" aur "maintain relative order" — yahi constraints hote hain.
+  Swap-based approach bhi hai but ye cleaner hai.
+
+------------------------------------------------------------------------------------------
+Q13. Find Duplicates in Array
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - HashSet use karo
+  - Har element ko set mein daalne ki koshish karo
+  - Agar already present hai → duplicate mil gaya
+
+CODE:
+  // Method 1: HashSet (General, works for any range)
+  public List<Integer> findDuplicates(int[] nums) {
+      Set<Integer> seen = new HashSet<>();
+      List<Integer> result = new ArrayList<>();
+
+      for (int num : nums) {
+          if (!seen.add(num)) {   // add() false return karta hai agar already present ho
+              result.add(num);    // Duplicate hai → result mein add karo
+          }
+      }
+
+      return result;
+  }
+
+  // Method 2: Index marking (Clever, O(1) space, works when nums are in range [1,n])
+  public List<Integer> findDuplicates2(int[] nums) {
+      List<Integer> result = new ArrayList<>();
+
+      for (int num : nums) {
+          int index = Math.abs(num) - 1;   // Number ko index mein convert karo (1-indexed to 0-indexed)
+
+          if (nums[index] < 0) {           // Agar already negative hai → pehle aa chuka hai → duplicate
+              result.add(Math.abs(num));
+          } else {
+              nums[index] = -nums[index];  // Negative mark karo "visited" ke liye
+          }
+      }
+
+      return result;
+  }
+
+EXAMPLE (Method 2):
+  Input: [4, 3, 2, 7, 8, 2, 3, 1]
+
+  num=4 → index=3 → nums[3]=7 (positive) → mark: nums[3]=-7
+  num=3 → index=2 → nums[2]=2 (positive) → mark: nums[2]=-2
+  num=2 → index=1 → nums[1]=3 (positive) → mark: nums[1]=-3
+  num=7 → index=6 → nums[6]=3 (positive) → mark: nums[6]=-3
+  num=8 → index=7 → nums[7]=1 (positive) → mark: nums[7]=-1
+  num=2 → index=1 → nums[1]=-3 (NEGATIVE!) → 2 is duplicate ✓
+  num=3 → index=2 → nums[2]=-2 (NEGATIVE!) → 3 is duplicate ✓
+
+  Output: [2, 3]
+
+TIME: O(n)  |  SPACE: O(1) for method 2
+
+------------------------------------------------------------------------------------------
+Q14. Sort Array of 0s, 1s, and 2s (Dutch National Flag)
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - 3 pointers: low=0 (0s yahan), mid=0 (current), high=end (2s yahan)
+  - mid==0: swap(low,mid), low++, mid++
+  - mid==1: mid++ (sahi jagah hai)
+  - mid==2: swap(mid,high), high-- (mid++ nahi karo, newly swapped check karna hai)
+
+CODE:
+  public void sortColors(int[] nums) {
+      int low = 0;              // 0s yahan tak aayenge
+      int mid = 0;              // Current element
+      int high = nums.length - 1;  // 2s yahan tak aayenge
+
+      while (mid <= high) {
+          if (nums[mid] == 0) {
+              // 0 mila → low aur mid ke saath swap, dono aage
+              swap(nums, low, mid);
+              low++;
+              mid++;
+          } else if (nums[mid] == 1) {
+              // 1 mila → sahi jagah hai, bas mid aage badho
+              mid++;
+          } else {
+              // 2 mila → high se swap karo, high peeche aao
+              // mid ko mat badhao — newly swapped element check karna hai
+              swap(nums, mid, high);
+              high--;
+          }
+      }
+  }
+
+  private void swap(int[] nums, int i, int j) {
+      int temp = nums[i];
+      nums[i] = nums[j];
+      nums[j] = temp;
+  }
+
+EXAMPLE:
+  Input: [2, 0, 2, 1, 1, 0]
+  low=0, mid=0, high=5
+
+  nums[mid]=2 → swap(0,5) → [0,0,2,1,1,2], high=4
+  nums[mid]=0 → swap(0,0) → [0,0,2,1,1,2], low=1, mid=1
+  nums[mid]=0 → swap(1,1) → [0,0,2,1,1,2], low=2, mid=2
+  nums[mid]=2 → swap(2,4) → [0,0,1,1,2,2], high=3
+  nums[mid]=1 → mid=3
+  nums[mid]=1 → mid=4 (mid>high, stop)
+
+  Output: [0, 0, 1, 1, 2, 2] ✓
+
+TIME: O(n)  |  SPACE: O(1)
+
+INTERVIEW TIP:
+  Isko Dutch National Flag Problem kehte hain — Dijkstra ne propose kiya tha.
+  In-place, single pass — yahi beauty hai is algorithm ki.
+
+------------------------------------------------------------------------------------------
+Q15. Rotate Array K Times
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - Trick: 3 reversals se kaam ho jaata hai
+  - Pura array reverse karo
+  - Pehle k elements reverse karo
+  - Baaki n-k elements reverse karo
+  - k = k % n (agar k > n ho)
+
+CODE:
+  public void rotateArray(int[] nums, int k) {
+      int n = nums.length;
+      k = k % n;   // k bada ho toh normalize karo (e.g. n=5, k=7 → k=2)
+
+      if (k == 0) return;   // Rotation ki zaroorat nahi
+
+      // Step 1: Pura array reverse karo
+      reverse(nums, 0, n - 1);
+
+      // Step 2: Pehle k elements reverse karo
+      reverse(nums, 0, k - 1);
+
+      // Step 3: Baaki n-k elements reverse karo
+      reverse(nums, k, n - 1);
+  }
+
+  private void reverse(int[] nums, int left, int right) {
+      while (left < right) {
+          int temp = nums[left];
+          nums[left] = nums[right];
+          nums[right] = temp;
+          left++;
+          right--;
+      }
+  }
+
+EXAMPLE:
+  Input: nums=[1,2,3,4,5,6,7], k=3
+
+  Step 1 (reverse all):    [7,6,5,4,3,2,1]
+  Step 2 (reverse 0 to 2): [5,6,7,4,3,2,1]
+  Step 3 (reverse 3 to 6): [5,6,7,1,2,3,4]
+
+  Output: [5,6,7,1,2,3,4] ✓
+  (Last 3 elements [5,6,7] front mein aa gaye)
+
+TIME: O(n)  |  SPACE: O(1)
+
+INTERVIEW TIP:
+  Extra array wala approach O(n) space leta hai — interviewer O(1) space maangta hai.
+  3-reversal trick yaad rakho, classic hai.
+
+------------------------------------------------------------------------------------------
+Q16. Majority Element (appears more than n/2 times)
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - Boyer-Moore Voting Algorithm
+  - candidate = pehla element, count = 1
+  - Har element: agar candidate se match → count++, warna count--
+  - count 0 hone pe candidate badal do
+  - At end, candidate = majority element (guaranteed kyunki >n/2 hai)
+
+CODE:
+  public int majorityElement(int[] nums) {
+      int candidate = nums[0];   // Pehle element ko candidate maano
+      int count = 1;             // Count 1 se start
+
+      for (int i = 1; i < nums.length; i++) {
+          if (count == 0) {
+              candidate = nums[i];   // Naya candidate choose karo
+              count = 1;
+          } else if (nums[i] == candidate) {
+              count++;   // Same element → vote dena hai → count badhao
+          } else {
+              count--;   // Different element → vote cancel → count ghataao
+          }
+      }
+
+      return candidate;   // Majority element guaranteed hai (>n/2 condition)
+  }
+
+EXAMPLE:
+  Input: [2, 2, 1, 1, 1, 2, 2]
+
+  i=0: candidate=2, count=1
+  i=1: 2==2 → count=2
+  i=2: 1!=2 → count=1
+  i=3: 1!=2 → count=0
+  i=4: count==0 → candidate=1, count=1
+  i=5: 2!=1 → count=0
+  i=6: count==0 → candidate=2, count=1
+
+  Output: 2 ✓ (appears 4 times out of 7)
+
+TIME: O(n)  |  SPACE: O(1)
+
+INTERVIEW TIP:
+  HashMap se count track karna O(n) time, O(n) space → simple but not optimal.
+  Boyer-Moore O(1) space → always mention karo aur explain karo.
+
+------------------------------------------------------------------------------------------
+Q17. Classic Binary Search
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - Sorted array mein element dhundho
+  - Middle element check karo
+  - Agar target < mid → left half mein dhundho
+  - Agar target > mid → right half mein dhundho
+  - Agar equal → mil gaya
+
+CODE:
+  public int binarySearch(int[] nums, int target) {
+      int left = 0;
+      int right = nums.length - 1;
+
+      while (left <= right) {               // <= important hai (single element case)
+          int mid = left + (right - left) / 2;   // Overflow se bachne ke liye (left+right)/2 mat karo
+
+          if (nums[mid] == target) {
+              return mid;              // Target mil gaya → index return karo
+          } else if (nums[mid] < target) {
+              left = mid + 1;          // Target right half mein hai
+          } else {
+              right = mid - 1;         // Target left half mein hai
+          }
+      }
+
+      return -1;   // Target nahi mila
+  }
+
+EXAMPLE:
+  Input: nums=[1,3,5,7,9,11], target=7
+
+  left=0, right=5, mid=2 → nums[2]=5 < 7 → left=3
+  left=3, right=5, mid=4 → nums[4]=9 > 7 → right=3
+  left=3, right=3, mid=3 → nums[3]=7 == 7 → return 3 ✓
+
+TIME: O(log n)  |  SPACE: O(1)
+
+INTERVIEW TIP:
+  mid = left + (right - left) / 2 ← ALWAYS use this, not (left+right)/2
+  (left+right) overflow ho sakta hai jab dono large integers ho.
+  left <= right condition yaad rakho (not just <).
+
+------------------------------------------------------------------------------------------
+Q18. Find Peak Element
+------------------------------------------------------------------------------------------
+
+LOGIC:
+  - Peak = element jo apne neighbors se bada ho
+  - Binary search use karo:
+  - Agar nums[mid] < nums[mid+1] → peak right mein hai
+  - Warna → peak left mein hai (ya mid khud peak hai)
+
+CODE:
+  public int findPeakElement(int[] nums) {
+      int left = 0;
+      int right = nums.length - 1;
+
+      while (left < right) {             // left < right (not <=) kyunki mid+1 access karte hain
+          int mid = left + (right - left) / 2;
+
+          if (nums[mid] < nums[mid + 1]) {
+              // Right side upar ja raha hai → peak wahan hai
+              left = mid + 1;
+          } else {
+              // Left side upar ja raha hai ya mid khud peak hai
+              right = mid;   // mid+1 nahi (mid khud peak ho sakta hai)
+          }
+      }
+
+      return left;   // left == right → peak element ka index
+  }
+
+EXAMPLE:
+  Input: [1, 2, 3, 1]
+  left=0, right=3, mid=1 → nums[1]=2 < nums[2]=3 → left=2
+  left=2, right=3, mid=2 → nums[2]=3 > nums[3]=1 → right=2
+  left==right==2 → return 2
+
+  nums[2] = 3 → Peak ✓
+
+TIME: O(log n)  |  SPACE: O(1)
+
+INTERVIEW TIP:
+  Linear scan O(n) se bhi peak dhundh sakte ho, but interviewer O(log n) maangta hai.
+  right = mid (not mid-1) kyunki mid khud answer ho sakta hai.
+
+==========================================================================================
+QUICK REVISION CHEATSHEET
+==========================================================================================
+
+Q#   Question                         Key Technique           Time    Space
+-------------------------------------------------------------------------------------
+1    Reverse String                   Two Pointers            O(n)    O(n)
+2    Check Palindrome                 Two Pointers            O(n)    O(1)
+3    Valid Anagram                    Freq Array [26]         O(n)    O(1)
+4    First Non-Repeating Char         Freq Array, 2 pass      O(n)    O(1)
+5    Character Frequency Count        HashMap                 O(n)    O(k)
+6    Remove Duplicate Chars           LinkedHashSet / bool[]  O(n)    O(1)
+7    Capitalize First Letter          split + substring       O(n)    O(n)
+8    Sum of Digits in String          c - '0' trick           O(n)    O(1)
+9    Check Pangram                    bool[26]                O(n)    O(1)
+10   Longest Common Prefix            startsWith shrink       O(n*m)  O(1)
+11   Missing Number                   Sum formula / XOR       O(n)    O(1)
+12   Move Zeroes                      insertPos pointer       O(n)    O(1)
+13   Find Duplicates                  HashSet / Index mark    O(n)    O(1)
+14   Sort 0-1-2                       Dutch Flag 3 pointers   O(n)    O(1)
+15   Rotate Array K times             3 Reversals             O(n)    O(1)
+16   Majority Element                 Boyer-Moore Voting      O(n)    O(1)
+17   Binary Search                    left+right/2 carefully  O(logn) O(1)
+18   Peak Element                     Binary Search variant   O(logn) O(1)
+-------------------------------------------------------------------------------------
+
+COMMON TRICKS TO REMEMBER:
+  c - '0'          → char digit to int  (e.g. '5'-'0' = 5)
+  c - 'a'          → char to index      (e.g. 'c'-'a' = 2)
+  (char)('a' + i)  → index to char      (e.g. 'a'+2 = 'c')
+  left+(right-left)/2 → safe mid calculation (no overflow)
+  map.getOrDefault(key, 0) + 1 → frequency count shorthand
+  set.add() returns false if already present → duplicate check
+==========================================================================================

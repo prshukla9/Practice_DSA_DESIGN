@@ -1,0 +1,58 @@
+
+SECTION 1: CORE THREAD BASICS
+Thread kya hota hai? Process se difference?
+Thread create kaise karte ho? (Thread vs Runnable vs Callable)
+start() vs run() difference?
+Thread lifecycle (states) explain karo?
+Sleep vs wait vs yield difference?
+
+SECTION 2: SYNCHRONIZATION & LOCKS
+Synchronization kya hota hai?
+synchronized method vs synchronized block?
+Object-level vs class-level lock?
+Intrinsic lock (monitor) kya hota hai?
+Reentrant lock kya hota hai?
+Concurrency â€” ExecutorService, submit vs execute, Locks vs synchronized, volatile
+Thread.join() & run()?
+
+SECTION 3: ADVANCED LOCKS
+ReentrantLock vs synchronized?
+ReadWriteLock kya hota hai?
+Lock fairness kya hota hai?
+TryLock kya karta hai?
+Deadlock kya hota hai? kaise avoid karte ho?
+
+SECTION 4: VOLATILE & MEMORY MODEL
+volatile keyword kya karta hai?
+Visibility vs atomicity vs ordering?
+Java Memory Model (JMM) kya hai?
+Happens-before relationship kya hota hai?
+Double-checked locking kya hota hai?
+
+SECTION 5: EXECUTORS & THREAD POOLS
+Executor framework kya hai?
+ThreadPoolExecutor ka working?
+Fixed vs Cached thread pool?
+Queue ka role thread pool me?
+Future vs CompletableFuture?
+
+SECTION 6: CONCURRENT COLLECTIONS
+ConcurrentHashMap ka internal working?
+ConcurrentHashMap vs HashMap?
+CopyOnWriteArrayList kya hota hai?
+BlockingQueue kya hota hai?
+Fail-fast vs Fail-safe iterators?
+
+SECTION 7: REAL PROBLEMS & DEBUGGING
+Race condition kya hota hai? real example?
+Thread starvation kya hota hai?
+Livelock kya hota hai?
+Deadlock detect kaise karte ho production me?
+High CPU threads kaise debug karte ho?
+
+SECTION 8: PRACTICAL DESIGN QUESTIONS
+Thread-safe singleton kaise banate ho?
+Producer-Consumer problem ka solution?
+Rate limiter design using threads?
+Parallel processing kaise implement karte ho?
+Async processing Spring Boot me kaise karte ho?

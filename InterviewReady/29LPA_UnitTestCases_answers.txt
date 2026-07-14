@@ -1,0 +1,1379 @@
+
+================================================================================
+  UNIT TESTING — COMPLETE INTERVIEW PREPARATION (6 YRS EXPERIENCE)
+  Hinglish mein - Simple + Code + Real Interview Answers
+================================================================================
+
+> 6 Sections | ~30 Questions + Missing Topics (Kafka Testing etc.)
+> JUnit 5 + Mockito + Spring Boot Test
+> Har answer: Concept → Code → Interview Tip
+
+================================================================================
+SECTION 1: UNIT TESTING FUNDAMENTALS
+================================================================================
+
+------------------------------------------------------------------------
+Q1. Unit testing kya hota hai aur kyun important hai?
+------------------------------------------------------------------------
+
+CONCEPT:
+Unit test = ek SINGLE unit (class/method) ko ISOLATION mein test karna
+- External dependencies (DB, Kafka, external APIs) ko MOCK karte hain
+- Fast, repeatable, independent hota hai
+
+WHY IMPORTANT (6 yrs exp wale se expect):
+1. Regression prevention — naya code purane features nahi todega
+2. Living documentation — test naam se pata chalta hai code kya karta hai
+3. Refactoring confidence — tests green hain matlab safe hai
+4. Design feedback — testable code = loosely coupled code
+5. CI/CD pipeline — tests fail → deploy nahi hoga
+
+// REAL WORLD:
+// Bina tests ke production bug fix karo → side effects ka pata nahi
+// Tests ke saath → change karo, run tests → confident deploy
+
+INTERVIEW TIP: "At my current project, we maintain ~80% code coverage with focus on
+business logic coverage. Tests ne humein confidently microservices refactor karne diya."
+
+------------------------------------------------------------------------
+Q2. Unit test vs Integration test difference?
+------------------------------------------------------------------------
+
+| Feature           | Unit Test              | Integration Test            |
+|-------------------|------------------------|-----------------------------|
+| Scope             | Single class/method    | Multiple components together|
+| Dependencies      | All mocked             | Real (or some mocked)       |
+| Speed             | Milliseconds           | Seconds to minutes          |
+| Isolation         | Complete               | Partial                     |
+| Spring context    | No (pure Java)         | Yes (@SpringBootTest)       |
+| DB                | No (mocked)            | Yes (H2 / TestContainers)   |
+| Test pyramid      | Base (most tests)      | Middle layer                |
+
+// UNIT TEST EXAMPLE:
+class OrderServiceTest {
+    @Mock private OrderRepository mockRepo; // Real DB nahi — mock
+    @InjectMocks private OrderService orderService; // Only this class tested
+
+    @Test
+    void shouldCalculateCorrectTotal() {
+        Order order = new Order(Arrays.asList(
+            new Item("book", 100.0),
+            new Item("pen", 50.0)
+        ));
+        double total = orderService.calculateTotal(order);
+        assertEquals(150.0, total);
+    }
+}
+
+// INTEGRATION TEST EXAMPLE:
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY) // H2
+class OrderControllerIntegrationTest {
+    @Autowired private TestRestTemplate restTemplate;
+
+    @Test
+    void shouldCreateOrderEndToEnd() {
+        // Real HTTP request → Controller → Service → H2 DB
+        ResponseEntity<Order> response = restTemplate.postForEntity("/orders", newOrder, Order.class);
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+    }
+}
+
+------------------------------------------------------------------------
+Q3. Good Unit Test ke characteristics kya hote hain? (FIRST)
+------------------------------------------------------------------------
+
+F - FAST: Milliseconds mein chale (no I/O, no DB, no network)
+I - INDEPENDENT: Test ka result doosre tests pe depend na kare, order matter na kare
+R - REPEATABLE: Kisi bhi environment mein same result (no random, no time-dependent)
+S - SELF-VALIDATING: Pass/fail clearly bole (no manual checking required)
+T - TIMELY/THOROUGH: Code ke saath likho, edge cases cover karo
+
+// BAD TEST — violates FIRST:
+@Test
+void badTest() {
+    Thread.sleep(2000); // Slow — F violated
+    // depends on previous test's data — I violated
+    // uses new Date() without mocking — R violated
+    System.out.println(result); // No assertion — S violated
+}
+
+// GOOD TEST:
+@Test
+@DisplayName("Should return empty list when no users found")
+void shouldReturnEmptyListWhenNoUsersFound() {
+    // FAST — no I/O
+    // INDEPENDENT — fresh mock
+    when(mockRepo.findAll()).thenReturn(Collections.emptyList());
+    List<User> result = userService.getAllUsers();
+    assertTrue(result.isEmpty()); // SELF-VALIDATING
+}
+
+------------------------------------------------------------------------
+Q4. Test Pyramid kya hota hai?
+------------------------------------------------------------------------
+
+          /\
+         /  \
+        / E2E \          ← Few (Selenium, API end-to-end)
+       /--------\
+      / Integration\     ← Some (@SpringBootTest)
+     /-------------\
+    /   Unit Tests   \   ← MOST (@Test + Mockito)
+   /------------------\
+
+PYRAMID RULES:
+- Zyada unit tests — fast, cheap
+- Kam integration tests — medium speed
+- Bahut kam E2E tests — slow, brittle, expensive
+
+ANTI-PATTERN: Ice cream cone (inverted pyramid) — zyada E2E, kam unit
+→ Slow CI, brittle tests, hard to debug
+
+------------------------------------------------------------------------
+Q5. TDD (Test Driven Development) kya hai?
+------------------------------------------------------------------------
+
+TDD CYCLE: RED → GREEN → REFACTOR
+
+1. RED: Pehle failing test likho (feature abhi exist nahi karti)
+2. GREEN: Minimum code likho jisse test pass ho
+3. REFACTOR: Code clean karo (tests still green)
+
+// TDD EXAMPLE: Password validator banana
+
+// STEP 1: RED — test likho (PasswordValidator class nahi bani abhi)
+@Test
+void shouldFailForPasswordShorterThan8Chars() {
+    PasswordValidator validator = new PasswordValidator();
+    assertFalse(validator.isValid("abc")); // Test FAILS — class exist nahi
+}
+
+// STEP 2: GREEN — minimum implementation
+class PasswordValidator {
+    public boolean isValid(String password) {
+        return password != null && password.length() >= 8; // Minimum to pass test
+    }
+}
+
+// STEP 3: More tests
+@Test
+void shouldFailWithoutUpperCase() {
+    assertFalse(new PasswordValidator().isValid("abcdefgh")); // RED again
+}
+
+// Fix:
+public boolean isValid(String password) {
+    return password != null
+        && password.length() >= 8
+        && password.matches(".*[A-Z].*"); // GREEN
+}
+
+// STEP 4: REFACTOR — extract constants, improve readability
+// → tests still green
+
+INTERVIEW TIP: "TDD forces you to think about API design before implementation.
+Production mein hum BDD (Behavior Driven) approach use karte hain — Gherkin/Cucumber for
+acceptance tests, TDD for unit tests."
+
+================================================================================
+SECTION 2: JUNIT DEEP DIVE
+================================================================================
+
+------------------------------------------------------------------------
+Q6. JUnit 4 vs JUnit 5 difference?
+------------------------------------------------------------------------
+
+| Feature           | JUnit 4                    | JUnit 5                      |
+|-------------------|----------------------------|------------------------------|
+| Package           | org.junit.*                | org.junit.jupiter.api.*      |
+| Architecture      | Monolithic                 | Modular (Platform+Jupiter+Vintage) |
+| @Before/@After    | @Before, @After            | @BeforeEach, @AfterEach      |
+| @BeforeClass      | @BeforeClass (static)      | @BeforeAll (static default)  |
+| @Ignore           | @Ignore                    | @Disabled                    |
+| Expected exception| @Test(expected=X.class)    | assertThrows()               |
+| Parameterized     | @RunWith(Parameterized)    | @ParameterizedTest (built-in)|
+| Extension         | @RunWith                   | @ExtendWith (composable)     |
+| Assertions        | Assert.*                   | Assertions.* (better messages)|
+| Lambda support    | No                         | Yes                          |
+
+------------------------------------------------------------------------
+Q7. Common Annotations explain karo?
+------------------------------------------------------------------------
+
+import org.junit.jupiter.api.*;
+
+class UserServiceTest {
+
+    @BeforeAll // Class ke saare tests se PEHLE — ONCE (static method)
+    static void setupClass() {
+        System.out.println("Ek baar — test class shuru hone se pehle");
+        // Expensive setup: test containers start, schema create
+    }
+
+    @BeforeEach // Har test se PEHLE — fresh state ensure karo
+    void setUp() {
+        MockitoAnnotations.openMocks(this); // Mocks reinitialize
+        // State reset karo — test independence
+    }
+
+    @AfterEach // Har test ke BAAD
+    void tearDown() {
+        // Cleanup — files delete, connections close
+    }
+
+    @AfterAll // Saare tests ke BAAD — ONCE (static)
+    static void tearDownClass() {
+        // TestContainer stop, connection close
+    }
+
+    @Test
+    @DisplayName("Should return user when valid ID provided")
+    void shouldReturnUser() {
+        // Test code
+    }
+
+    @Test
+    @Disabled("Flaky test — fix pending JIRA-123") // Skip with reason
+    void flakyTest() { }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS) // 5 sec se zyada toh fail
+    void shouldCompleteWithinTimeout() { }
+
+    @RepeatedTest(3) // Same test 3 baar run karo
+    void shouldPassConsistently() { }
+
+    @Nested // Related tests group karo
+    @DisplayName("When user is admin")
+    class AdminUserTests {
+        @Test
+        void shouldAccessAdminDashboard() { }
+        @Test
+        void shouldDeleteOtherUsers() { }
+    }
+}
+
+------------------------------------------------------------------------
+Q8. Assertions ka use?
+------------------------------------------------------------------------
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@Test
+void demonstrateAssertions() {
+    // BASIC
+    assertEquals(5, 2 + 3, "2+3 should be 5"); // message optional — failure pe show hoga
+    assertNotEquals(4, 2 + 3);
+    assertTrue(user.isActive());
+    assertFalse(list.isEmpty());
+    assertNull(user.getDeletedAt());
+    assertNotNull(user.getId());
+
+    // SAME OBJECT REFERENCE check
+    User user1 = userService.getUser(1L);
+    assertSame(user1, userService.getUser(1L)); // Same instance?
+    assertNotSame(new User(), new User());
+
+    // COLLECTIONS
+    assertIterableEquals(expected, actual); // Order matters
+    assertTrue(list.containsAll(expected));
+
+    // EXCEPTION TESTING (JUnit 5 way)
+    UserNotFoundException ex = assertThrows(
+        UserNotFoundException.class,
+        () -> userService.findById(-1L) // Yeh exception throw kare
+    );
+    assertEquals("User not found with id: -1", ex.getMessage()); // Exception message bhi verify
+
+    // assertDoesNotThrow
+    assertDoesNotThrow(() -> userService.findById(1L));
+
+    // ALL assertions ek saath check karo (ek fail hone pe bhi baaki run hoti hain)
+    assertAll("user validation",
+        () -> assertNotNull(user.getId()),
+        () -> assertNotNull(user.getName()),
+        () -> assertTrue(user.isActive()),
+        () -> assertEquals("prashant@example.com", user.getEmail())
+    );
+
+    // TIMEOUT
+    assertTimeout(Duration.ofMillis(500), () -> {
+        // Yeh 500ms mein complete hona chahiye
+        userService.processUser(user);
+    });
+}
+
+// AssertJ (Fluent assertions — RECOMMENDED):
+import static org.assertj.core.api.Assertions.*;
+
+assertThat(user.getName()).isEqualTo("Prashant");
+assertThat(users).hasSize(3).extracting("name").contains("Alice", "Bob");
+assertThat(exception).isInstanceOf(UserNotFoundException.class)
+                       .hasMessage("User not found with id: -1");
+assertThatThrownBy(() -> userService.findById(-1L))
+    .isInstanceOf(UserNotFoundException.class);
+
+------------------------------------------------------------------------
+Q9. Parameterized Tests kya hote hain?
+------------------------------------------------------------------------
+
+// Same test multiple inputs pe run karo — code duplication avoid
+
+@ParameterizedTest
+@ValueSource(strings = {"", " ", "  ", "\t"}) // Multiple values
+@DisplayName("Should throw exception for blank username")
+void shouldRejectBlankUsername(String username) {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> userService.createUser(username, "password")
+    );
+}
+
+@ParameterizedTest
+@CsvSource({
+    "Prashant, prashant@gmail.com, true",   // valid
+    "A, a@b.com, false",                     // too short name
+    "Valid Name, notanemail, false"          // invalid email
+})
+void shouldValidateUserInput(String name, String email, boolean expected) {
+    assertEquals(expected, validator.isValid(name, email));
+}
+
+// CsvFileSource — large datasets ko CSV file mein
+@ParameterizedTest
+@CsvFileSource(resources = "/test-data/user-inputs.csv", numLinesToSkip = 1)
+void shouldProcessAllInputs(String input, String expected) { ... }
+
+// MethodSource — complex objects
+@ParameterizedTest
+@MethodSource("providePaymentScenarios")
+void shouldHandlePaymentScenarios(Payment payment, PaymentResult expected) {
+    assertEquals(expected, paymentService.process(payment));
+}
+
+static Stream<Arguments> providePaymentScenarios() {
+    return Stream.of(
+        Arguments.of(new Payment(100, "CREDIT"), PaymentResult.SUCCESS),
+        Arguments.of(new Payment(-1, "CREDIT"), PaymentResult.INVALID_AMOUNT),
+        Arguments.of(new Payment(100, "UNKNOWN"), PaymentResult.UNSUPPORTED_METHOD)
+    );
+}
+
+// EnumSource — enum values
+@ParameterizedTest
+@EnumSource(value = PaymentType.class, names = {"CREDIT", "DEBIT"})
+void shouldAcceptCardPayments(PaymentType type) { ... }
+
+------------------------------------------------------------------------
+Q10. Test Lifecycle kaise kaam karta hai?
+------------------------------------------------------------------------
+
+// DEFAULT: Har @Test method ke liye NAYA instance create hota hai
+// → Complete test isolation
+// → @BeforeEach har test ke liye fresh run
+
+// @TestInstance(Lifecycle.PER_CLASS) — single instance, @BeforeAll non-static ho sakti hai
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class DatabaseIntegrationTest {
+    private Connection connection;
+
+    @BeforeAll // static nahi chahiye ab
+    void setupConnection() {
+        connection = DriverManager.getConnection(testDbUrl);
+    }
+
+    @AfterAll
+    void closeConnection() {
+        connection.close();
+    }
+}
+
+================================================================================
+SECTION 3: MOCKITO CORE
+================================================================================
+
+------------------------------------------------------------------------
+Q11. Mock vs Spy difference?
+------------------------------------------------------------------------
+
+// MOCK — Complete fake object, koi real method nahi chalta
+// Har method ka default return: null (objects), 0 (primitives), false (boolean), empty list
+
+@Mock
+UserRepository mockRepo; // Real DB nahi — completely fake
+
+// By default, KUCH NAHI HOTA — configure karo:
+when(mockRepo.findById(1L)).thenReturn(Optional.of(new User(1L, "Prashant")));
+// Unconfigured methods → null/0/false return karte hain
+
+// SPY — Real object ka wrapper, unless override karo
+@Spy
+UserService spyService = new UserService(); // REAL object!
+
+// Specific method override karo:
+doReturn(mockUser).when(spyService).findById(1L); // Yeh method mock
+// Baaki methods REAL implementation use karenge
+
+// WHEN TO USE WHAT:
+// Mock → Unit test mein external dependencies (DB, external APIs, message queues)
+// Spy → Partial mocking — ek method mock, baaki real (rare use case, generally code smell)
+
+// RULE: Spy se seedha mock banana prefer karo — agar bahut zyada spy chahiye → design problem
+
+------------------------------------------------------------------------
+Q12. @Mock vs @InjectMocks?
+------------------------------------------------------------------------
+
+// @Mock — Mockito mock object create karta hai
+// @InjectMocks — Mocks inject karta hai is class mein (class under test)
+
+@ExtendWith(MockitoExtension.class) // JUnit 5 mein yeh zaroori hai
+class OrderServiceTest {
+
+    @Mock
+    private OrderRepository orderRepository; // Fake — DB nahi jaata
+
+    @Mock
+    private PaymentGateway paymentGateway; // Fake — real payment nahi
+
+    @Mock
+    private EmailService emailService; // Fake — email nahi jaata
+
+    @InjectMocks
+    private OrderService orderService;
+    // Mockito automatically inject karta hai:
+    // Constructor injection pehle try karta hai
+    // Phir setter injection
+    // Phir field injection
+    // OrderService mein jo bhi @Autowired hai, matching mock inject ho jaata hai
+
+    @Test
+    void shouldPlaceOrderSuccessfully() {
+        // orderService ke andar real dependency nahi — sab mock hain
+        when(orderRepository.save(any())).thenReturn(savedOrder);
+        when(paymentGateway.charge(any())).thenReturn(true);
+
+        orderService.placeOrder(newOrder); // UNIT test — no DB, no payment, no email
+
+        verify(orderRepository).save(any());
+        verify(emailService).sendConfirmation(any());
+    }
+}
+
+// MANUAL APPROACH (no annotations):
+class ManualTest {
+    private OrderRepository mockRepo = Mockito.mock(OrderRepository.class);
+    private OrderService orderService = new OrderService(mockRepo); // Constructor inject
+}
+
+------------------------------------------------------------------------
+Q13. when() vs doReturn() difference?
+------------------------------------------------------------------------
+
+// when().thenReturn() — STANDARD — Non-void methods ke liye
+when(mockRepo.findById(1L)).thenReturn(Optional.of(user));
+when(service.calculate(5)).thenReturn(25);
+when(service.process(any())).thenThrow(new ServiceException("error")); // Exception throw
+
+// thenAnswer — dynamic response
+when(mockRepo.findById(anyLong())).thenAnswer(invocation -> {
+    Long id = invocation.getArgument(0); // Argument access karo
+    return Optional.of(new User(id, "User-" + id)); // Dynamic return
+});
+
+// doReturn().when() — KAB ZAROORAT:
+// 1. VOID methods (doNothing, doThrow)
+// 2. SPY objects mein real method call avoid karo
+// 3. Type-safe issues
+
+// SPY mein problem:
+UserService spy = Mockito.spy(new UserService());
+// when(spy.findById(1L)) → ACTUAL method call hoti hai BEFORE stubbing (BAD for spy!)
+// FIX: doReturn use karo
+doReturn(mockUser).when(spy).findById(1L); // Actual method call NAHI hoti
+
+// Chained responses:
+when(mockRepo.findAll())
+    .thenReturn(firstList)       // Pehli call
+    .thenReturn(secondList)      // Doosri call
+    .thenThrow(new RuntimeException()); // Teesri call pe exception
+
+------------------------------------------------------------------------
+Q14. verify() ka use?
+------------------------------------------------------------------------
+
+// verify() — check karo ki method call HUI ya NAHI
+
+@Test
+void shouldSendEmailAfterOrderPlaced() {
+    // ARRANGE
+    when(orderRepo.save(any())).thenReturn(savedOrder);
+
+    // ACT
+    orderService.placeOrder(newOrder);
+
+    // ASSERT — interaction verify karo
+    verify(emailService).sendOrderConfirmation(savedOrder); // Exactly 1 baar call hui?
+    verify(emailService, times(1)).sendOrderConfirmation(any()); // Explicit times
+    verify(auditService, never()).logFailure(any()); // Kabhi call nahi hui?
+    verify(smsService, atLeast(1)).sendSms(any()); // Kam se kam 1 baar
+    verify(notifService, atMost(2)).notify(any()); // Zyada se zyada 2 baar
+
+    // ORDER VERIFY karo (rare use case):
+    InOrder inOrder = inOrder(orderRepo, emailService);
+    inOrder.verify(orderRepo).save(any()); // Pehle save
+    inOrder.verify(emailService).sendOrderConfirmation(any()); // Phir email
+
+    // NO MORE INTERACTIONS — unexpected calls check
+    verifyNoMoreInteractions(emailService);
+    verifyNoInteractions(smsService); // Kabhi bhi call nahi hui
+}
+
+// ARGUMENT CAPTURE:
+@Test
+void shouldSaveUserWithCorrectData() {
+    ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+
+    userService.registerUser("Prashant", "prashant@gmail.com");
+
+    verify(userRepo).save(userCaptor.capture()); // Argument capture karo
+    User savedUser = userCaptor.getValue();
+    assertEquals("Prashant", savedUser.getName());
+    assertEquals("prashant@gmail.com", savedUser.getEmail());
+    assertNotNull(savedUser.getCreatedAt());
+    assertTrue(savedUser.isActive());
+}
+
+------------------------------------------------------------------------
+Q15. ArgumentMatchers kya hote hain?
+------------------------------------------------------------------------
+
+import static org.mockito.ArgumentMatchers.*;
+
+// Exact match (default):
+when(service.findById(1L)).thenReturn(user); // Sirf id=1 ke liye
+
+// ANY matchers:
+when(service.findById(anyLong())).thenReturn(user); // Koi bhi Long id
+when(service.save(any(User.class))).thenReturn(savedUser); // Koi bhi User object
+when(service.findByName(anyString())).thenReturn(users); // Koi bhi String
+
+// SPECIFIC matchers:
+when(repo.findByAge(gt(18))).thenReturn(adults);     // 18 se zyada
+when(repo.findByName(startsWith("A"))).thenReturn(aUsers); // "A" se shuru
+when(repo.findByEmail(contains("@gmail"))).thenReturn(gmailUsers);
+when(repo.findByEmail(matches(".*@.*\\.com"))).thenReturn(users); // Regex
+
+// NULL/NOT-NULL:
+when(service.process(isNull())).thenThrow(new NullPointerException());
+when(service.process(notNull())).thenReturn(result);
+
+// SAME object reference:
+when(service.update(same(specificUser))).thenReturn(updatedUser);
+
+// IMPORTANT RULE: Agar ek argument matcher use karo toh SAARE arguments matchers hone chahiye
+// WRONG:
+// when(service.findByNameAndAge("Prashant", anyInt())); // ❌ Mixed — compile error nahi but NPE
+// RIGHT:
+when(service.findByNameAndAge(eq("Prashant"), anyInt())); // ✅ eq() for exact value
+
+================================================================================
+SECTION 4: ADVANCED MOCKING
+================================================================================
+
+------------------------------------------------------------------------
+Q16. Void methods ko kaise mock karte ho?
+------------------------------------------------------------------------
+
+// Void method pe when().thenReturn() nahi chal sakta (koi return nahi)
+
+// DO NOTHING (default behavior for void methods in mocks — already no-op)
+doNothing().when(emailService).sendEmail(any()); // Explicitly explicit karo
+
+// THROW EXCEPTION from void method:
+doThrow(new EmailException("SMTP down")).when(emailService).sendEmail(any());
+
+// DO ANSWER — complex logic
+doAnswer(invocation -> {
+    String email = invocation.getArgument(0);
+    String subject = invocation.getArgument(1);
+    System.out.println("Mock email sent to: " + email + " | Subject: " + subject);
+    return null; // void method mein null return karo
+}).when(emailService).sendEmail(anyString(), anyString());
+
+// VERIFY void method calls:
+verify(emailService).sendEmail("prashant@gmail.com", "Welcome!");
+verify(auditService, never()).logError(any());
+
+------------------------------------------------------------------------
+Q17. Exception throwing kaise mock karte ho?
+------------------------------------------------------------------------
+
+// FROM NON-VOID METHOD:
+when(userRepo.findById(anyLong()))
+    .thenThrow(new DataAccessException("DB connection failed") {});
+
+// FROM VOID METHOD:
+doThrow(new RuntimeException("Network error")).when(notifService).notify(any());
+
+// CHAINED — first success phir exception:
+when(service.process(any()))
+    .thenReturn(successResult)          // 1st call
+    .thenThrow(new TimeoutException())  // 2nd call
+    .thenReturn(successResult);         // 3rd call
+
+// TEST EXCEPTION:
+@Test
+void shouldHandleDBFailureGracefully() {
+    when(userRepo.findById(1L))
+        .thenThrow(new DataAccessException("Connection pool exhausted") {});
+
+    assertThrows(ServiceException.class, () -> userService.getUser(1L));
+    verify(alertService).sendAlert(anyString()); // Alert bheja gaya?
+}
+
+------------------------------------------------------------------------
+Q18. Private methods ko test kaise karte ho?
+------------------------------------------------------------------------
+
+SHORT ANSWER: Private methods ko DIRECTLY test mat karo — yeh implementation detail hai
+
+// WHY:
+// Private method = internal implementation
+// Public method ke through test karo → indirect testing
+// Private method change karo (refactor) → tests nahi todne chahiye
+
+// GOOD APPROACH: Public method ke through test karo
+class OrderService {
+    public double calculateTotal(Order order) {
+        return applyDiscount(subtotal(order)); // private methods internally
+    }
+
+    private double subtotal(Order order) { ... } // Don't test directly
+    private double applyDiscount(double amount) { ... } // Don't test directly
+}
+
+// Test:
+@Test
+void totalShouldIncludeDiscount() {
+    Order order = new Order(...);
+    double total = orderService.calculateTotal(order); // Public method se verify
+    assertEquals(90.0, total); // Discount applied hai ya nahi — indirectly tested
+}
+
+// IF YOU REALLY MUST (legacy code, no refactoring option):
+// ReflectionTestUtils (Spring):
+import org.springframework.test.util.ReflectionTestUtils;
+
+@Test
+void testPrivateMethodViaReflection() {
+    double result = (double) ReflectionTestUtils.invokeMethod(
+        orderService, "applyDiscount", 100.0); // Method name, args
+    assertEquals(90.0, result);
+}
+
+// PACKAGE-PRIVATE (test-friendly design):
+// Production code package = test code package
+// Method ko package-private banao (no access modifier) — tests access kar sakte hain
+
+INTERVIEW TIP: "If you find yourself needing to test many private methods, it's a sign
+the class is doing too much — consider extracting a new class."
+
+------------------------------------------------------------------------
+Q19. Static methods mocking kaise hoti hai? (Mockito 3.4+)
+------------------------------------------------------------------------
+
+// Static methods mock karna — MOCKITO-INLINE extension chahiye
+// pom.xml: mockito-inline (Mockito 3.4+) ya Mockito 5.x
+
+import org.mockito.MockedStatic;
+
+@Test
+void shouldMockStaticMethod() {
+    // Static mock — try-with-resources mein use karo (scope limited)
+    try (MockedStatic<UUID> mockedUuid = Mockito.mockStatic(UUID.class)) {
+        UUID fixedUuid = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+        mockedUuid.when(UUID::randomUUID).thenReturn(fixedUuid); // Static method mock
+
+        String orderId = orderService.generateOrderId(); // Internally UUID.randomUUID() use karta hai
+        assertEquals("123e4567-e89b-12d3-a456-426614174000", orderId);
+    }
+    // Try block ke baad — static mock automatically reset
+}
+
+// LocalDate/Clock mock karna:
+@Test
+void shouldUseCorrectDate() {
+    try (MockedStatic<LocalDate> mockedDate = Mockito.mockStatic(LocalDate.class)) {
+        LocalDate fixedDate = LocalDate.of(2024, 1, 15);
+        mockedDate.when(LocalDate::now).thenReturn(fixedDate);
+
+        Report report = reportService.generateDailyReport();
+        assertEquals(fixedDate, report.getDate());
+    }
+}
+
+INTERVIEW TIP: "Static methods testing ka better solution: Inject a Clock/Supplier — testability
+improve hoti hai. Static mocking should be last resort for legacy code."
+
+// BETTER DESIGN — Clock inject karo:
+@Service
+public class ReportService {
+    private final Clock clock; // Inject — testable!
+
+    public Report generateDailyReport() {
+        LocalDate today = LocalDate.now(clock); // Static nahi!
+    }
+}
+
+// Test mein:
+ReportService service = new ReportService(Clock.fixed(Instant.parse("2024-01-15T00:00:00Z"), ZoneId.of("UTC")));
+
+------------------------------------------------------------------------
+Q20. Final classes mocking kaise hoti hai?
+------------------------------------------------------------------------
+
+// Mockito DEFAULT mein final classes mock nahi kar sakta
+
+// SOLUTION 1: mockito-inline (Mockito 3.4+ / 5.x)
+// pom.xml mein mockito-inline add karo — automatically final classes support
+@Mock
+FinalClass finalMock; // Works with mockito-inline!
+
+// SOLUTION 2: Interface extract karo (BEST — design improve hoga)
+// Final class → interface banao → implementation inject karo → mock the interface
+
+// SOLUTION 3: @Spy over concrete (sometimes works)
+
+// EXAMPLE WITH MOCKITO-INLINE:
+final class ThirdPartyClient {
+    public String callApi(String request) { /* ... */ }
+}
+
+@Test
+void shouldHandleThirdPartyResponse() {
+    ThirdPartyClient mockClient = Mockito.mock(ThirdPartyClient.class); // Works!
+    when(mockClient.callApi(any())).thenReturn("{\"status\":\"ok\"}");
+    // ...
+}
+
+================================================================================
+SECTION 5: REAL-WORLD TESTING SCENARIOS
+================================================================================
+
+------------------------------------------------------------------------
+Q21. Service Layer ko kaise test karte ho? (with repo mock)
+------------------------------------------------------------------------
+
+@ExtendWith(MockitoExtension.class)
+class UserServiceTest {
+
+    @Mock private UserRepository userRepository;
+    @Mock private EmailService emailService;
+    @Mock private PasswordEncoder passwordEncoder;
+
+    @InjectMocks private UserService userService; // Class under test
+
+    @Test
+    @DisplayName("Should register user and send welcome email")
+    void shouldRegisterUserAndSendWelcomeEmail() {
+        // ARRANGE
+        RegisterRequest request = new RegisterRequest("Prashant", "prashant@gmail.com", "Pass@123");
+        User expectedUser = User.builder()
+            .name("Prashant").email("prashant@gmail.com")
+            .password("hashedPass").active(true).build();
+
+        when(userRepository.existsByEmail("prashant@gmail.com")).thenReturn(false);
+        when(passwordEncoder.encode("Pass@123")).thenReturn("hashedPass");
+        when(userRepository.save(any(User.class))).thenReturn(expectedUser);
+
+        // ACT
+        User result = userService.register(request);
+
+        // ASSERT — state
+        assertNotNull(result);
+        assertEquals("Prashant", result.getName());
+        assertTrue(result.isActive());
+
+        // ASSERT — interactions
+        verify(userRepository).save(argThat(user ->
+            user.getName().equals("Prashant") &&
+            user.getPassword().equals("hashedPass") &&
+            user.isActive()
+        ));
+        verify(emailService).sendWelcomeEmail("prashant@gmail.com");
+    }
+
+    @Test
+    @DisplayName("Should throw when email already exists")
+    void shouldThrowWhenEmailAlreadyExists() {
+        when(userRepository.existsByEmail("existing@gmail.com")).thenReturn(true);
+
+        assertThrows(
+            UserAlreadyExistsException.class,
+            () -> userService.register(new RegisterRequest("name", "existing@gmail.com", "pass"))
+        );
+
+        verifyNoInteractions(emailService); // Email nahi gaya
+        verify(userRepository, never()).save(any()); // DB save nahi hua
+    }
+}
+
+------------------------------------------------------------------------
+Q22. Controller test kaise likhte ho? (@WebMvcTest)
+------------------------------------------------------------------------
+
+// @WebMvcTest — ONLY Web layer test karo (no full Spring context)
+// Service/Repository mock karo
+@WebMvcTest(UserController.class) // Sirf UserController ka context load
+class UserControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc; // HTTP request simulate karo
+
+    @MockBean // Spring context mein mock bean inject karo
+    private UserService userService;
+
+    @Autowired
+    private ObjectMapper objectMapper; // JSON serialization
+
+    @Test
+    @DisplayName("GET /users/{id} should return user when found")
+    void shouldReturnUserWhenFound() throws Exception {
+        User user = new User(1L, "Prashant", "prashant@gmail.com");
+        when(userService.findById(1L)).thenReturn(user);
+
+        mockMvc.perform(get("/users/1")
+                .contentType(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())                            // 200?
+            .andExpect(jsonPath("$.id").value(1))                  // JSON field check
+            .andExpect(jsonPath("$.name").value("Prashant"))
+            .andExpect(jsonPath("$.email").value("prashant@gmail.com"))
+            .andDo(print()); // Request/Response print karo (debug ke liye)
+    }
+
+    @Test
+    @DisplayName("POST /users should create user")
+    void shouldCreateUser() throws Exception {
+        CreateUserRequest request = new CreateUserRequest("Prashant", "prashant@gmail.com");
+        User created = new User(1L, "Prashant", "prashant@gmail.com");
+
+        when(userService.create(any())).thenReturn(created);
+
+        mockMvc.perform(post("/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))) // Request body
+            .andExpect(status().isCreated())          // 201?
+            .andExpect(jsonPath("$.id").value(1))
+            .andExpect(header().exists("Location"));  // Location header check
+    }
+
+    @Test
+    @DisplayName("GET /users/{id} should return 404 when not found")
+    void shouldReturn404WhenUserNotFound() throws Exception {
+        when(userService.findById(999L))
+            .thenThrow(new UserNotFoundException(999L));
+
+        mockMvc.perform(get("/users/999"))
+            .andExpect(status().isNotFound())          // 404?
+            .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"))
+            .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    @DisplayName("POST /users with invalid data should return 400")
+    void shouldReturn400ForInvalidInput() throws Exception {
+        CreateUserRequest invalidRequest = new CreateUserRequest("", "notanemail"); // Invalid!
+
+        mockMvc.perform(post("/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(invalidRequest)))
+            .andExpect(status().isBadRequest()) // 400 — Bean Validation
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+}
+
+------------------------------------------------------------------------
+Q23. External API calls ko kaise mock karte ho?
+------------------------------------------------------------------------
+
+// APPROACH 1: Interface banao aur mock karo (BEST)
+public interface PaymentGatewayClient {
+    PaymentResponse charge(PaymentRequest request);
+}
+
+@Service
+public class StripeGatewayClient implements PaymentGatewayClient {
+    public PaymentResponse charge(PaymentRequest request) {
+        return restTemplate.postForObject(stripeUrl, request, PaymentResponse.class);
+    }
+}
+
+// Test mein:
+@Mock PaymentGatewayClient mockClient; // Interface mock karo
+when(mockClient.charge(any())).thenReturn(new PaymentResponse("success", "txn-123"));
+
+// APPROACH 2: WireMock (HTTP-level mocking — integration tests ke liye)
+// pom: com.github.tomakehurst:wiremock-jre8
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureWireMock(port = 0) // Random port pe WireMock server start
+class PaymentIntegrationTest {
+
+    @Test
+    void shouldProcessPaymentWithExternalGateway() {
+        // WireMock — fake HTTP server configure karo
+        stubFor(post(urlEqualTo("/api/v1/charge"))
+            .withHeader("Authorization", containing("Bearer"))
+            .willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"status\":\"success\",\"transactionId\":\"txn-123\"}")));
+
+        // Actual service call — external API ke bajaye WireMock response milega
+        PaymentResult result = paymentService.processPayment(payment);
+        assertEquals("success", result.getStatus());
+    }
+}
+
+// APPROACH 3: MockRestServiceServer (RestTemplate ke liye)
+@SpringBootTest
+class RestTemplateTest {
+    @Autowired RestTemplate restTemplate;
+    MockRestServiceServer mockServer;
+
+    @BeforeEach
+    void setup() {
+        mockServer = MockRestServiceServer.createServer(restTemplate);
+    }
+
+    @Test
+    void shouldCallExternalApi() {
+        mockServer.expect(requestTo("https://api.example.com/users/1"))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(withSuccess("{\"id\":1,\"name\":\"Prashant\"}", MediaType.APPLICATION_JSON));
+
+        User user = userClient.getUser(1L);
+        assertEquals("Prashant", user.getName());
+        mockServer.verify(); // Sare expected requests aaye?
+    }
+}
+
+------------------------------------------------------------------------
+Q24. Database dependency kaise avoid karte ho unit test mein?
+------------------------------------------------------------------------
+
+// LEVEL 1: Pure unit test — repository mock karo
+@Mock UserRepository mockRepo;
+when(mockRepo.findById(1L)).thenReturn(Optional.of(user));
+// → Fast, no DB needed
+
+// LEVEL 2: Repository layer test — H2 in-memory DB
+@DataJpaTest // JPA components only — full context nahi
+class UserRepositoryTest {
+    @Autowired TestEntityManager entityManager;
+    @Autowired UserRepository userRepository;
+
+    @Test
+    void shouldFindByEmail() {
+        // H2 in-memory DB use hoti hai — @DataJpaTest automatically configure karta hai
+        User user = new User("Prashant", "prashant@gmail.com");
+        entityManager.persistAndFlush(user); // Save to H2
+
+        Optional<User> found = userRepository.findByEmail("prashant@gmail.com");
+        assertTrue(found.isPresent());
+        assertEquals("Prashant", found.get().getName());
+    }
+}
+
+// LEVEL 3: TestContainers — real DB (MySQL/PostgreSQL) in Docker
+@SpringBootTest
+@Testcontainers
+class FullIntegrationTest {
+    @Container
+    static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0")
+        .withDatabaseName("testdb")
+        .withUsername("test")
+        .withPassword("test");
+
+    @DynamicPropertySource // Container ka URL Spring ko dynamically pass karo
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", mysql::getJdbcUrl);
+        registry.add("spring.datasource.username", mysql::getUsername);
+        registry.add("spring.datasource.password", mysql::getPassword);
+    }
+
+    @Test
+    void shouldWorkWithRealMySQLDatabase() {
+        // Real MySQL Docker container ke saath test
+    }
+}
+
+------------------------------------------------------------------------
+Q25. Slow tests ko fast kaise banate ho?
+------------------------------------------------------------------------
+
+// PROBLEM: @SpringBootTest full context load karta hai — 10-30 sec
+
+// SOLUTION 1: Context slicing — sirf jo chahiye
+@WebMvcTest(UserController.class)   // Only web layer
+@DataJpaTest                        // Only JPA layer
+@JsonTest                           // Only JSON serialization
+@RestClientTest(UserClient.class)   // Only REST client
+
+// SOLUTION 2: Context caching — same context reuse karo
+// Spring boot automatically cache karta hai — same config = same context
+
+// SOLUTION 3: @MockBean judiciously use karo — koi naya bean = context reload
+
+// SOLUTION 4: TestPropertySource — test properties inject
+@SpringBootTest
+@TestPropertySource(properties = {
+    "spring.jpa.show-sql=false", // Logging disable
+    "spring.main.lazy-initialization=true" // Lazy beans
+})
+
+// SOLUTION 5: Parallel test execution (JUnit 5):
+// junit-platform.properties:
+// junit.jupiter.execution.parallel.enabled=true
+// junit.jupiter.execution.parallel.mode.default=concurrent
+
+// SOLUTION 6: Avoid Thread.sleep — Awaitility use karo:
+import org.awaitility.Awaitility;
+
+Awaitility.await()
+    .atMost(5, TimeUnit.SECONDS) // Max 5 sec wait
+    .pollInterval(100, TimeUnit.MILLISECONDS)
+    .until(() -> orderService.isOrderProcessed(orderId)); // Condition check karte raho
+
+================================================================================
+SECTION 6: BEST PRACTICES
+================================================================================
+
+------------------------------------------------------------------------
+Q26. Test naming convention kya hona chahiye?
+------------------------------------------------------------------------
+
+// PATTERN: should[ExpectedBehavior]When[StateUnderTest]
+// Ya: [methodName]_[state]_[expectedBehavior]
+
+// GOOD TEST NAMES:
+@Test void shouldReturnUserWhenValidIdProvided() { }
+@Test void shouldThrowNotFoundExceptionWhenUserDoesNotExist() { }
+@Test void shouldSendEmailAfterSuccessfulRegistration() { }
+@Test void calculateTotal_withDiscountApplied_shouldReturnReducedAmount() { }
+@Test void placeOrder_whenInventoryInsufficient_shouldThrowException() { }
+
+// BAD TEST NAMES:
+@Test void testMethod() { }       // Kya test kar raha hai pata nahi
+@Test void test1() { }            // Meaningless
+@Test void testUserService() { }  // Too generic
+
+// @DisplayName — readable Hindi/English mixed names:
+@Test
+@DisplayName("Order total should include 10% discount for premium users")
+void shouldApplyPremiumDiscount() { }
+
+------------------------------------------------------------------------
+Q27. AAA Pattern (Arrange-Act-Assert) kya hota hai?
+------------------------------------------------------------------------
+
+// AAA = Structure for clear, readable tests
+
+@Test
+void shouldCalculateOrderTotalWithDiscount() {
+    // ===================== ARRANGE — Setup karo =====================
+    User premiumUser = User.builder()
+        .id(1L).name("Prashant")
+        .tier(UserTier.PREMIUM).build(); // Premium user — discount milega
+
+    List<Item> items = Arrays.asList(
+        new Item("Laptop", 50000.0),
+        new Item("Mouse", 500.0)
+    );
+    Order order = new Order(premiumUser, items);
+
+    when(discountService.getDiscount(UserTier.PREMIUM)).thenReturn(0.10); // 10% discount
+
+    // ===================== ACT — Ek action karo =====================
+    double total = orderService.calculateTotal(order);
+    // SINGLE action — ek se zyada actions → multiple tests likhna chahiye
+
+    // ===================== ASSERT — Verify karo =====================
+    assertEquals(45450.0, total, 0.01); // 50500 * 0.90 = 45450
+    verify(discountService).getDiscount(UserTier.PREMIUM); // Discount check hua?
+}
+
+// GIVEN-WHEN-THEN (BDD style — same concept, different names):
+@Test
+void givenPremiumUser_whenCalculatingTotal_thenDiscountApplied() {
+    // GIVEN (= Arrange)
+    // WHEN (= Act)
+    // THEN (= Assert)
+}
+
+------------------------------------------------------------------------
+Q28. Over-mocking kya hota hai?
+------------------------------------------------------------------------
+
+// OVER-MOCKING — jab BAHUT ZYADA cheezein mock karte ho
+// → Tests brittle ho jaate hain (implementation change karo → tests fail)
+// → Test actual behavior verify nahi karta
+
+// OVER-MOCKED (BAD):
+@Test
+void overMockedTest() {
+    when(mockValidator.validateName(any())).thenReturn(true);
+    when(mockValidator.validateEmail(any())).thenReturn(true);
+    when(mockHasher.hash(any())).thenReturn("hash");
+    when(mockIdGenerator.generate()).thenReturn("id-123");
+    when(mockRepo.save(any())).thenReturn(savedUser);
+    when(mockCache.put(any(), any())).thenReturn(true);
+    when(mockAudit.log(any())).thenReturn(auditEntry);
+    // Itna mock kiya — actually kya test kar rahe ho??
+}
+
+// BETTER — real objects use karo jab possible:
+@Test
+void betterTest() {
+    // PasswordEncoder real use karo — simple aur reliable
+    PasswordEncoder realEncoder = new BCryptPasswordEncoder();
+    UserService service = new UserService(mockRepo, realEncoder);
+
+    service.register("Prashant", "Pass@123");
+
+    ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+    verify(mockRepo).save(captor.capture());
+    assertTrue(realEncoder.matches("Pass@123", captor.getValue().getPassword())); // Real behavior test!
+}
+
+RULE: Don't mock what you own — value objects, simple utilities real use karo
+
+------------------------------------------------------------------------
+Q29. Flaky Tests kya hote hain? kaise fix karte ho?
+------------------------------------------------------------------------
+
+FLAKY TEST = Kabhi pass, kabhi fail — same code, same environment
+
+CAUSES:
+1. Time dependency (new Date(), LocalDate.now())
+2. Random data (UUID.randomUUID())
+3. External service dependency (real API call)
+4. Thread-safety issues (concurrent tests)
+5. Test order dependency (shared mutable state)
+6. Resource contention (same port, same file)
+
+// FIX 1: Time mock karo
+// BAD:
+order.setCreatedAt(LocalDateTime.now()); // Test kal bhi same time expect karega? NO!
+
+// GOOD: Clock inject karo
+@Service
+public class OrderService {
+    private final Clock clock;
+    public OrderService(Clock clock) { this.clock = clock; }
+    public Order createOrder() {
+        order.setCreatedAt(LocalDateTime.now(clock)); // Testable!
+    }
+}
+// Test mein: Clock.fixed(...) inject karo
+
+// FIX 2: Random data fix karo
+// BAD:
+String orderId = UUID.randomUUID().toString();
+
+// GOOD: IdGenerator inject karo, mock in tests
+
+// FIX 3: Test isolation — @BeforeEach mein state reset karo
+// FIX 4: Parallel test issues — @Execution(SAME_THREAD) for shared resources
+// FIX 5: Awaitility for async operations instead of Thread.sleep()
+
+------------------------------------------------------------------------
+Q30. Code Coverage kitna hona chahiye?
+------------------------------------------------------------------------
+
+PRAGMATIC ANSWER: 80% overall, 90%+ business logic
+
+// IMPORTANT: Coverage = measurement, not goal!
+// 100% coverage bhi bugs ho sakte hain
+// 50% meaningful tests better hai than 100% useless tests
+
+WHAT TO COVER:
+✅ Business logic (service layer) — HIGH priority
+✅ Edge cases (null, empty, boundary values)
+✅ Exception paths
+✅ Complex algorithms
+
+WHAT NOT TO STRESS ABOUT:
+❌ DTO/POJO classes (getters/setters)
+❌ Spring Boot Application main class
+❌ Configuration classes (Spring manages them)
+❌ Generated code (Lombok, MapStruct)
+
+// JaCoCo configuration — coverage thresholds enforce karo:
+// pom.xml:
+// <plugin>
+//   <groupId>org.jacoco</groupId>
+//   <artifactId>jacoco-maven-plugin</artifactId>
+//   <configuration>
+//     <excludes>
+//       <exclude>**/*Application.class</exclude>
+//       <exclude>**/dto/**</exclude>
+//     </excludes>
+//   </configuration>
+//   <execution>
+//     <rule>
+//       <limits>
+//         <limit>
+//           <counter>LINE</counter>
+//           <minimum>0.80</minimum>  <!-- 80% minimum -->
+//         </limit>
+//       </limits>
+//     </rule>
+//   </execution>
+// </plugin>
+
+INTERVIEW TIP: "Hum 80% overall coverage maintain karte hain with ~95% on service/domain layer.
+Coverage badge se zyada important hai mutation testing — PIT (PITest) use karte hain
+to check if tests actually catch bugs."
+
+------------------------------------------------------------------------
+Q31. Kafka Consumer Unit Test — Idempotency + Outbox Pattern
+------------------------------------------------------------------------
+
+// KAFKA CONSUMER UNIT TEST:
+@ExtendWith(MockitoExtension.class)
+class OrderEventConsumerTest {
+
+    @Mock private OrderService orderService;
+    @Mock private IdempotencyService idempotencyService;
+
+    @InjectMocks private OrderEventConsumer consumer;
+
+    @Test
+    void shouldProcessNewEvent() {
+        OrderCreatedEvent event = new OrderCreatedEvent("order-123", "user-456", 1000.0);
+        String messageId = "msg-abc-123";
+
+        // Naya message — pehle nahi aaya
+        when(idempotencyService.isAlreadyProcessed(messageId)).thenReturn(false);
+
+        consumer.handleOrderCreated(event, messageId);
+
+        verify(orderService).processOrder(event); // Order process hua
+        verify(idempotencyService).markAsProcessed(messageId); // Mark karo
+    }
+
+    @Test
+    @DisplayName("Duplicate message should be skipped — idempotency")
+    void shouldSkipDuplicateMessage() {
+        OrderCreatedEvent event = new OrderCreatedEvent("order-123", "user-456", 1000.0);
+        String messageId = "msg-abc-123";
+
+        // Already processed
+        when(idempotencyService.isAlreadyProcessed(messageId)).thenReturn(true);
+
+        consumer.handleOrderCreated(event, messageId);
+
+        verifyNoInteractions(orderService); // Order dobara process NAHI hona chahiye
+    }
+}
+
+// OUTBOX PATTERN TEST:
+@ExtendWith(MockitoExtension.class)
+class OutboxPublisherTest {
+
+    @Mock private OutboxRepository outboxRepository;
+    @Mock private KafkaTemplate<String, String> kafkaTemplate;
+
+    @InjectMocks private OutboxPublisher publisher;
+
+    @Test
+    void shouldPublishPendingEventsFromOutbox() {
+        List<OutboxEvent> pendingEvents = Arrays.asList(
+            new OutboxEvent("1", "ORDER_CREATED", "{...}"),
+            new OutboxEvent("2", "PAYMENT_DONE", "{...}")
+        );
+        when(outboxRepository.findByStatus(Status.PENDING)).thenReturn(pendingEvents);
+
+        publisher.publishPendingEvents();
+
+        verify(kafkaTemplate, times(2)).send(anyString(), anyString(), anyString());
+        verify(outboxRepository, times(2)).markAsPublished(anyString());
+    }
+}
+
+================================================================================
+WHAT'S MISSING — UNIT TESTING (6 YRS EXP)
+================================================================================
+
+1. MUTATION TESTING (PITest)
+   - Tests ki quality measure karo
+   - mvn test-compile org.pitest:pitest-maven:mutationCoverage
+
+2. TESTCONTAINERS — Real dependencies with Docker
+   - MySQL, Redis, Kafka in Docker containers
+   - Realistic integration tests
+
+3. SPRING BOOT TEST SLICES
+   @DataRedisTest, @DataMongoTest, @JsonTest, @RestClientTest
+
+4. CONTRACT TESTING (Pact / Spring Cloud Contract)
+   - Consumer-driven contracts
+   - Microservices API compatibility
+
+5. PERFORMANCE TESTING
+   - JMH (Java Microbenchmark Harness) for micro-benchmarks
+   - Gatling/JMeter for load testing
+
+6. SECURITY TESTING
+   - @WithMockUser, @WithSecurityContext
+   - MockMvc with security
+
+// SECURITY TEST EXAMPLE:
+@WebMvcTest(AdminController.class)
+@WithMockUser(roles = "USER") // Non-admin user
+class AdminControllerSecurityTest {
+    @Test
+    void shouldReturn403ForNonAdminUser() throws Exception {
+        mockMvc.perform(get("/admin/users"))
+            .andExpect(status().isForbidden()); // 403
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn200ForAdminUser() throws Exception {
+        mockMvc.perform(get("/admin/users"))
+            .andExpect(status().isOk());
+    }
+}
+
+================================================================================
+QUICK CHEAT SHEET — UNIT TESTING
+================================================================================
+
+SCENARIO                          → TOOL/APPROACH
+--------------------------------    -----------------------------------------
+Service unit test                 → @Mock + @InjectMocks + Mockito
+Controller test                   → @WebMvcTest + MockMvc + @MockBean
+JPA repository test               → @DataJpaTest + TestEntityManager
+Full integration test             → @SpringBootTest
+Real DB integration               → TestContainers
+External HTTP API mock            → WireMock / Interface mock
+Static method mock                → MockedStatic (mockito-inline)
+Final class mock                  → mockito-inline
+Void method mock                  → doNothing() / doThrow()
+Exception test                    → assertThrows()
+Argument capture                  → ArgumentCaptor
+Multiple inputs                   → @ParameterizedTest
+Async operation test              → Awaitility
+Time-dependent test               → Clock injection / MockedStatic
+Coverage tool                     → JaCoCo
+Mutation testing                  → PITest
+Contract testing                  → Pact / Spring Cloud Contract
+
+================================================================================
+END OF DOCUMENT
+Written for: 6 Years Java Backend Developer — Unit Testing (JUnit 5 + Mockito)
+================================================================================

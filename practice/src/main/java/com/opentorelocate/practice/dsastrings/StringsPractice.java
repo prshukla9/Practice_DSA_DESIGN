@@ -95,4 +95,20 @@ public class StringsPractice {
 
       }
 //    Longest common prefix, Anagram check(without sorting), group anagram
+
+//    date -> 18/06/2026  5-7 questions of strings
+
+
+//    date -> 19/06/2026  5-7 questions of strings
+
+
+//    date -> 18/06/2026  5-7 questions of strings
+
+//    date -> 19/06/2026  5-7 questions of strings
+
+//    date -> 20/06/2026  5-7 questions of strings
+
+//    date -> 21/06/2026  5-7 questions of strings
+
+//    date -> 22/06/2026  5-7 questions of strings
 }

@@ -1,0 +1,1495 @@
+==========================================================================================
+  29LPA — COMPLETE DEV+ ENVIRONMENT GUIDE
+  Mentor: Senior DevOps Engineer + Backend Architect
+  Path: LOCAL → DOCKER → DOCKER COMPOSE → AWS EC2 → JENKINS CI/CD
+  Audience: 6-Year Java Backend Developer
+==========================================================================================
+
+BEFORE WE START — YE SAMJHO (Big Picture)
+==========================================================================================
+
+Tum abhi ek Java developer ho jo sirf code likhta hai.
+Is guide ke baad tum ek developer banne wale ho jo:
+  - Apni application khud containerize kar sake
+  - Kisi bhi machine pe deploy kar sake
+  - CI/CD pipeline se automate kar sake
+
+Real life mein kya hota hai:
+  Code likha (IntelliJ) → Git push → Jenkins ne build kiya → Docker image bana →
+  EC2 pe deploy hua → Application live!
+
+Ye poora flow tum aaj sikhoge.
+
+WHY NOT KUBERNETES/EKS/Load Balancer?
+--------------------------------------
+❌ Kubernetes:
+   - 50+ concepts sikhne padte hain pehle (Pods, Deployments, Services, Ingress...)
+   - Docker Compose se 10x zyada complex
+   - Dev practice ke liye overkill — same goal Docker Compose se achieve hota hai
+   - Ek baar Docker Compose samjho, phir K8s sikhna asan lagega
+
+❌ AWS EKS (Kubernetes on AWS):
+   - Costly hai (even for practice)
+   - Production-level tool — dev mein nahi chahiye
+   - Pehle EC2 + Docker samjho
+
+❌ Load Balancer:
+   - Ek instance pe practice kar rahe hain
+   - Multiple instances nahi hain toh LB ka koi kaam nahi
+   - Cost bhi lagti hai
+
+❌ Auto Scaling:
+   - Production feature hai
+   - Dev mein traffic spikes nahi aate
+   - Pehle basic deployment samjho
+
+MENTOR RULE: Complexity tab add karo jab zaroorat ho, pehle nahi.
+
+
+==========================================================================================
+  PHASE 1: LOCAL DEVELOPMENT — DOCKER
+==========================================================================================
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 1: DOCKER BASICS — Concept Crystal Clear Karo
+══════════════════════════════════════════════════════════════════════════════════════════
+
+PROBLEM DOCKER SOLVE KARTA HAI:
+--------------------------------
+"Works on my machine" — ye problem tum zaroor face kiye ho.
+
+Scenario:
+  Tum ne locally code likha — Java 17, PostgreSQL 15, Kafka 3.5
+  Teammate ne pull kiya — uske paas Java 11, PostgreSQL 13
+  Result: 10 alag alag errors, 2 ghante debug, frustration
+
+Solution chahiye: "Mere machine pe jo environment hai, exactly wahi package karke do"
+Docker yahi karta hai.
+
+CONTAINER KYA HAI?
+------------------
+Analogy: Shipping Container socho.
+  Pehle: Har desh ka alag loading system → chaos
+  Container aaya: Standard box → koi bhi ship, truck, train pe load karo
+
+Software mein:
+  Container = Ek isolated box jisme:
+    - Tumhara Java app
+    - Sahi version ki Java (17)
+    - Saari dependencies
+    - Config files
+    sab packaged hain.
+
+  Ye box kisi bhi machine pe exactly same chalega.
+  Developer ki laptop, EC2, kisi bhi Linux server — same behavior.
+
+VM vs CONTAINER:
+----------------
+  VM (Virtual Machine):
+    - Poora OS copy karta hai (Windows/Linux ka poora installation)
+    - 10-20 GB size
+    - Boot hone mein 1-2 minute
+    - Slow, heavy
+
+  Container:
+    - Host OS ka kernel share karta hai (sirf app + dependencies)
+    - 100-500 MB size
+    - Seconds mein start
+    - Fast, lightweight
+
+  Analogy:
+    VM = Alag plot pe alag ghar banana (apni foundation, walls, roof sab)
+    Container = Ek apartment building (foundation, structure shared; sirf flat alag)
+
+KEY DOCKER TERMS:
+-----------------
+  Dockerfile   → Recipe (kaise banana hai image)
+  Image        → Packaged app (bana hua, immutable)
+  Container    → Running image (chalti hui copy)
+  Registry     → Images store karne ki jagah (Docker Hub, ECR)
+  Layer        → Image ka ek part (caching ke liye — efficient rebuild)
+
+  Flow:
+  Dockerfile → (docker build) → Image → (docker run) → Container
+
+INSTALL DOCKER:
+---------------
+  Windows/Mac: Docker Desktop download karo
+  https://www.docker.com/products/docker-desktop/
+
+  Verify:
+  $ docker --version
+  Docker version 24.0.5
+
+  $ docker run hello-world
+  # Agar "Hello from Docker!" aaya → Docker working hai ✓
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 2: SIMPLE DOCKERFILE FOR SPRING BOOT
+══════════════════════════════════════════════════════════════════════════════════════════
+
+PROJECT STRUCTURE (assume karo):
+---------------------------------
+  my-microservices/
+  ├── order-service/
+  │   ├── src/
+  │   ├── pom.xml
+  │   └── Dockerfile          ← yahan banayenge
+  ├── user-service/
+  │   ├── src/
+  │   ├── pom.xml
+  │   └── Dockerfile
+  ├── payment-service/
+  │   └── ...
+  └── docker-compose.yml      ← baad mein
+
+SINGLE-STAGE DOCKERFILE (Fast, Simple):
+-----------------------------------------
+  # order-service/Dockerfile
+
+  # Line 1: Base image — Java 17 JRE (sirf runtime, JDK nahi)
+  # WHY JRE not JDK? JDK mein compiler tools hain jo runtime mein nahi chahiye
+  # WHY 17-jre-slim? "slim" = lightweight version, kam size
+  FROM eclipse-temurin:17-jre-slim
+
+  # Line 2: Working directory set karo container ke andar
+  # WHY? Organized rahega — sab files yahan hongi
+  # Agar directory exist nahi karti toh Docker khud banata hai
+  WORKDIR /app
+
+  # Line 3: JAR file copy karo host machine se container mein
+  # target/*.jar → Maven build ke baad yahan hota hai
+  # app.jar → container mein is naam se rakho (simple naam)
+  COPY target/*.jar app.jar
+
+  # Line 4: Port declare karo (documentation ke liye)
+  # WHY EXPOSE? Ye sirf documentation hai — "ye container is port pe listen karta hai"
+  # Actual port mapping docker-compose mein hogi
+  EXPOSE 8081
+
+  # Line 5: Container start hone pe ye command chalao
+  # java -jar app.jar → Spring Boot app start karo
+  ENTRYPOINT ["java", "-jar", "app.jar"]
+
+WHY SINGLE-STAGE (not multi-stage)?
+  Multi-stage build mein Maven build bhi Docker ke andar hoti hai.
+  Dev mein hum IntelliJ/Maven se already build karte hain — extra complexity nahi chahiye.
+  Simple raho: build locally → copy JAR → Docker image.
+
+BUILD KARO:
+-----------
+  # order-service directory mein jao
+  $ cd order-service
+
+  # Pehle Maven se build karo (JAR banao)
+  $ mvn clean package -DskipTests
+  # -DskipTests: tests skip karo (dev ke liye fast build)
+  # JAR ban jayega: target/order-service-0.0.1-SNAPSHOT.jar
+
+  # Ab Docker image banao
+  $ docker build -t order-service:1.0 .
+  # -t = tag (naam:version)
+  # . = current directory mein Dockerfile dhundho
+
+  # Image dekho
+  $ docker images
+  REPOSITORY      TAG    IMAGE ID       SIZE
+  order-service   1.0    abc123def456   180MB
+
+RUN KARO (Single container):
+------------------------------
+  $ docker run -p 8081:8081 order-service:1.0
+  # -p 8081:8081 → host:container port mapping
+  # localhost:8081 → container ka port 8081
+
+  # Environment variables de sakte ho
+  $ docker run -p 8081:8081 \
+    -e DB_URL=jdbc:postgresql://localhost:5432/orders \
+    -e DB_PASSWORD=secret \
+    order-service:1.0
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 3: DOCKERFILES FOR ALL 8 MICROSERVICES
+══════════════════════════════════════════════════════════════════════════════════════════
+
+PORT CONVENTION (Yaad rakho):
+------------------------------
+  Service Name          Port    Description
+  ──────────────────────────────────────────
+  api-gateway           8080    Entry point — sabse pehle
+  user-service          8081    User management
+  order-service         8082    Order processing
+  payment-service       8083    Payment handling
+  inventory-service     8084    Stock management
+  notification-service  8085    Email/SMS/Push
+  product-service       8086    Product catalog
+  shipping-service      8087    Delivery tracking
+
+DOCKERFILE TEMPLATE (Sab ke liye same — sirf port alag):
+----------------------------------------------------------
+  # ===== api-gateway/Dockerfile =====
+  FROM eclipse-temurin:17-jre-slim
+  WORKDIR /app
+  COPY target/*.jar app.jar
+  EXPOSE 8080
+  ENTRYPOINT ["java", "-jar", "app.jar"]
+
+  # ===== user-service/Dockerfile =====
+  FROM eclipse-temurin:17-jre-slim
+  WORKDIR /app
+  COPY target/*.jar app.jar
+  EXPOSE 8081
+  ENTRYPOINT ["java", "-jar", "app.jar"]
+
+  # ===== order-service/Dockerfile =====
+  FROM eclipse-temurin:17-jre-slim
+  WORKDIR /app
+  COPY target/*.jar app.jar
+  EXPOSE 8082
+  ENTRYPOINT ["java", "-jar", "app.jar"]
+
+  # ...baaki sab same pattern, sirf EXPOSE mein port alag
+
+JVM TUNING (Optional lekin important for DEV):
+-----------------------------------------------
+  # Memory issues? JVM ko container-aware banao
+  ENTRYPOINT ["java",
+    "-XX:+UseContainerSupport",
+    "-XX:MaxRAMPercentage=75.0",
+    "-jar", "app.jar"]
+
+  # WHY? Docker container mein JVM ko pata nahi hota kitni RAM available hai
+  # UseContainerSupport → Docker limits respect karta hai
+  # MaxRAMPercentage=75 → Available RAM ka 75% use karo (25% OS ke liye)
+
+BUILD SCRIPT (Saari services ek saath build karo):
+----------------------------------------------------
+  # build-all.sh
+  #!/bin/bash
+
+  SERVICES=("api-gateway" "user-service" "order-service" "payment-service"
+            "inventory-service" "notification-service" "product-service" "shipping-service")
+
+  for service in "${SERVICES[@]}"; do
+      echo "Building $service..."
+      cd $service
+      mvn clean package -DskipTests -q    # -q = quiet mode
+      docker build -t $service:latest .
+      cd ..
+      echo "$service built successfully ✓"
+  done
+
+  echo "All services built!"
+
+  # Run karo:
+  $ chmod +x build-all.sh
+  $ ./build-all.sh
+
+
+==========================================================================================
+  PHASE 2: DOCKER COMPOSE
+==========================================================================================
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 4: docker-compose.yml — Complete File
+══════════════════════════════════════════════════════════════════════════════════════════
+
+WHY DOCKER COMPOSE?
+--------------------
+  Abhi tak: Har service manually `docker run` se chalani padti
+  8 services + PostgreSQL + Kafka = 10+ docker run commands!
+  Order bhi matter karta — DB pehle chale, phir services
+
+  Docker Compose: Ek YAML file mein sab define karo.
+  Ek command: `docker-compose up` → sab kuch start!
+  Dependencies automatically handle hoti hain.
+
+COMPLETE docker-compose.yml:
+------------------------------
+  # Root directory mein ye file banao: my-microservices/docker-compose.yml
+
+  version: '3.8'   # Docker Compose file format version
+
+  # ── SHARED NETWORK ────────────────────────────────────────────────────────
+  networks:
+    microservices-net:
+      driver: bridge   # Default network type — containers ek doosre se baat kar sakenge
+
+  # ── SHARED VOLUMES ────────────────────────────────────────────────────────
+  volumes:
+    postgres-data:     # PostgreSQL data persist karne ke liye (container delete hone pe data na jaye)
+    kafka-data:        # Kafka data persist karne ke liye
+
+  # ── SERVICES ──────────────────────────────────────────────────────────────
+  services:
+
+    # ── POSTGRESQL ──────────────────────────────────────────────────────────
+    postgres:
+      image: postgres:15-alpine          # Official PostgreSQL image, alpine = lightweight
+      container_name: postgres-db
+      environment:
+        POSTGRES_USER: devuser           # DB username
+        POSTGRES_PASSWORD: devpassword   # DB password
+        POSTGRES_DB: microservices       # Default database naam
+      ports:
+        - "5432:5432"                    # Host:Container — DBeaver/pgAdmin se connect ke liye
+      volumes:
+        - postgres-data:/var/lib/postgresql/data   # Data persist karo
+        - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql   # Auto-run on first start
+      networks:
+        - microservices-net
+      healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U devuser"]
+        interval: 10s    # Har 10 second mein check karo
+        timeout: 5s      # 5 second mein respond karna chahiye
+        retries: 5       # 5 baar fail hone pe unhealthy mark karo
+
+    # ── ZOOKEEPER (Kafka ko chahiye) ─────────────────────────────────────────
+    zookeeper:
+      image: confluentinc/cp-zookeeper:7.4.0
+      container_name: zookeeper
+      environment:
+        ZOOKEEPER_CLIENT_PORT: 2181
+        ZOOKEEPER_TICK_TIME: 2000
+      networks:
+        - microservices-net
+
+    # ── KAFKA ────────────────────────────────────────────────────────────────
+    kafka:
+      image: confluentinc/cp-kafka:7.4.0
+      container_name: kafka
+      depends_on:
+        - zookeeper        # Zookeeper pehle chalna chahiye
+      ports:
+        - "9092:9092"      # Host se Kafka access ke liye
+      environment:
+        KAFKA_BROKER_ID: 1
+        KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181   # Container naam use karo — NOT localhost!
+        KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092
+        KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+        KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+        KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1   # Dev mein 1 replica kaafi hai
+      volumes:
+        - kafka-data:/var/lib/kafka/data
+      networks:
+        - microservices-net
+      healthcheck:
+        test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "kafka:9092"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+
+    # ── API GATEWAY ──────────────────────────────────────────────────────────
+    api-gateway:
+      build:
+        context: ./api-gateway            # Yahan Dockerfile hai
+        dockerfile: Dockerfile
+      container_name: api-gateway
+      ports:
+        - "8080:8080"                     # Bahar duniya yahan se access karegi
+      environment:
+        SPRING_PROFILES_ACTIVE: docker    # docker profile use karo
+        # Gateway ko services ke routes batao (container names use karo)
+        USER_SERVICE_URL: http://user-service:8081
+        ORDER_SERVICE_URL: http://order-service:8082
+        PAYMENT_SERVICE_URL: http://payment-service:8083
+      depends_on:
+        - user-service
+        - order-service
+        - payment-service
+      networks:
+        - microservices-net
+
+    # ── USER SERVICE ─────────────────────────────────────────────────────────
+    user-service:
+      build:
+        context: ./user-service
+        dockerfile: Dockerfile
+      container_name: user-service
+      ports:
+        - "8081:8081"
+      environment:
+        SPRING_PROFILES_ACTIVE: docker
+        SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/microservices
+        SPRING_DATASOURCE_USERNAME: devuser
+        SPRING_DATASOURCE_PASSWORD: devpassword
+        SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      depends_on:
+        postgres:
+          condition: service_healthy      # Postgres healthy hone ka wait karo
+        kafka:
+          condition: service_healthy
+      networks:
+        - microservices-net
+
+    # ── ORDER SERVICE ─────────────────────────────────────────────────────────
+    order-service:
+      build:
+        context: ./order-service
+        dockerfile: Dockerfile
+      container_name: order-service
+      ports:
+        - "8082:8082"
+      environment:
+        SPRING_PROFILES_ACTIVE: docker
+        SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/microservices
+        SPRING_DATASOURCE_USERNAME: devuser
+        SPRING_DATASOURCE_PASSWORD: devpassword
+        SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+        USER_SERVICE_URL: http://user-service:8081      # Service discovery (Eureka nahi hai)
+        INVENTORY_SERVICE_URL: http://inventory-service:8084
+      depends_on:
+        postgres:
+          condition: service_healthy
+        kafka:
+          condition: service_healthy
+      networks:
+        - microservices-net
+
+    # ── PAYMENT SERVICE ──────────────────────────────────────────────────────
+    payment-service:
+      build:
+        context: ./payment-service
+        dockerfile: Dockerfile
+      container_name: payment-service
+      ports:
+        - "8083:8083"
+      environment:
+        SPRING_PROFILES_ACTIVE: docker
+        SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/microservices
+        SPRING_DATASOURCE_USERNAME: devuser
+        SPRING_DATASOURCE_PASSWORD: devpassword
+        SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      depends_on:
+        postgres:
+          condition: service_healthy
+        kafka:
+          condition: service_healthy
+      networks:
+        - microservices-net
+
+    # ── INVENTORY SERVICE ─────────────────────────────────────────────────────
+    inventory-service:
+      build:
+        context: ./inventory-service
+        dockerfile: Dockerfile
+      container_name: inventory-service
+      ports:
+        - "8084:8084"
+      environment:
+        SPRING_PROFILES_ACTIVE: docker
+        SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/microservices
+        SPRING_DATASOURCE_USERNAME: devuser
+        SPRING_DATASOURCE_PASSWORD: devpassword
+        SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      depends_on:
+        postgres:
+          condition: service_healthy
+        kafka:
+          condition: service_healthy
+      networks:
+        - microservices-net
+
+    # ── NOTIFICATION SERVICE ──────────────────────────────────────────────────
+    notification-service:
+      build:
+        context: ./notification-service
+        dockerfile: Dockerfile
+      container_name: notification-service
+      ports:
+        - "8085:8085"
+      environment:
+        SPRING_PROFILES_ACTIVE: docker
+        SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+        # No DB — notification service sirf Kafka events consume karta hai
+      depends_on:
+        kafka:
+          condition: service_healthy
+      networks:
+        - microservices-net
+
+    # ── PRODUCT SERVICE ───────────────────────────────────────────────────────
+    product-service:
+      build:
+        context: ./product-service
+        dockerfile: Dockerfile
+      container_name: product-service
+      ports:
+        - "8086:8086"
+      environment:
+        SPRING_PROFILES_ACTIVE: docker
+        SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/microservices
+        SPRING_DATASOURCE_USERNAME: devuser
+        SPRING_DATASOURCE_PASSWORD: devpassword
+      depends_on:
+        postgres:
+          condition: service_healthy
+      networks:
+        - microservices-net
+
+    # ── SHIPPING SERVICE ──────────────────────────────────────────────────────
+    shipping-service:
+      build:
+        context: ./shipping-service
+        dockerfile: Dockerfile
+      container_name: shipping-service
+      ports:
+        - "8087:8087"
+      environment:
+        SPRING_PROFILES_ACTIVE: docker
+        SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/microservices
+        SPRING_DATASOURCE_USERNAME: devuser
+        SPRING_DATASOURCE_PASSWORD: devpassword
+        SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      depends_on:
+        postgres:
+          condition: service_healthy
+        kafka:
+          condition: service_healthy
+      networks:
+        - microservices-net
+
+INIT-DB.SQL (Auto-create databases):
+--------------------------------------
+  # ./init-db.sql — ye file pehli baar automatically run hogi
+
+  CREATE DATABASE users_db;
+  CREATE DATABASE orders_db;
+  CREATE DATABASE payments_db;
+  CREATE DATABASE inventory_db;
+  CREATE DATABASE products_db;
+  CREATE DATABASE shipping_db;
+
+  GRANT ALL PRIVILEGES ON DATABASE users_db TO devuser;
+  GRANT ALL PRIVILEGES ON DATABASE orders_db TO devuser;
+  -- ...baaki sab ke liye bhi
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 5: SERVICE COMMUNICATION — localhost KYUN KAAM NAHI KARTA
+══════════════════════════════════════════════════════════════════════════════════════════
+
+YE SABSE COMMON BEGINNER MISTAKE HAI:
+
+  ❌ GALAT:
+  SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/microservices
+  # OrderService ke andar localhost = OrderService container khud
+  # PostgreSQL wahan nahi hai!
+
+  ✓ SAHI:
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/microservices
+  # "postgres" = Docker Compose service ka naam = container ka hostname
+
+WHY CONTAINER NAME KAAM KARTA HAI:
+------------------------------------
+  Docker Compose ek internal DNS banata hai.
+  Jab service ka naam "postgres" hai, Docker automatically:
+    postgres → 172.20.0.2 (container ka internal IP)
+  resolve karta hai.
+
+  Ye DNS sirf same network ke containers ke beech kaam karta hai.
+  Isliye sab services same network mein hain: microservices-net
+
+NETWORK FLOW VISUALIZE KARO:
+------------------------------
+  ┌─────────────────────────────────────────────┐
+  │         microservices-net (Docker Network)   │
+  │                                             │
+  │  [order-service]──────→[postgres:5432]      │
+  │       ↓                                     │
+  │  [kafka:9092]←────[notification-service]    │
+  │       ↑                                     │
+  │  [payment-service]                          │
+  │                                             │
+  └─────────────────────────────────────────────┘
+          ↕ (Port mapping)
+  ┌─────────────────────────────────────────────┐
+  │         HOST MACHINE (tumhari laptop)        │
+  │  localhost:8080 → api-gateway               │
+  │  localhost:5432 → postgres (DBeaver)        │
+  │  localhost:9092 → kafka (tools)             │
+  └─────────────────────────────────────────────┘
+
+SPRING BOOT CONFIG (application-docker.yml):
+---------------------------------------------
+  # src/main/resources/application-docker.yml
+  # Ye tab load hoga jab SPRING_PROFILES_ACTIVE=docker
+
+  spring:
+    datasource:
+      url: jdbc:postgresql://postgres:5432/microservices   # container name!
+      username: ${DB_USERNAME:devuser}    # env var, default devuser
+      password: ${DB_PASSWORD:devpassword}
+    kafka:
+      bootstrap-servers: kafka:9092      # container name!
+      consumer:
+        group-id: ${spring.application.name}
+        auto-offset-reset: earliest
+
+  # Feign clients / RestTemplate URLs
+  services:
+    user-service:
+      url: http://user-service:8081      # container name!
+    inventory-service:
+      url: http://inventory-service:8084
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 6: SYSTEM CHALAO
+══════════════════════════════════════════════════════════════════════════════════════════
+
+PEHLI BAAR CHALANA:
+--------------------
+  # Root directory mein jao (jahan docker-compose.yml hai)
+  $ cd my-microservices
+
+  # Step 1: Pehle saari Maven builds karo
+  $ ./build-all.sh
+
+  # Step 2: Sab start karo (build + run)
+  $ docker-compose up --build
+
+  # --build: Images dobara build karo (code changes ke liye)
+  # Bina --build: Cached images use karega
+
+BACKGROUND MEIN CHALANA:
+--------------------------
+  $ docker-compose up -d
+  # -d = detached mode (terminal free rahega)
+
+  # Status dekho
+  $ docker-compose ps
+  NAME                STATUS          PORTS
+  api-gateway         Up 2 minutes    0.0.0.0:8080->8080/tcp
+  postgres-db         Up 2 minutes    0.0.0.0:5432->5432/tcp
+  kafka               Up 2 minutes    0.0.0.0:9092->9092/tcp
+  order-service       Up 1 minute     0.0.0.0:8082->8082/tcp
+  ...
+
+STARTUP ORDER (automatically handle hota hai):
+-----------------------------------------------
+  1. postgres starts → healthcheck pass hone tak wait
+  2. zookeeper starts
+  3. kafka starts → healthcheck pass hone tak wait
+  4. All microservices start (postgres + kafka ready hone ke baad)
+  5. api-gateway starts (sab microservices ke baad)
+
+  depends_on + healthcheck = Safe startup order ✓
+
+VERIFY:
+--------
+  # API Gateway pe hit karo
+  $ curl http://localhost:8080/actuator/health
+  {"status":"UP"}
+
+  # User service directly
+  $ curl http://localhost:8081/actuator/health
+  {"status":"UP"}
+
+  # PostgreSQL connect karo (DBeaver/pgAdmin se)
+  Host: localhost, Port: 5432
+  User: devuser, Password: devpassword
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 7: DEBUGGING — Jab Sab Galat Ho Jaaye
+══════════════════════════════════════════════════════════════════════════════════════════
+
+BASIC COMMANDS:
+----------------
+  # Sab containers ki status
+  $ docker-compose ps
+
+  # Specific service ke logs dekho
+  $ docker-compose logs order-service
+  $ docker-compose logs -f order-service    # -f = follow (live logs)
+  $ docker-compose logs --tail=50 order-service    # Last 50 lines
+
+  # Sab services ke logs ek saath
+  $ docker-compose logs -f
+
+  # Container ke andar jao (bash shell)
+  $ docker exec -it order-service bash
+  # Ab tum container ke andar ho
+  $ cat /app/app.jar    # File check karo
+  $ env                 # Environment variables dekho
+  $ exit                # Bahar aao
+
+  # Container restart karo
+  $ docker-compose restart order-service
+
+  # Sirf ek service rebuild + restart karo
+  $ docker-compose up -d --build order-service
+
+  # Sab band karo
+  $ docker-compose down
+
+  # Sab band karo + volumes delete karo (fresh start)
+  $ docker-compose down -v    # WARNING: DB data delete ho jayega!
+
+COMMON ERRORS + FIXES:
+------------------------
+  ❌ Error: "Connection refused to postgres"
+  Cause: Service postgres se pehle start ho gayi
+  Fix: depends_on mein healthcheck condition add karo (already hai humari file mein)
+
+  ❌ Error: "Port 8081 already in use"
+  Cause: Host machine pe already koi process us port pe hai
+  Fix: $ lsof -i :8081    (kaunsa process hai)
+       $ kill -9 <PID>    (band karo)
+       Ya docker-compose.yml mein port change karo: "8091:8081"
+
+  ❌ Error: "Cannot connect to Docker daemon"
+  Cause: Docker Desktop nahi chala
+  Fix: Docker Desktop open karo, wait karo fully start hone tak
+
+  ❌ Error: Application starts but "Table not found"
+  Cause: Schema create nahi hui
+  Fix: Hibernate DDL check karo: spring.jpa.hibernate.ddl-auto=update
+       Ya init-db.sql mein CREATE TABLE likho
+
+  ❌ Error: "Kafka: Leader not available"
+  Cause: Kafka abhi ready nahi — service jaldi start ho gayi
+  Fix: healthcheck already handle karta hai, thodi der wait karo
+       Ya manually: docker-compose restart order-service
+
+  ❌ Error: Image build fail (JAR not found)
+  Cause: Maven build nahi kiya pehle
+  Fix: $ cd order-service && mvn clean package -DskipTests
+       Phir: $ docker-compose up --build order-service
+
+
+==========================================================================================
+  PHASE 3: AWS EC2 DEPLOYMENT
+==========================================================================================
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 8: AWS EC2 INSTANCE BANAO
+══════════════════════════════════════════════════════════════════════════════════════════
+
+WHY EC2?
+---------
+  EC2 = Elastic Compute Cloud = AWS ka virtual machine/server
+  Ye practically ek Linux machine hai cloud mein.
+  Tum Docker + Docker Compose install karoge wahan — exactly local jaise kaam karega.
+
+STEP-BY-STEP EC2 BANAO (AWS Console):
+---------------------------------------
+  1. AWS Console → EC2 → "Launch Instance"
+
+  2. Name: "microservices-dev-server"
+
+  3. AMI (Operating System) choose karo:
+     → Amazon Linux 2023 (recommended for AWS, Docker support built-in)
+     WHY NOT Ubuntu? Amazon Linux AWS ke saath better optimize hai
+     WHY NOT Windows? Java microservices Linux pe chalte hain, cheap bhi hai
+
+  4. Instance Type:
+     → t3.medium (2 vCPU, 4GB RAM) — minimum for 8 services
+     → t3.large (2 vCPU, 8GB RAM) — comfortable
+     WHY NOT t2.micro (free tier)? 1GB RAM → sab services RAM mein nahi aayengi
+
+  5. Key Pair (SSH access ke liye):
+     → "Create new key pair"
+     → Name: "microservices-dev-key"
+     → Type: RSA
+     → Format: .pem (Mac/Linux) ya .ppk (Windows PuTTY)
+     → DOWNLOAD KARO — ek baar milta hai, safe rakhna!
+
+  6. Network Settings:
+     → VPC: Default VPC (okay for dev)
+     → Subnet: Any public subnet
+     → Auto-assign Public IP: ENABLE ← important!
+
+  7. Security Group (Firewall rules):
+     → "Create security group"
+     → Name: "microservices-sg"
+     → Rules add karo:
+       Type         Port    Source
+       ──────────────────────────────────
+       SSH          22      My IP ← SIRF tumhara IP (secure)
+       HTTP         8080    0.0.0.0/0 ← API Gateway — sabke liye
+       Custom TCP   8081    0.0.0.0/0 ← user-service (optional, testing ke liye)
+       Custom TCP   8082    0.0.0.0/0 ← order-service
+       Custom TCP   8083    0.0.0.0/0 ← payment-service
+       Custom TCP   8084    0.0.0.0/0 ← inventory-service
+       Custom TCP   8085    0.0.0.0/0 ← notification-service
+       Custom TCP   8086    0.0.0.0/0 ← product-service
+       Custom TCP   8087    0.0.0.0/0 ← shipping-service
+
+     SECURITY NOTE: Production mein sirf 8080 (API Gateway) open karo.
+     Dev practice ke liye saare open karo taaki seedha test kar sako.
+
+  8. Storage:
+     → 30 GB (Docker images + logs ke liye kaafi)
+
+  9. "Launch Instance" → Wait 1-2 minutes
+
+  10. Public IP note karo: e.g. 54.123.45.67
+      (Ye har start pe change hota hai — Elastic IP use karo agar stable chahiye)
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 9: SSH SE CONNECT KARO
+══════════════════════════════════════════════════════════════════════════════════════════
+
+SSH KYA HAI?
+-------------
+  SSH = Secure Shell = Remote machine se secure command line access
+  Tumhara laptop → encrypted tunnel → EC2 machine
+  Jaise aap remote wali machine pe directly baithe ho
+
+MAC/LINUX SE CONNECT:
+----------------------
+  # Key file ki permissions set karo (required!)
+  $ chmod 400 ~/Downloads/microservices-dev-key.pem
+  # WHY 400? SSH require karta hai ki key file sirf owner padh sake
+  # Agar permissions loose hain → SSH refuse karta hai
+
+  # Connect karo
+  $ ssh -i ~/Downloads/microservices-dev-key.pem ec2-user@54.123.45.67
+  # -i = identity file (private key)
+  # ec2-user = Amazon Linux ka default user
+  # 54.123.45.67 = tumhara EC2 public IP
+
+  # Pehli baar: "Are you sure you want to continue connecting? (yes/no)"
+  → yes type karo (host fingerprint save hoga)
+
+  # Success! Ab tum EC2 ke andar ho:
+  [ec2-user@ip-172-31-45-23 ~]$
+
+WINDOWS SE CONNECT (2 options):
+---------------------------------
+  Option 1: Windows Terminal / PowerShell (same command as above)
+  Option 2: PuTTY (.ppk file ke saath)
+
+SSH CONFIG (Shortcut banao — optional):
+-----------------------------------------
+  # ~/.ssh/config file mein:
+  Host myec2
+      HostName 54.123.45.67
+      User ec2-user
+      IdentityFile ~/Downloads/microservices-dev-key.pem
+
+  # Ab sirf:
+  $ ssh myec2
+  # Done!
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 10: EC2 PE DOCKER + DOCKER COMPOSE INSTALL KARO
+══════════════════════════════════════════════════════════════════════════════════════════
+
+  # EC2 mein logged in ho — ye commands wahan chalao
+
+  # System update karo pehle
+  $ sudo yum update -y
+
+  # Docker install karo
+  $ sudo yum install docker -y
+
+  # Docker service start karo
+  $ sudo systemctl start docker
+
+  # Boot pe automatically start hone do
+  $ sudo systemctl enable docker
+
+  # ec2-user ko docker group mein add karo (sudo nahi lagega baar baar)
+  $ sudo usermod -aG docker ec2-user
+
+  # IMPORTANT: Log out karo aur wapas login karo (group change apply ke liye)
+  $ exit
+  $ ssh myec2
+
+  # Verify Docker
+  $ docker --version
+  Docker version 24.0.5
+
+  # Docker Compose install karo (V2 — plugin as)
+  $ sudo mkdir -p /usr/local/lib/docker/cli-plugins
+  $ sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
+      -o /usr/local/lib/docker/cli-plugins/docker-compose
+  $ sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+  # Verify
+  $ docker compose version
+  Docker Compose version v2.21.0
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 11: PROJECT EC2 PE COPY KARO
+══════════════════════════════════════════════════════════════════════════════════════════
+
+METHOD 1: Git Clone (RECOMMENDED — Best Practice):
+----------------------------------------------------
+  # EC2 pe:
+  $ sudo yum install git -y
+  $ git clone https://github.com/yourusername/my-microservices.git
+  $ cd my-microservices
+
+  WHY GIT?
+  - Standard workflow hai
+  - Sirf code copy hota hai, JARs nahi (JAR EC2 pe build karo)
+  - Jenkins mein bhi yahi use hoga
+
+  # Maven install karo EC2 pe (JAR build ke liye)
+  $ sudo yum install java-17-amazon-corretto-devel maven -y
+
+  # Saari services build karo
+  $ ./build-all.sh
+
+METHOD 2: SCP (Simple Copy — quick testing ke liye):
+------------------------------------------------------
+  # LOCAL machine pe ye command chalao (JAR files copy karo)
+  $ scp -i ~/Downloads/microservices-dev-key.pem \
+      -r ./my-microservices \
+      ec2-user@54.123.45.67:~/
+
+  # WHY NOT SCP always?
+  # - Slow hai large projects ke liye
+  # - Baar baar manually copy karna padta hai
+  # - Jenkins automation ke saath Git better hai
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 12: EC2 PE DOCKER COMPOSE CHALAO
+══════════════════════════════════════════════════════════════════════════════════════════
+
+  # EC2 pe project directory mein jao
+  $ cd ~/my-microservices
+
+  # Background mein start karo
+  $ docker compose up -d --build
+
+  # Progress dekho
+  $ docker compose logs -f
+
+  # Status check karo
+  $ docker compose ps
+
+  # Memory check karo (important — t3.medium mein 4GB hai)
+  $ free -h
+  $ docker stats    # Real-time container resource usage
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 13: APPLICATION ACCESS KARO PUBLIC IP SE
+══════════════════════════════════════════════════════════════════════════════════════════
+
+  # EC2 Public IP: 54.123.45.67 (example)
+
+  # Local machine se test karo:
+  $ curl http://54.123.45.67:8080/actuator/health
+  {"status":"UP"}
+
+  # Postman mein:
+  GET http://54.123.45.67:8080/api/users
+  GET http://54.123.45.67:8082/api/orders
+
+  # Browser mein:
+  http://54.123.45.67:8080/swagger-ui.html  (agar Swagger add kiya hai)
+
+COST REMINDER:
+--------------
+  Practice ke baad EC2 STOP karo (not terminate — data rehega):
+  AWS Console → EC2 → Instance → Stop
+  Stopped instance ka charge nahi lagta (sirf storage ka lagta hai — negligible)
+
+
+==========================================================================================
+  PHASE 4: JENKINS CI/CD
+==========================================================================================
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 14: JENKINS INSTALL KARO
+══════════════════════════════════════════════════════════════════════════════════════════
+
+CI/CD KYA HAI?
+---------------
+  CI = Continuous Integration
+  → Code push karo → automatically build + test hoga
+  → "Mere code mein koi break toh nahi?"
+
+  CD = Continuous Deployment
+  → Build pass → automatically deploy ho jaye
+  → "Production pe manually deploy nahi karna"
+
+  Without CI/CD:
+    Code likho → manually mvn build → manually docker build → manually SSH → manually run
+    10 services × 5 developers = chaos
+
+  With CI/CD:
+    Code push → Jenkins ne sab handle kiya → 5 minutes mein deployed ✓
+
+JENKINS INSTALL (EC2 pe — same server, dev practice):
+-------------------------------------------------------
+  # EC2 pe:
+  # Java already install hai (Step 11 mein kiya)
+
+  # Jenkins repository add karo
+  $ sudo wget -O /etc/yum.repos.d/jenkins.repo \
+      https://pkg.jenkins.io/redhat-stable/jenkins.repo
+  $ sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+
+  # Jenkins install karo
+  $ sudo yum install jenkins -y
+
+  # Jenkins start karo
+  $ sudo systemctl start jenkins
+  $ sudo systemctl enable jenkins
+
+  # Jenkins port 8090 pe chalao (8080 already API Gateway pe hai)
+  $ sudo vi /etc/sysconfig/jenkins
+  # JENKINS_PORT="8090" set karo
+
+  $ sudo systemctl restart jenkins
+
+  # Initial admin password
+  $ sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+  # Copy this password
+
+  # Security Group mein port 8090 open karo (AWS Console → EC2 → Security Groups)
+  # Add rule: Custom TCP, Port 8090, 0.0.0.0/0
+
+  # Browser mein:
+  http://54.123.45.67:8090
+  # Password paste karo → Install suggested plugins → Admin user banao
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 15 & 16: JENKINS PIPELINE — COMPLETE JENKINSFILE
+══════════════════════════════════════════════════════════════════════════════════════════
+
+  # Project root mein Jenkinsfile banao
+
+  # Jenkinsfile
+  pipeline {
+      agent any    # Jenkins ka koi bhi agent use karo
+
+      // Environment variables — sensitive values Jenkins Credentials mein store karo
+      environment {
+          EC2_HOST = '54.123.45.67'
+          EC2_USER = 'ec2-user'
+          DEPLOY_DIR = '/home/ec2-user/my-microservices'
+          SSH_KEY = credentials('ec2-ssh-key')    // Jenkins mein add kiya hua SSH key
+      }
+
+      stages {
+
+          // ── STAGE 1: CODE CHECKOUT ──────────────────────────────────────
+          stage('Checkout') {
+              steps {
+                  echo '=== Code checkout kar raha hun ==='
+                  checkout scm    // GitHub se latest code lo
+                  // scm = Source Code Management (GitHub webhook se configure hoga)
+              }
+          }
+
+          // ── STAGE 2: BUILD ───────────────────────────────────────────────
+          stage('Build All Services') {
+              steps {
+                  echo '=== Maven build kar raha hun ==='
+                  sh '''
+                      # Saari services build karo parallel mein (faster)
+                      for service in api-gateway user-service order-service \
+                                     payment-service inventory-service \
+                                     notification-service product-service shipping-service; do
+                          echo "Building $service..."
+                          cd $service
+                          mvn clean package -DskipTests -q
+                          cd ..
+                      done
+                      echo "All builds complete!"
+                  '''
+              }
+          }
+
+          // ── STAGE 3: TEST ────────────────────────────────────────────────
+          stage('Run Tests') {
+              steps {
+                  echo '=== Tests chal rahe hain ==='
+                  sh '''
+                      for service in api-gateway user-service order-service \
+                                     payment-service inventory-service; do
+                          cd $service
+                          mvn test -q
+                          cd ..
+                      done
+                  '''
+              }
+              post {
+                  always {
+                      // JUnit test results publish karo Jenkins mein
+                      junit '**/target/surefire-reports/*.xml'
+                  }
+              }
+          }
+
+          // ── STAGE 4: DOCKER BUILD ────────────────────────────────────────
+          stage('Docker Build') {
+              steps {
+                  echo '=== Docker images build kar raha hun ==='
+                  sh '''
+                      for service in api-gateway user-service order-service \
+                                     payment-service inventory-service \
+                                     notification-service product-service shipping-service; do
+                          echo "Docker building $service..."
+                          docker build -t $service:${BUILD_NUMBER} ./$service
+                          docker tag $service:${BUILD_NUMBER} $service:latest
+                          # BUILD_NUMBER = Jenkins ka build number (1, 2, 3...)
+                          # latest tag bhi lagao deploy ke liye
+                      done
+                  '''
+              }
+          }
+
+          // ── STAGE 5: DEPLOY ──────────────────────────────────────────────
+          stage('Deploy to EC2') {
+              steps {
+                  echo '=== EC2 pe deploy kar raha hun ==='
+                  // SSH key se EC2 pe connect karo aur deploy karo
+                  sshagent(['ec2-ssh-key']) {
+                      sh '''
+                          # docker-compose.yml EC2 pe copy karo
+                          scp -o StrictHostKeyChecking=no \
+                              docker-compose.yml \
+                              ${EC2_USER}@${EC2_HOST}:${DEPLOY_DIR}/
+
+                          # EC2 pe docker-compose restart karo
+                          ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "
+                              cd ${DEPLOY_DIR}
+                              docker compose pull            # Latest images lo (agar registry use karo)
+                              docker compose up -d --build  # Rebuild + restart
+                              docker compose ps             # Status print karo
+                          "
+                      '''
+                  }
+              }
+          }
+
+          // ── STAGE 6: HEALTH CHECK ────────────────────────────────────────
+          stage('Health Check') {
+              steps {
+                  echo '=== Application health check kar raha hun ==='
+                  sh '''
+                      # 30 seconds wait karo services start hone ke liye
+                      sleep 30
+
+                      # Health check
+                      response=$(curl -s -o /dev/null -w "%{http_code}" \
+                                      http://${EC2_HOST}:8080/actuator/health)
+
+                      if [ $response -eq 200 ]; then
+                          echo "✓ Application healthy hai! Status: $response"
+                      else
+                          echo "✗ Application unhealthy! Status: $response"
+                          exit 1    # Pipeline fail karo
+                      fi
+                  '''
+              }
+          }
+      }
+
+      // ── POST ACTIONS ─────────────────────────────────────────────────────
+      post {
+          success {
+              echo '✅ Pipeline SUCCESS! Deployment complete!'
+              // Email notification bhi bhej sakte ho (Jenkins Email plugin)
+          }
+          failure {
+              echo '❌ Pipeline FAILED! Logs check karo.'
+              // Slack notification bhi bhej sakte ho
+          }
+          always {
+              // Dangling Docker images clean karo
+              sh 'docker image prune -f'
+          }
+      }
+  }
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 17: GITHUB INTEGRATION — Auto Trigger Pipeline
+══════════════════════════════════════════════════════════════════════════════════════════
+
+WEBHOOK KYA HOTA HAI?
+----------------------
+  Normal: Tum manually Jenkins pe "Build Now" click karo
+  Webhook: GitHub code push hone pe automatically Jenkins ko batata hai
+
+  GitHub → (HTTP POST) → Jenkins → Pipeline trigger
+
+SETUP:
+-------
+  1. JENKINS SIDE:
+     → Jenkins → Manage Jenkins → Plugins → Install: "GitHub plugin"
+     → New Item → Pipeline → Name: "microservices-pipeline"
+     → Build Triggers → "GitHub hook trigger for GITScm polling" ENABLE karo
+     → Pipeline → "Pipeline script from SCM" → Git → Your repo URL
+     → Branch: */main
+     → Script Path: Jenkinsfile
+     → Save
+
+  2. GITHUB SIDE:
+     → Your Repository → Settings → Webhooks → "Add webhook"
+     → Payload URL: http://54.123.45.67:8090/github-webhook/
+     → Content type: application/json
+     → Trigger: "Just the push event"
+     → Add webhook
+
+  3. TEST KARO:
+     $ git add .
+     $ git commit -m "test: trigger CI/CD pipeline"
+     $ git push origin main
+     → Jenkins pe jao → Build automatically shuru hoga! ✓
+
+JENKINS CREDENTIALS SETUP (SSH Key ke liye):
+----------------------------------------------
+  → Jenkins → Manage Jenkins → Credentials → System → Global credentials
+  → Add Credentials:
+     Kind: SSH Username with private key
+     ID: ec2-ssh-key              ← Jenkinsfile mein yahi use kiya
+     Username: ec2-user
+     Private Key: (pem file ka content paste karo)
+  → Save
+
+
+==========================================================================================
+  PHASE 5: CONFIGURATION
+==========================================================================================
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 18: APPLICATION CONFIG FILES
+══════════════════════════════════════════════════════════════════════════════════════════
+
+FOLDER STRUCTURE:
+------------------
+  order-service/
+  └── src/main/resources/
+      ├── application.yml          ← Common config (sab profiles ke liye)
+      ├── application-local.yml    ← Local development (IntelliJ se run karo)
+      ├── application-docker.yml   ← Docker Compose mein
+      └── application-prod.yml     ← Production (future mein)
+
+application.yml (Common — sab profiles share karein):
+-------------------------------------------------------
+  spring:
+    application:
+      name: order-service    # Service ka naam (Actuator, logs mein dikhega)
+    jpa:
+      hibernate:
+        ddl-auto: update     # Dev mein: auto-create/update tables
+      show-sql: false        # SQL print karo? Dev mein true, prod mein false
+
+  server:
+    port: 8082
+
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health,info,metrics    # Actuator endpoints
+
+application-local.yml (IntelliJ se run karo):
+----------------------------------------------
+  spring:
+    datasource:
+      url: jdbc:postgresql://localhost:5432/orders_db    # localhost OK hai — local mein
+      username: postgres
+      password: postgres
+    kafka:
+      bootstrap-servers: localhost:9092
+
+application-docker.yml (Docker Compose mein):
+----------------------------------------------
+  spring:
+    datasource:
+      url: jdbc:postgresql://postgres:5432/microservices    # Container name!
+      username: ${DB_USERNAME}      # docker-compose.yml se environment variable
+      password: ${DB_PASSWORD}
+    kafka:
+      bootstrap-servers: kafka:9092    # Container name!
+
+  # Feign client URLs
+  services:
+    user-service:
+      url: http://user-service:8081
+    inventory-service:
+      url: http://inventory-service:8084
+
+══════════════════════════════════════════════════════════════════════════════════════════
+  STEP 19: ENVIRONMENT SEPARATION
+══════════════════════════════════════════════════════════════════════════════════════════
+
+  Environment      Profile          Where
+  ─────────────────────────────────────────────────────
+  Local            local            IntelliJ → Run config → Active profiles: local
+  Docker (Dev)     docker           docker-compose: SPRING_PROFILES_ACTIVE=docker
+  Production       prod             Real server (future — secrets manager use karo)
+
+PROFILE ACTIVATE KARNA:
+------------------------
+  # IntelliJ mein:
+  Run → Edit Configurations → Environment Variables:
+  SPRING_PROFILES_ACTIVE=local
+
+  # Docker Compose mein:
+  environment:
+    SPRING_PROFILES_ACTIVE: docker
+
+  # Command line se:
+  $ java -jar app.jar --spring.profiles.active=docker
+
+
+==========================================================================================
+  EXTRA: COMMON MISTAKES + BEST PRACTICES
+==========================================================================================
+
+TOP BEGINNER MISTAKES:
+-----------------------
+
+  MISTAKE 1: localhost use karna containers mein
+  ❌ SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/db
+  ✓  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/db
+
+  MISTAKE 2: Passwords hardcode karna
+  ❌ password: mysecretpassword
+  ✓  password: ${DB_PASSWORD}   (environment variable se lo)
+
+  MISTAKE 3: Maven build kiye bina Docker build karna
+  ❌ docker build -t order-service .   (purana JAR hai target mein)
+  ✓  mvn clean package -DskipTests && docker build -t order-service .
+
+  MISTAKE 4: Docker Compose down karna volumes ke saath
+  ❌ docker-compose down -v    (DB data delete!)
+  ✓  docker-compose down       (data safe)
+     docker-compose down -v    (sirf tab jab fresh start chahiye)
+
+  MISTAKE 5: Services ka depends_on bina healthcheck
+  ❌ depends_on:
+       - postgres          (postgres container start hone pe hi service start hogi)
+                           (postgres start ≠ postgres ready for connections!)
+  ✓  depends_on:
+       postgres:
+         condition: service_healthy    (actual health check pass hone ke baad)
+
+  MISTAKE 6: EC2 mein sab ports open karna
+  ❌ 0-65535 all open
+  ✓  Sirf required ports, SSH sirf My IP se
+
+  MISTAKE 7: Jenkins credentials hardcode karna
+  ❌ EC2_PASSWORD=mypassword Jenkinsfile mein
+  ✓  Jenkins Credentials store use karo
+
+FOLDER STRUCTURE BEST PRACTICES:
+----------------------------------
+  my-microservices/
+  ├── api-gateway/
+  │   ├── src/
+  │   ├── pom.xml
+  │   └── Dockerfile
+  ├── user-service/
+  │   ├── src/
+  │   ├── pom.xml
+  │   └── Dockerfile
+  ├── ...other services...
+  ├── docker-compose.yml           ← Root level
+  ├── docker-compose.override.yml  ← Local overrides (gitignore mein)
+  ├── init-db.sql                  ← DB initialization
+  ├── build-all.sh                 ← Build script
+  ├── Jenkinsfile                  ← CI/CD pipeline
+  └── README.md                   ← Setup instructions
+
+.gitignore mein ye add karo:
+------------------------------
+  target/
+  *.jar
+  .env                 ← Local secrets
+  docker-compose.override.yml
+  *.pem               ← SSH keys
+
+DEBUG WHEN SERVICE FAILS:
+--------------------------
+  Step 1: docker-compose ps → kaunsa service down hai?
+  Step 2: docker-compose logs <service-name> → error kya hai?
+  Step 3: docker exec -it <container> bash → andar jao, check karo
+  Step 4: environment variables sahi hain? → docker exec -it <container> env
+  Step 5: Network issue? → docker exec -it <container> curl http://postgres:5432
+  Step 6: Port conflict? → docker ps, lsof -i :<port>
+
+
+==========================================================================================
+  INTERVIEW EXPLANATION — Simple Terms Mein
+==========================================================================================
+
+  "Humara setup kuch aise hai:"
+
+  "Sab microservices Docker containers mein hain.
+   Docker Compose se locally ek command mein sab start ho jaata hai —
+   PostgreSQL, Kafka, aur saari 8 services.
+
+   Docker network mein services container names se communicate karti hain —
+   localhost nahi, 'order-service', 'postgres' use hota hai.
+
+   Deployment ke liye AWS EC2 use karte hain.
+   Same Docker Compose file wahan bhi run hoti hai.
+
+   CI/CD ke liye Jenkins hai.
+   GitHub pe code push karo → webhook Jenkins ko trigger karta hai →
+   Maven build → Docker images build → EC2 pe deploy → Health check.
+
+   Environment separation ke liye Spring profiles use karte hain —
+   local mein 'local' profile, Docker mein 'docker' profile,
+   toh config alag alag jagah alag rehti hai."
+
+  WHY NOT KUBERNETES (interview mein):
+  "Hum Kubernetes evaluate kiya lekin dev environment ke liye overkill tha.
+   Docker Compose se same isolation aur orchestration milti hai.
+   Jab production-scale pe jaayenge toh K8s consider karenge —
+   abhi simplicity aur speed development priority hai."
+
+==========================================================================================
+  COMPLETE COMMAND CHEATSHEET
+==========================================================================================
+
+  LOCAL DEVELOPMENT:
+  $ ./build-all.sh                          # Sab Maven builds
+  $ docker compose up -d --build            # Start sab
+  $ docker compose down                     # Stop sab
+  $ docker compose logs -f order-service   # Live logs
+  $ docker compose restart order-service   # Ek restart
+  $ docker compose ps                       # Status
+
+  EC2 CONNECTION:
+  $ ssh -i key.pem ec2-user@<public-ip>    # Connect
+  $ scp -i key.pem file ec2-user@<ip>:~/  # File copy
+
+  DOCKER MAINTENANCE:
+  $ docker image prune -f                   # Unused images delete
+  $ docker system prune -f                  # Sab cleanup
+  $ docker stats                            # Resource usage
+
+  JENKINS PIPELINE:
+  Manual trigger: Jenkins UI → "Build Now"
+  Auto trigger: Git push → Webhook → Auto build
+
+==========================================================================================
+  NEXT STEPS (Ye guide complete karne ke baad)
+==========================================================================================
+
+  1. AWS RDS (Managed PostgreSQL):
+     Docker PostgreSQL → AWS RDS pe migrate karo
+     Connection string: postgres container → RDS endpoint
+     WHY? Production mein managed DB use karte hain (backups, failover automatic)
+
+  2. AWS SQS/SNS (Managed Messaging):
+     Kafka container → AWS SQS/SNS
+     Spring Cloud AWS library use karo
+     WHY? Managed service — Kafka maintain nahi karna padata
+
+  3. CloudWatch (Logging/Monitoring):
+     docker logs → CloudWatch Logs
+     Application metrics → CloudWatch Metrics
+     Alerts → CloudWatch Alarms → SNS → Email/Slack
+
+  4. AWS IAM (Permissions):
+     EC2 ko permissions do — bina credentials hardcode kiye
+     EC2 Instance Role → S3/SQS/SNS access
+     WHY? Credentials file mein mat rakho — security risk
+
+  5. Secrets Manager:
+     DB passwords → AWS Secrets Manager
+     Spring Boot auto-fetch karta hai at startup
+     WHY? .env files mein passwords = security risk
+
+==========================================================================================

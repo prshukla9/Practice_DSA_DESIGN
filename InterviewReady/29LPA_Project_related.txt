@@ -1,0 +1,477 @@
+Software Developer | Nov 2025 - Present
+EPAM | Bengaluru
+Designing and developing scalable healthcare microservices for patient and doctor workflows, integrating FHIR-based interoperable data exchange and AI-driven capabilities for intelligent query handling and decision support.
+● Designed and developed Spring Boot-based microservices for patient management and doctor availability in a distributed architecture
+● Implemented FHIR-based interoperable data exchange to enable secure and standardized sharing of patient health records across systems
+● Developed HIPAA-compliant patient consent management workflows for secure access to sensitive healthcare data
+● Designed and implemented Kafka-based event-driven architecture for real-time updates and notifications
+● Built AI-powered assistant using OpenAI APIs to handle patient and doctor queries with natural language interaction
+● Implemented semantic search using pgvector and designed context-aware prompt pipelines to improve response accuracy and relevance
+● Optimized high-traffic APIs, reducing latency by 200ms and improving response time by 30%
+
+
+
+Software Developer | Apr 2024 – Oct 2025
+Blue Yonder | Bengaluru
+● Developed and deployed RESTful microservices using Spring Boot, ensuring modularity, scalability, and ease of maintenance across multiple components.
+● Implemented Kafka-based asynchronous communication between services to handle high-volume event-driven data processing and ensure real-time data consistency.
+● Enhanced API functionality to improve system performance and ensure seamless integration with client-facing applications. Resolved P1 production issues, improving system reliability and, and ensuring a smooth user experience.
+● Conducted JMeter and PSR load testing, optimizing server performance by identifying and resolving bottlenecks.
+● Collaborated on the materialization process, significantly improving data processing speed and efficiency.
+● Designed event-driven architecture using Kafka.
+● Handled async processing and data consistency.
+
+
+================================================================================
+NOTE — EPAM PROJECT SCOPE (Interview me yahi bolna)
+================================================================================
+Tumhara EPAM project 3 core pillars pe hai — inke alawa assume mat karo:
+
+  1. FHIR Document Exchange  → health records / documents share & receive (interoperability)
+  2. Consent Management      → HIPAA-compliant access control (kaun kya dekh sakta hai)
+  3. AI Search & Query       → OpenAI + pgvector semantic search + intelligent Q&A
+
+Supporting: Kafka (async events), Spring Boot microservices, performance optimization
+
+❌ Is project me NAHI hai (mat bolo interview me):
+  - Appointment booking / scheduling
+  - Doctor availability / slot management
+  - Patient registration / profile CRUD as main feature
+
+✅ Resume bullet "patient and doctor workflows" = users jo system use karte hain (context),
+   core engineering = FHIR docs + consent + AI search
+================================================================================
+
+
+-------------------------------------------------------------------------------------------
+EPAM HEALTHCARE — QUESTIONS (6 YOE Java Developer Level)
+-------------------------------------------------------------------------------------------
+
+SECTION 1: Project Overview (Entry → Deep)
+Apna healthcare platform ek line me explain karo — domain + tumhara exact contribution
+End-to-end architecture explain karo (FHIR exchange + consent + AI search flow)
+System ke 3 core modules kaise interact karte hain? (document exchange, consent, AI assistant)
+External hospital/lab systems se FHIR document kaise aata aur jaata hai?
+Synchronous vs asynchronous calls kahan use kiye aur kyun?
+Agar tumhe system redesign karna ho 6 YOE perspective se kya change karoge?
+👉 Killer: "Tumhara exact ownership kya tha — kaunse modules tumne build kiye?"
+👉 Killer: "Ye system solve kya problem karta hai healthcare me?"
+
+
+⚙️ SECTION 2: Microservices Design (6 YOE Depth)
+Microservices ka breakdown kaise kiya? (consent, fhir-sync, ai-assistant, notification etc.)
+Service boundaries decide kaise kiye — DDD / bounded context approach?
+Kaunsa service kis data ka owner hai? Database-per-service follow kiya?
+Inter-service communication — REST sync kab, Kafka async kab?
+API contracts kaise manage kiye? (OpenAPI, contract testing)
+API versioning strategy kya thi? Breaking change kaise handle kiya?
+Inter-service communication secure kaise ki? (JWT, mTLS, IAM)
+Tightly coupled services avoid kaise kiye multiple teams ke beech?
+Ek service deploy karo bina doosri ko break kiye — kaise ensure kiya?
+Shared library vs independent services — tumne kya approach liya?
+👉 Killer: "Agar consent-service down ho jaye to FHIR document access ka kya hoga?"
+👉 Killer: "Microservices me distributed transaction kaise handle kiya?"
+
+
+🏥 SECTION 3: FHIR Document Exchange (CORE USP 💥 — MUST KNOW)
+FHIR kya hai aur tumhare project me exactly kis kaam ke liye use kiya?
+FHIR document sharing flow explain karo end-to-end (request → consent check → fetch → deliver)
+FHIR document receiving flow explain karo (external system se data aana)
+Kaunse FHIR resources use kiye? (DocumentReference, Patient, Bundle, Binary etc.)
+DocumentReference resource ka role kya tha?
+Interoperability achieve kaise ki different hospital systems ke saath?
+Legacy / non-FHIR systems se data mapping kaise kiya?
+FHIR search parameters ka use kaise kiya? ($everything, _include etc.)
+Document versioning kaise handle kiya? (same document update ho jaye to?)
+Large clinical documents (PDF, imaging reports) kaise handle kiye?
+FHIR Bundle ka use kab kiya? (bulk document transfer)
+External system unavailable ho to retry / fallback strategy kya thi?
+FHIR data validation kaise ki? (HAPI FHIR validator, schema checks)
+👉 Killer: "FHIR document request aayi lekin consent nahi hai — exact flow kya hoga?"
+👉 Killer: "Do hospitals alag FHIR versions use karte hain — kaise handle karoge?"
+👉 Killer: "FHIR document exchange me data inconsistent ho jaye to kaise fix karoge?"
+
+
+🔐 SECTION 4: Consent Management & HIPAA (CORE USP 💥)
+HIPAA compliance ensure kaise kiya system level pe?
+Patient consent management ka complete flow explain karo
+Consent types kya the? (view records, share with provider, AI query access etc.)
+Consent grant ka flow — step by step
+Consent revoke ka flow — step by step, downstream impact kya hota hai?
+Consent revoke hone par running/in-flight FHIR request ka kya hoga?
+Consent check har API call pe kaise enforce kiya? (middleware / interceptor approach)
+Consent scope kaise define kiya? (kaunsa document, kaunsa time period, kaunsa provider)
+Sensitive data encryption — at rest aur in transit kaise kiya?
+Access control implement kaise kiya? (RBAC + consent-based access)
+Audit logging — har PHI access ka trail kaise maintain kiya?
+Kafka me consent-revoked event ka role kya tha?
+Consent service alag microservice kyun banaya?
+Minimum necessary principle implement kaise kiya?
+👉 Killer: "Consent revoke ho jaye aur AI ne already context me data fetch kar liya ho — kya hoga?"
+👉 Killer: "Audit log me kya fields hote hain — ek example batao"
+👉 Killer: "Bina consent ke FHIR document access ki koshish hui — system ka behavior?"
+
+
+🔥 SECTION 5: Kafka / Event-Driven Architecture (6 YOE Depth)
+Kafka ka use exactly kahan aur kyun kiya project me?
+Real event flows batao (consent-revoked, document-shared, fhir-sync-completed, notification)
+Producer-consumer design kaise kiya? Kaunse service producer, kaunse consumer?
+Topic design — kaunse topics, kitne partitions, partition key kya?
+Message ordering maintain kaise ki? (consent events per patient ordered honi chahiye?)
+Duplicate message handling — idempotent consumer kaise implement kiya?
+Exactly-once vs at-least-once — tumne kya use kiya aur kyun?
+Kafka + DB consistency — Outbox pattern use kiya? Explain karo
+Consumer lag monitor kaise kiya? (CloudWatch / MSK metrics)
+Consumer slow ho jaye ya lag spike aaye — scaling strategy kya hai?
+Retry mechanism + Dead Letter Queue (DLQ) kaise implement kiya?
+Kafka me sensitive data / PHI kaise handle kiya? (payload me kya bheja, kya nahi)
+Schema evolution — event format change ho jaye to kaise handle kiya?
+Broker failure scenario — system ka behavior kya hota hai?
+Kafka delay ho jaye to user/system pe kya impact?
+Kafka vs REST — tumhare project me trade-off kya tha?
+👉 Killer: "Same consent-revoked event 3 baar process ho jaye — kya hoga?"
+👉 Killer: "Kafka hata ke sirf REST use karte to FHIR sync me kya problem aati?"
+👉 Killer: "FHIR document sync fail ho jaye Kafka consumer me — DLQ ke baad kya?"
+
+
+🤖 SECTION 6: AI Search & Intelligent Query (CORE USP 💥 — STRONGEST)
+AI assistant / search feature ka exact use case kya tha project me?
+AI assistant ka architecture explain karo (components + data flow)
+User query se response generate hone tak ka complete flow?
+OpenAI API exactly kahan use kiya? (embeddings vs chat completion)
+Semantic search kya hai aur FHIR/clinical documents ke liye kyun use kiya?
+pgvector ka role kya tha? PostgreSQL me hi kyun, alag vector DB kyun nahi?
+Embeddings kaise generate kiye? Kaunsa model use kiya?
+Document content ko searchable banane ka flow? (FHIR doc → chunk → embed → store)
+Similarity search kaise kaam karta hai? (cosine distance, top-K retrieval)
+Context-aware prompt pipeline ka design explain karo
+Static vs dynamic prompts — tumne kya approach liya?
+Context window / token limit manage kaise kiya?
+Prompt engineering approach — system prompt me kya rules the?
+Hallucination control — kaise reduce kiya?
+AI galat / irrelevant answer de to kaise handle kiya?
+AI ko sensitive healthcare data kaise diya securely? (PII masking, consent check)
+AI query se pehle consent verify hoti hai ya nahi? Flow batao
+OpenAI API down / slow ho jaye to fallback strategy?
+High traffic me AI calls scale kaise kiye? Caching use ki?
+AI API cost optimization kaise ki?
+Multi-turn conversation handle ki? Kaise?
+👉 Killer: "AI ne galat medical information de di — production me kaise rokoge?"
+👉 Killer: "User ne consent nahi diya lekin AI se health record pucha — kya hoga?"
+👉 Killer: "Keyword search se semantic search better kyun tha tumhare use case me?"
+
+
+⚡ SECTION 7: Performance & Optimization (6 YOE Depth)
+200ms latency reduction — kaunse API pe, kaise achieve ki?
+30% response time improvement — root cause kya tha, kaise measure kiya?
+Bottleneck identify kaise kiya? (tools + process)
+High-traffic APIs kaunsi thi? (FHIR fetch, AI search, consent check?)
+Optimization techniques kya use kiye?
+  → DB query optimization / indexing
+  → Redis caching (kahan cache kiya — FHIR doc metadata? AI frequent queries?)
+  → Connection pool tuning (HikariCP)
+  → pgvector index tuning (IVFFlat / HNSW)
+  → Async processing (Kafka)
+Load testing approach? JMeter use kiya EPAM me?
+Before/after metrics kaise present karoge interviewer ko?
+👉 Killer: "30% improvement claim — proof kaise doge?"
+👉 Killer: "AI search slow ho jaye production me — debug steps?"
+
+
+💣 SECTION 8: EPAM Killer Questions (100% Prep — Resume Mapped)
+
+👉 "FHIR document share karna hai lekin patient ne consent revoke kar diya — exact system behavior?"
+👉 "AI wrong answer de to kya karoge?"
+👉 "FHIR data external system se inconsistent aaya — reconciliation kaise karoge?"
+👉 "Consent revoke + running FHIR fetch request — race condition handle kaise kiya?"
+👉 "Kafka delay ho jaye to FHIR sync aur notifications pe kya impact?"
+👉 "Large FHIR document (50MB PDF) fetch karna ho — approach kya hoga?"
+👉 "6 microservices me ek bug deploy hua — rollback strategy?"
+👉 "Raat ko 2 baje P1 aaya consent-service down — first 15 minutes plan?"
+
+
+🚨 SECTION 9: EPAM P1 / Production Scenarios (STAR Format Ready)
+P1 incident kya hota hai? Healthcare context me example batao
+EPAM me P1 scenario ready rakho — options:
+  → Consent-service down → all document access blocked
+  → FHIR sync consumer stuck → stale documents
+  → AI service timeout spike → user queries failing
+  → Kafka lag → consent-revoked events delayed → security risk
+STAR format me ek example likho (Situation, Task, Action, Result)
+P1 detect kaise hota hai? (CloudWatch alerts, user complaints)
+Debugging tools? (logs, metrics, Kafka lag, RDS performance)
+Temporary mitigation vs permanent fix — example batao
+Post-incident RCA aur preventive measures?
+
+
+🔗 SECTION 10: EPAM vs Blue Yonder — Interview Comparison Table
+
+| Topic              | EPAM (Healthcare)                         | Blue Yonder (Supply Chain)           |
+|--------------------|-------------------------------------------|--------------------------------------|
+| Domain             | FHIR docs, Consent, AI Search             | Inventory, Orders, Planning          |
+| Core USP           | FHIR exchange + Consent + AI/pgvector     | Kafka volume + Materialization + PSR |
+| Main Services      | consent, fhir-sync, ai-assistant, notify  | order, inventory, materialization    |
+| Kafka use          | Consent events, FHIR sync, notifications  | High-volume events, materialization  |
+| Database           | PostgreSQL + pgvector                     | PostgreSQL                           |
+| Compliance         | HIPAA, consent audit trail                | Enterprise SLA                       |
+| Performance win    | 200ms latency, 30% on FHIR/AI APIs        | 30% improvement, materialization     |
+| Testing            | JMeter (FHIR + AI search APIs)            | JMeter + PSR                         |
+| P1 experience      | Consent/FHIR/AI scenario                  | Order/inventory/API scenario         |
+
+
+------------------------------------------------------------------------------------
+BLUE YONDER — QUESTIONS (6 YOE Java Developer Level)
+EPAM = FHIR + Consent + AI | Blue Yonder = Microservices + Kafka + Materialization + PSR
+Interview me dono projects alag-alag confidently explain karne hain.
+------------------------------------------------------------------------------------
+
+
+🏭 SECTION 11: Blue Yonder — Project Overview (Entry → Deep)
+Blue Yonder project ek line me explain karo (supply chain / inventory / planning domain)
+System ka end-to-end architecture explain karo (client apps → API layer → microservices → DB → Kafka)
+Kaunse microservices the? (order-service, inventory-service, materialization-service, notification-service etc.)
+Tumhara role exactly kya tha? (develop, deploy, debug, optimize)
+Monolith tha ya pehle se microservices? Tumne kya contribute kiya?
+Client-facing applications ke saath integration kaise kiya?
+RESTful APIs kaunse develop kiye? Example endpoints batao
+Synchronous vs asynchronous calls kahan use kiye?
+Blue Yonder vs EPAM — architecture aur domain difference?
+Agar tumhe Blue Yonder system redesign karna ho to kya change karoge?
+👉 Killer: "Blue Yonder me tumhara biggest contribution kya tha?"
+
+
+⚙️ SECTION 12: Blue Yonder — Microservices Design
+Service boundaries kaise decide kiye supply chain domain me?
+Kaunsa service kis data ka owner tha? (database per service?)
+Inter-service communication — REST sync kab, Kafka async kab?
+Tight coupling avoid kaise kiya multiple teams ke beech?
+API contracts kaise manage kiye? (OpenAPI/Swagger, versioning)
+Service independently deploy ho sakta tha? CI/CD kaise tha?
+Shared library use ki ya har service independent?
+Error handling across services kaise kiya?
+Circuit breaker / retry use kiya? Kab?
+👉 Killer: "Ek service deploy karo bina doosri ko break kiye — kaise ensure kiya?"
+
+
+🔥 SECTION 13: Blue Yonder — Kafka (Project Mapped)
+Blue Yonder me Kafka exactly kahan use kiya?
+Kaunse events publish hote the?
+  → order-created, inventory-updated, materialization-trigger, data-sync-events
+Producer kaunse service me tha? Consumer kaunse service me?
+Topic design — partitions, replication factor, partition key?
+Message format — JSON / Avro? Schema versioning?
+Consumer groups — parallel processing kaise achieve kiya?
+At-least-once delivery — duplicate handle kaise kiya?
+Event-driven vs pure REST — benefit kya mila?
+Kafka down ho jaye to system ka behavior?
+Real-time data consistency async flow me kaise ensure ki?
+👉 Killer: "Kafka hata ke sirf REST use karte to kya problem aati?"
+👉 Killer: "High volume event burst — Kafka + consumers kaise handle karenge?"
+
+
+📦 SECTION 14: Materialization Process (RESUME BULLET — MUST KNOW)
+Materialization process kya hota hai high level pe?
+Blue Yonder me kis data ke liye thi? (inventory snapshots, demand forecasts, planning data)
+Kyun zaroori thi? (on-the-fly compute slow → pre-compute for fast reads)
+Materialization flow step-by-step explain karo
+Tumne exactly kya improve kiya? (speed, reliability, correctness)
+Batch → stream / incremental materialization — kya change kiya?
+Pehle kitna time vs baad me? (approximate numbers)
+Bottleneck kahan thi?
+Failure handling — retry, DLQ, eventual consistency
+Stale materialized data ka issue — kaise handle kiya?
+Full refresh vs incremental — tumne kya use kiya?
+👉 Killer: "Materialized data outdated — user ko wrong inventory dikhe — kaise fix?"
+👉 Killer: "Materialization slow ho gaya production me — debug steps?"
+
+
+🚨 SECTION 15: P1 Production Issue (STAR — Blue Yonder Primary)
+P1 incident kya hota hai? Blue Yonder me kaunsa resolve kiya?
+STAR format me ek example ready rakho (S, T, A, R)
+P1 detect kaise hua? First 15 minutes ka plan?
+Debugging tools? (CloudWatch, logs, JMeter, DB metrics, Kafka lag)
+Common P1 scenarios:
+  → API 5xx spike / thread pool exhaustion
+  → DB connection pool exhausted
+  → Kafka consumer stuck / lag spike
+  → Slow API (N+1 query / missing index)
+  → OOM crash loop / deployment regression
+Temporary mitigation vs permanent fix — example
+Rollback experience? Kitni der me?
+Post-incident RCA + monitoring improvements?
+👉 Killer: "Root cause logs me nahi mil raha — next steps?"
+👉 Killer: "Fix deploy karna safe hai ya pehle rollback?"
+
+
+⚡ SECTION 16: Blue Yonder — Performance & JMeter
+JMeter / PSR testing kis APIs pe ki?
+Concurrent users kitne simulate kiye?
+Bottleneck kya tha? (DB / CPU / Kafka / network)
+30% performance improvement — specific changes?
+200ms latency reduction — kaunse API pe?
+Load test se production capacity estimate kaise kiya?
+👉 Killer: "30% improvement claim — proof kaise doge?"
+
+
+💣 SECTION 17: Blue Yonder Killer Questions
+
+👉 "Microservices breakdown explain karo"
+👉 "Materialization me kya improve kiya — numbers ke saath?"
+👉 "Ek P1 issue STAR format me batao"
+👉 "Kafka event miss ho jaye materialization me — kya hoga?"
+👉 "High volume event processing me data consistency kaise ensure ki?"
+👉 "Client-facing API slow — debug kaise kiya?"
+👉 "Deployment ke baad production regression — experience?"
+
+
+================================================================================
+ADDITIONAL — EPAM KAFKA Q&A (Resume Mapped — NO Appointment References)
+================================================================================
+
+1. Kafka use kyun kiya?
+👉 FHIR document sync, consent propagation, aur notifications ke liye async decoupling.
+   External system calls slow/unreliable hain — Kafka buffer karta hai, retry + replay possible.
+
+2. Real event flow — Consent Revoked
+👉 Patient consent revoke karta hai → consent-service DB update → Kafka "consent-revoked" publish
+   → fhir-sync-service: active syncs stop + cache clear
+   → ai-assistant-service: patient context remove
+   → notification-service: audit log + alert
+
+3. Real event flow — FHIR Document Shared
+👉 Provider document share request → consent check (sync) → fhir-sync-service fetch from external
+   → DB save + Kafka "document-shared" → notification-service notify recipient
+   → AI indexing job: document chunk → embed → pgvector store (async)
+
+4. Topic aur partition kaise decide kiye?
+👉 High throughput topics (document-events): 6+ partitions
+   Ordering needed per patient: partition key = patientId
+   Consumer count ≤ partition count
+
+5. Duplicate messages kaise handle kiye?
+👉 Idempotent consumer — processed_event_id table / Redis dedup key
+   Same eventId aaye → skip business logic, commit offset
+
+6. Exactly-once vs At-least-once
+👉 At-least-once + idempotency — consent revoke dubara process ho to bhi same end state
+
+7. Kafka + DB consistency
+👉 Outbox pattern — consent update + event same DB transaction me
+   Outbox worker Kafka publish karta hai — guaranteed eventual consistency
+
+8. Consumer lag monitor
+👉 CloudWatch MSK metrics (EstimatedMaxTimeLag) → alarm > 5 min → scale consumers
+
+9. Kafka delay impact
+👉 Consent revoke delayed = security window (critical — monitor closely)
+   FHIR sync delayed = stale documents (acceptable short-term, alert if prolonged)
+   Notifications delayed = low impact
+
+10. PHI in Kafka payloads
+👉 Payload me sirf reference IDs (patientId, documentId) — no raw PHI
+    Consumer full data DB se fetch karta hai after consent re-check
+
+11. Retry + DLQ
+👉 3 retries exponential backoff → fail → DLQ topic → manual reprocess after fix
+
+12. Kafka vs REST in your project
+👉 REST: consent check, synchronous FHIR fetch response to user
+    Kafka: consent propagation, async FHIR sync, document indexing, notifications
+
+13. Project summary (Kafka)
+👉 "Kafka use kiya FHIR document sync aur consent event propagation ke liye.
+    Consent-revoked events downstream services ko instantly inform karti hain.
+    Idempotent consumers + lag monitoring + DLQ se system reliable aur HIPAA-compliant raha."
+
+
+================================================================================
+ADDITIONAL — EPAM AI / FHIR SEARCH Q&A (Resume Mapped)
+================================================================================
+
+1. AI assistant ka architecture
+👉 User query → consent check → embedding generate (OpenAI) → pgvector semantic search
+   on indexed FHIR/clinical documents → top-K context retrieve → prompt pipeline
+   → OpenAI chat completion → validation layer → response
+
+2. FHIR documents searchable kaise banaye?
+👉 FHIR DocumentReference fetch → extract text content (PDF parse / clinical text)
+   → chunk into segments → generate embeddings → store in pgvector table with metadata
+   (documentId, patientId, documentType)
+
+3. Semantic search kyun?
+👉 User "lab results for diabetes" bole ya "blood sugar test report" — keyword miss karega,
+   semantic search same meaning samjhega across FHIR clinical documents
+
+4. pgvector kyun alag vector DB nahi?
+👉 Data already PostgreSQL me tha (FHIR metadata + vectors same DB)
+   Scale sufficient tha, extra infra cost/complexity avoid
+
+5. Prompt pipeline flow
+👉 System prompt (rules: no diagnosis, consent scope only, cite document source)
+   + Retrieved FHIR document chunks (dynamic context)
+   + User query → LLM → Response validation → Return with source references
+
+6. Hallucination control
+👉 Context grounding (sirf retrieved FHIR chunks se answer)
+   Temperature=0.3, validation layer, "Information not found in your records" fallback
+   Source document reference mandatory in response
+
+7. Sensitive data AI ko kaise?
+👉 Consent check before query, PII masked in prompts (reference IDs only)
+   Audit log every AI query, no raw SSN/MRN in OpenAI call
+
+8. OpenAI down ho jaye to?
+👉 Cached FAQ responses, graceful fallback message, retry with backoff
+   Core FHIR document access (non-AI) unaffected — AI is enhancement not blocker
+
+9. AI search vs FHIR REST search ($everything, _search)
+👉 FHIR REST = structured exact queries (specific resource types, filters)
+   AI search = natural language over document content (semantic, cross-document)
+   Dono complementary — FHIR API for precise fetch, AI for intelligent discovery
+
+10. Project summary (AI + FHIR)
+👉 "FHIR documents ko index karke pgvector semantic search enable kiya.
+    Users natural language me apne health records query kar sakte hain.
+    Consent-enforced, context-grounded AI responses with hallucination guardrails."
+
+
+================================================================================
+💡 PERFECT ANSWER TEMPLATES (Customize With Your Real Details)
+================================================================================
+
+EPAM — 2 Minute Project Pitch:
+"EPAM me healthcare interoperability platform pe kaam kiya. Teen core areas the:
+ pehla — FHIR-based document exchange jahan patient health records securely share aur receive hote hain external systems se;
+ doosra — HIPAA-compliant consent management jahan har document access consent se control hota hai, revoke pe instantly propagate;
+ teesra — AI-powered search jahan OpenAI + pgvector se users apne clinical documents natural language me query kar sakte hain.
+ Kafka se async FHIR sync aur consent events handle kiye. High-traffic APIs optimize kiye — 200ms latency reduction, 30% improvement."
+
+Blue Yonder — 2 Minute Project Pitch:
+"Blue Yonder me supply chain domain me Spring Boot microservices develop kiye.
+ Kafka-based high-volume event processing, materialization process optimize kiya pre-computed views ke liye.
+ JMeter/PSR load testing, P1 production issues resolve kiye, 30% performance improvement achieve kiya."
+
+EPAM — FHIR Document Share Flow (Verbal):
+"Provider document share request bhejta hai → consent-service check karta hai patient ne share ki permission di hai →
+ agar valid → fhir-sync-service external FHIR server se DocumentReference fetch karta hai →
+ local store + Kafka document-shared event → notification recipient ko →
+ async me AI indexing job document ko searchable banata hai pgvector me."
+
+EPAM — Consent Revoke (Verbal):
+"Patient consent revoke karta hai → consent-service DB update + Kafka consent-revoked event →
+ fhir-sync-service active fetches stop karta hai → ai-assistant patient context clear karta hai →
+ audit log entry → koi bhi naya document access attempt 403 return karega."
+
+P1 Issue STAR (Blue Yonder):
+"S: Production me order API response 3s se 15s peak hours me, client complaints.
+ T: Main on-call developer tha.
+ A: CloudWatch → DB connection pool exhausted. Temp: HikariCP pool increase, scale pods.
+    Root cause: N+1 query in new deployment. Index add + EntityGraph fix.
+ R: 15s → 400ms within 2 hours. Query monitoring alert added."
+
+P1 Issue STAR (EPAM — prepare this):
+"S: FHIR sync consumer lag spike — consent-revoked events 30 min delay, security concern.
+ T: On-call, immediate investigation.
+ A: CloudWatch → consumer pod OOM. Scale pods, increase memory limit.
+    Root cause: large document payload processing without chunking. Fix: stream processing + chunk limit.
+ R: Lag cleared in 1 hour. Chunk size limit + lag alert added."

@@ -1,0 +1,38 @@
+Tech:
+Mandatory: Java, Kafka, AI, Microservices, Develop Rest API, MongoDB, SQL/NoSQL,PostgreSQL, Distributed Systems
+
+Role overview
+
+-> Strong expertise in Java (Spring Boot) and working knowledge of Kotlin for building scalable backend services.
+ -> Deep understanding of distributed systems design, including scalability, fault tolerance, and eventual consistency.
+-> Hands-on experience with microservices architecture and event-driven systems using messaging platforms like Kafka.
+-> Proficiency in working with both relational databases (PostgreSQL,Oracle) and NoSQL databases (MongoDB, Cassandra, Redis), including data modeling and performance optimization.
+-> Experience with API design, service contracts, and building high-throughput, low-latency services.
+-> Familiarity with cloud-native development in environments like AWS, GCP, or Azure.
+-> Strong experience in containerization (Docker) and orchestration tools like Kubernetes.
+-> Knowledge of CI/CD pipelines, automated testing, and deployment strategies (blue-green, canary releases).
+-> Understanding of observability practices, including logging, monitoring, and distributed tracing.
+-> Exposure to search technologies like ElasticSearch.
+-> Solid foundation in data structures, algorithms, and problem-solving.
+-> Working knowledge of secure coding practices, authentication/authorization mechanisms.
+-> Exposure to AI-assisted development tools and basic understanding of integrating AI-driven components (good to have).
+-> Leverage AI coding assistants for development and utilize them to generate better quality of output.
+-> Support integration of AI or automation driven components into the backend systems.
+-> Ensure AI-enabled components operate within defined reliability and safety boundaries.
+-> AI exposure is valued, but distributed systems engineering remains the primary focus of this role.
+
+What would you do here
+
+-> Design and build scalable, reliable backend systems that power core enterprise platforms.
+-> Develop and maintain microservices and event-driven architectures, ensuring systems are loosely coupled and highly available.
+-> Take ownership of end-to-end system development, from design to deployment and production support.
+-> Ensure systems are production-ready by implementing strong observability, monitoring, and alerting mechanisms.
+-> Optimize system performance by improving latency, throughput, and resource utilization.
+-> Collaborate with cross-functional teams to define APIs, service contracts, and data models.
+-> Implement resilience patterns such as retries, circuit breakers, and graceful degradation.
+-> Contribute to and improve CI/CD pipelines and deployment processes for faster and safer releases.
+-> Write clean, maintainable, and well-tested code, following best engineering practices.
+-> Use production data and metrics to continuously improve system reliability and performance.
+-> Participate in code reviews, technical discussions, and architectural decisions.
+-> Support and mentor team members, contributing to overall engineering excellence.
+-> Explore opportunities to integrate automation or AI-driven enhancements where applicable.

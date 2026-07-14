@@ -1,0 +1,1008 @@
+================================================================================
+  HLD — HIGH LEVEL DESIGN COMPLETE INTERVIEW PREP
+  6 Years Java Backend | Tier 2 Product Companies
+  Hinglish + Architecture + Scenario Questions + Real-Time Follow-ups
+================================================================================
+
+================================================================================
+SECTION 0: PRIORITY GUIDE — PEHLE KYA PADHO
+================================================================================
+
+TIER 1 PRIORITY — MUST DO (Almost certain to be asked):
+  🔥🔥🔥  1. URL Shortener         — Simplest, asked everywhere, builds confidence
+  🔥🔥🔥  2. Rate Limiter          — Practical, Redis+algo combo, high value
+  🔥🔥🔥  3. Notification System   — Kafka heavy, directly matches your project
+  🔥🔥🔥  4. E-commerce System     — Comprehensive, tests all concepts together
+  🔥🔥🔥  5. Chat System           — WebSocket + real-time — modern companies
+
+TIER 2 PRIORITY — GOOD TO KNOW:
+  🔥🔥    6. News Feed / Timeline  — Facebook feed, social product companies
+  🔥🔥    7. Distributed Cache     — Deep dive on Redis — asked in backend-heavy rounds
+  🔥🔥    8. Search Autocomplete   — Trie + debounce + ranking
+  🔥🔥    9. Payment System        — Fintech companies (Razorpay, Juspay)
+  🔥🔥   10. File Storage (S3)     — Asked at infra-focused companies
+
+TIER 3 — LESS IMPORTANT for 6yr Java backend:
+  🔥      Video Streaming (Netflix) — Very complex, rarely asked at tier 2
+  🔥      Ride Sharing (Uber)       — Geo-spatial knowledge needed
+  🔥      Log Aggregation           — DevOps-heavy, less for backend devs
+  🔥      Online Code Editor        — Niche
+  🔥      Recommendation System     — ML knowledge needed
+
+YOUR STRATEGY: Master Tier 1 (5 designs) → You can crack 80% of tier 2 interviews.
+               Tier 2 gives you the remaining edge.
+
+================================================================================
+SECTION 1: SYSTEM DESIGN FRAMEWORK — HAMESHA YAHI STRUCTURE FOLLOW KARO
+================================================================================
+
+STEP 1 — REQUIREMENTS CLARIFY (2-3 min):
+  Functional:  "Kya karna chahiye? Users, use cases"
+  Non-functional: "Scale? Latency? Consistency? Availability?"
+  Out of scope: "Kya nahi banana?"
+
+STEP 2 — CAPACITY ESTIMATION (1-2 min):
+  DAU (Daily Active Users), Read/Write ratio, Storage, Bandwidth
+  "Is system read-heavy ya write-heavy?"
+
+STEP 3 — HIGH LEVEL COMPONENTS (3-4 min):
+  Draw boxes: Client → API Gateway → Services → DB/Cache/Queue
+
+STEP 4 — DATA MODEL / DB DESIGN (2-3 min):
+  Tables, relationships, SQL vs NoSQL choice + reason
+
+STEP 5 — DEEP DIVE (5-7 min):
+  Jahan interviewer interest dikhaye — scale, failure, consistency
+
+STEP 6 — SCALING + FAILURE HANDLING (2-3 min):
+  Load balancer, caching, sharding, retries, circuit breaker
+
+OPENING LINE (ALWAYS SAY):
+"Before I start designing, let me clarify the requirements and understand
+the scale we're targeting. This will help me make the right design decisions."
+
+================================================================================
+SECTION 2: FOUNDATIONS QUICK REFERENCE
+================================================================================
+
+LOAD BALANCER:
+  L4 (Transport layer) = IP/Port based routing — fast, no content awareness
+  L7 (Application layer) = HTTP header/URL based — smarter, can route /api vs /static
+  Healthcare project mein: ALB (L7) use kiya — path-based routing
+
+CAP THEOREM:
+  Consistency = Sab nodes same data dikhayein
+  Availability = Hamesha response milega (no error)
+  Partition Tolerance = Network split hone pe bhi kaam kare
+  → Pick ANY 2 (can't have all 3 in distributed system)
+  → Kafka: AP (Available + Partition tolerant) → eventual consistency
+  → Banking DB: CP (Consistent + Partition tolerant) → may be unavailable briefly
+
+CONSISTENT HASHING:
+  Problem: 5 servers hain, server add/remove karo → sab cache miss!
+  Solution: Circular hash ring — sirf adjacent keys move hote hain
+  Use: Redis cluster, distributed caches, CDN routing
+
+SHARDING:
+  Horizontal partitioning of data across multiple DB servers
+  Shard key: user_id % 4 → Shard 0, 1, 2, 3
+  Problem: Cross-shard queries, hotspots
+  Healthcare: Patient data sharded by patient_id (consistent hashing)
+
+REPLICATION:
+  Master-Slave: Master writes, Slaves reads → Read scale
+  Multi-Master: Multiple writers → Conflict resolution needed
+  Healthcare: RDS Multi-AZ = synchronous replication → failover < 60s
+
+================================================================================
+SECTION 3: HLD #1 — URL SHORTENER (START WITH THIS)
+================================================================================
+
+Q. "Design a URL Shortener like bit.ly"
+
+── REQUIREMENTS CLARIFY ──────────────────────────────────────
+Functional:
+  - Long URL → Short URL generate karo (7-char code)
+  - Short URL → Redirect to long URL
+  - Custom alias support (optional)
+  - Expiry date support (optional)
+Non-functional:
+  - 100M URLs/day write, 10B redirects/day (100:1 read:write)
+  - Latency: Redirect < 10ms
+  - Availability: 99.99%
+  - Short URL unique + collision-free
+
+── CAPACITY ESTIMATION ───────────────────────────────────────
+Writes: 100M/day = ~1200/sec
+Reads:  10B/day  = ~115,000/sec (read-heavy!)
+Storage: 100M URLs × 500 bytes = 50GB/day → 5TB in 10 years
+
+── ARCHITECTURE ──────────────────────────────────────────────
+
+  [Client] → [CDN] → [Load Balancer]
+                           |
+              ┌────────────┴────────────┐
+              |                         |
+    [URL Generation Service]   [Redirect Service]
+              |                         |
+        [PostgreSQL DB]          [Redis Cache]
+              |                         |
+        (Write + Store)          (Short→Long map)
+                                        |
+                                  [PostgreSQL DB]
+                                  (Cache miss fallback)
+
+── URL ID GENERATION ─────────────────────────────────────────
+OPTION 1: MD5 Hash (BAD — collision possible, 128-bit too long)
+
+OPTION 2: Base62 Encoding (OUR CHOICE ✅)
+  Characters: a-z (26) + A-Z (26) + 0-9 (10) = 62 chars
+  7 chars = 62^7 = 3.5 trillion URLs — enough!
+
+  // HOW IT WORKS:
+  Auto-increment ID from DB: 100000 (decimal)
+  Convert to Base62: 100000 → "q0U" type code
+
+  public String toBase62(long id) {
+      String chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+      StringBuilder result = new StringBuilder();
+      while (id > 0) {
+          result.insert(0, chars.charAt((int)(id % 62)));
+          id /= 62;
+      }
+      // Pad to 7 chars
+      while (result.length() < 7) result.insert(0, 'a');
+      return result.toString();
+  }
+
+OPTION 3: Pre-generate keys (KEY GENERATION SERVICE):
+  Separate service jo IDs pre-generate karta hai
+  Short URL service se ek ID request karo — no collision!
+  Better for distributed systems
+
+── DB SCHEMA ─────────────────────────────────────────────────
+Table: url_mapping
+  id          BIGINT    PK (auto-increment → Base62 ID generate)
+  short_code  VARCHAR(7) UNIQUE INDEX
+  long_url    TEXT
+  user_id     BIGINT
+  created_at  TIMESTAMP
+  expires_at  TIMESTAMP (nullable)
+  click_count BIGINT DEFAULT 0
+
+── CACHING STRATEGY ──────────────────────────────────────────
+  Redis: short_code → long_url (TTL = URL expiry time)
+  Redirect flow:
+    1. Redis check karo
+    2. HIT → 301/302 redirect
+    3. MISS → DB fetch → Redis store → redirect
+
+  301 vs 302:
+    301 = Permanent redirect (browser caches → less server load but analytics miss)
+    302 = Temporary redirect (every request comes to server → track clicks!)
+    bit.ly uses 302 for analytics
+
+── SCALING ───────────────────────────────────────────────────
+  Read replicas for DB (100:1 read-heavy)
+  Redis cluster (millions of cache hits/sec)
+  CDN for static redirect (most popular URLs cached at edge)
+
+── SCENARIO QUESTIONS ────────────────────────────────────────
+
+Q. "Ek hi URL ke liye 2 users simultaneously short URL create karein — collision?"
+A. "DB pe UNIQUE constraint on short_code. Auto-increment ID = no collision by design.
+   Pre-generated key service use karo distributed system mein."
+
+Q. "URL expire ho jaaye toh kya?"
+A. "TTL Redis mein set karo. Redirect service pe: expires_at check karo.
+   Expired → 404 return karo. Background job: Old expired URLs soft-delete."
+
+Q. "10x traffic aaya suddenly?"
+A. "Redirect service stateless hai → horizontal scale. Redis handles millions/sec.
+   DB pe read replicas already hain. CDN popular URLs cache karta hai."
+
+Q. "Analytics kaise track karoge? (click count, geography)"
+A. "Async track: Redirect service Kafka pe click event publish kare.
+   Analytics service consume kare → ClickHouse ya BigQuery mein store.
+   Main redirect flow block nahi hoga — fast response!"
+
+================================================================================
+SECTION 4: HLD #2 — RATE LIMITER
+================================================================================
+
+Q. "Design a Rate Limiter for APIs"
+
+── REQUIREMENTS ──────────────────────────────────────────────
+  - Per user: 100 requests/minute
+  - Per IP: 1000 requests/minute
+  - Distributed (multiple API servers)
+  - Low latency overhead (< 1ms)
+  - Return 429 Too Many Requests when exceeded
+
+── ALGORITHMS ────────────────────────────────────────────────
+
+ALGORITHM 1: TOKEN BUCKET (Most common, used in AWS/Stripe) ✅
+  Story: Bucket mein tokens hain (max capacity).
+         Every request → 1 token consume.
+         Every second → N tokens refill.
+         Bucket full? → New tokens overflow.
+         Tokens empty? → Request REJECTED (429)
+
+  Pros: Burst traffic allow (tokens accumulated)
+  Cons: Race condition in distributed
+
+ALGORITHM 2: FIXED WINDOW COUNTER
+  Story: 1-minute window mein 100 request allowed.
+         Window end → Counter reset.
+  Problem: Window boundary exploit!
+    59th second: 100 requests. Next second (new window): 100 more = 200 in 2 sec!
+
+ALGORITHM 3: SLIDING WINDOW LOG ✅ (Most accurate)
+  Story: Last 60 seconds ke saare requests timestamps store.
+         New request → Old timestamps purge → Count remaining → Allow/Reject
+  Pros: Exact rate limiting
+  Cons: Memory intensive (store timestamps)
+
+ALGORITHM 4: SLIDING WINDOW COUNTER (Best balance) ✅
+  Hybrid: Previous window count + Current window count (weighted)
+  Formula: count = prev_window_count × (1 - overlap%) + curr_window_count
+  Memory efficient + accurate!
+
+── ARCHITECTURE ──────────────────────────────────────────────
+
+  [Client] → [API Gateway]
+                  |
+         [Rate Limiter Middleware]
+                  |
+         [Redis] ← Atomic counter/token store
+                  |
+         [Backend Service]
+
+REDIS IMPLEMENTATION (Token Bucket with Lua script):
+
+  // Lua script — atomic execution (no race condition)
+  local key = KEYS[1]          -- "rate_limit:user:123"
+  local capacity = tonumber(ARGV[1])   -- 100 tokens max
+  local refill_rate = tonumber(ARGV[2]) -- 10 tokens/sec
+  local now = tonumber(ARGV[3])
+
+  local bucket = redis.call('HMGET', key, 'tokens', 'last_refill')
+  local tokens = tonumber(bucket[1]) or capacity
+  local last_refill = tonumber(bucket[2]) or now
+
+  -- Refill tokens based on time elapsed
+  local elapsed = now - last_refill
+  tokens = math.min(capacity, tokens + elapsed * refill_rate)
+
+  if tokens >= 1 then
+      tokens = tokens - 1   -- Consume 1 token
+      redis.call('HMSET', key, 'tokens', tokens, 'last_refill', now)
+      redis.call('EXPIRE', key, 3600)
+      return 1  -- ALLOWED
+  else
+      return 0  -- REJECTED
+  end
+
+// Spring Boot Middleware:
+@Component
+public class RateLimiterFilter implements Filter {
+
+    @Override
+    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) {
+        String userId = extractUserId((HttpServletRequest) req);
+        String key = "rate_limit:user:" + userId;
+
+        boolean allowed = redisRateLimiter.isAllowed(key, 100, 10);
+
+        if (!allowed) {
+            HttpServletResponse httpRes = (HttpServletResponse) res;
+            httpRes.setStatus(429);
+            httpRes.addHeader("Retry-After", "60");
+            httpRes.getWriter().write("{\"error\": \"Rate limit exceeded\"}");
+            return;
+        }
+        chain.doFilter(req, res);
+    }
+}
+
+── DISTRIBUTED RATE LIMITING ─────────────────────────────────
+
+  Problem: 5 API servers, har server apna counter rakhta hai
+  User 100 servers par 100 × 5 = 500 requests kar sakta hai!
+
+  Solution: Centralized Redis (single source of truth)
+  All API servers same Redis cluster check karte hain
+
+  Redis Cluster: 3 master nodes (sharded by user_id)
+  → High availability + handles millions of checks/sec
+
+── SCENARIO QUESTIONS ────────────────────────────────────────
+
+Q. "Redis down ho jaaye → kya rate limiting fail hogi?"
+A. "Fail-open vs Fail-closed strategy:
+   Fail-open: Redis down → Request allow karo (availability > security)
+   Fail-closed: Redis down → Block all (security > availability)
+   Healthcare/payment: Fail-closed. Normal APIs: Fail-open.
+   Add circuit breaker — Redis ka health track karo."
+
+Q. "DDoS attack — rate limiter bypass kaise hoga?"
+A. "IP-based rate limiting (L3/L4 at load balancer) = first line.
+   User-based rate limiting (L7) = second line.
+   CloudFlare/WAF = third line (before it even hits our servers)."
+
+Q. "Different APIs ke liye different limits chahiye?"
+A. "Key mein endpoint encode karo: rate_limit:user:123:POST:/api/search
+   Config service mein per-endpoint limits define karo.
+   Redis hash mein store → flexible configuration."
+
+================================================================================
+SECTION 5: HLD #3 — NOTIFICATION SYSTEM
+================================================================================
+
+Q. "Design a Notification System (Email/SMS/Push)"
+
+── REQUIREMENTS ──────────────────────────────────────────────
+  Channels: Email, SMS, Push notification, In-app
+  Scale: 10M notifications/day
+  Reliability: At-least-once delivery
+  Features: Templates, user preferences, retry on failure
+
+── ARCHITECTURE ──────────────────────────────────────────────
+
+  [Triggering Services]       (Order service, Patient service, etc.)
+         |
+  [Notification API Service]  (Validate, store, enqueue)
+         |
+  [Kafka Topics]
+    notification.email
+    notification.sms
+    notification.push
+         |
+  [Channel Workers]           (Email Worker, SMS Worker, Push Worker)
+         |
+  [Third-party Providers]
+    Email: SES / SendGrid
+    SMS:   Twilio / SNS
+    Push:  Firebase FCM / APNs
+         |
+  [Delivery Status Tracking]  (DynamoDB / Cassandra)
+
+── DATA FLOW ─────────────────────────────────────────────────
+
+  Step 1: Order service → Notification API
+    POST /notify
+    { userId: "123", event: "ORDER_PLACED", data: {orderId: "456"} }
+
+  Step 2: Notification API:
+    a. User preferences fetch karo — does user want email/SMS?
+    b. Template render karo (Velocity/Freemarker templates)
+    c. Kafka pe events publish karo (one per channel)
+    d. DB mein record store karo (status: QUEUED)
+
+  Step 3: Channel workers:
+    Kafka consume karo → Third-party API call → Status update
+
+  Step 4: Webhook/polling for delivery status
+
+── DB DESIGN ─────────────────────────────────────────────────
+
+Table: notifications
+  id            UUID       PK
+  user_id       VARCHAR
+  channel       ENUM (EMAIL, SMS, PUSH)
+  template_id   VARCHAR
+  payload       JSONB      (dynamic data for template)
+  status        ENUM (QUEUED, SENT, DELIVERED, FAILED)
+  retry_count   INT DEFAULT 0
+  created_at    TIMESTAMP
+  sent_at       TIMESTAMP
+
+Table: user_preferences
+  user_id       VARCHAR    PK
+  email_enabled BOOLEAN
+  sms_enabled   BOOLEAN
+  push_enabled  BOOLEAN
+  quiet_hours   JSONB      {"start": "22:00", "end": "08:00"}
+
+Table: notification_templates
+  id            VARCHAR    PK  ("ORDER_PLACED_EMAIL")
+  channel       ENUM
+  subject       TEXT
+  body          TEXT       (with {{variables}})
+
+── RETRY STRATEGY ────────────────────────────────────────────
+  Attempt 1: Immediately
+  Attempt 2: 5 minutes
+  Attempt 3: 30 minutes
+  Attempt 4: 2 hours
+  After 4 fails → DLQ + Alert ops team
+
+  // Spring Kafka retry:
+  @RetryableTopic(
+    attempts = "4",
+    backoff = @Backoff(delay = 300000, multiplier = 6),
+    dltTopicSuffix = ".DLT"
+  )
+  @KafkaListener(topics = "notification.email")
+  public void sendEmail(NotificationEvent event) { ... }
+
+── RATE LIMITING FOR PROVIDERS ───────────────────────────────
+  Twilio: 100 SMS/sec limit
+  SES: 14 emails/sec (sandbox), 50,000/day
+
+  Solution: Rate limiting per provider in workers
+  Token bucket in Redis: "provider:twilio:tokens"
+  Worker checks before sending → backs off if limited
+
+── SCENARIO QUESTIONS ────────────────────────────────────────
+
+Q. "Same user ko baar baar same notification aa rahi hai?"
+A. "Idempotency key: notification_id as Kafka message key.
+   DB mein unique constraint on (user_id, event_id, channel).
+   Deduplication window: Redis SETNX 'sent:user123:event456' TTL=1hour"
+
+Q. "User ki preference update ho gayi notification send hone ke baad?"
+A. "Worker preference check karta hai event consume karte time (not produce time).
+   Agar user ne opt-out kiya → Skip karo, status=SKIPPED log karo."
+
+Q. "10M notifications — kaise scale karoge?"
+A. "Kafka partitions = worker instances count.
+   Email heavy? Email workers zyada scale karo.
+   Auto-scaling: Consumer lag > 10000 → scale out workers.
+   Prioritized queues: Transactional (OTP) > Marketing emails"
+
+Q. "Push notification iOS/Android difference?"
+A. "iOS → APNs (Apple Push Notification Service)
+   Android → FCM (Firebase Cloud Messaging)
+   Both: Device token store karo when app installs.
+   Token expire → Remove from DB (feedback service se pata chalta hai)"
+
+================================================================================
+SECTION 6: HLD #4 — E-COMMERCE SYSTEM
+================================================================================
+
+Q. "Design Amazon/Flipkart — focus on ordering + inventory"
+
+── REQUIREMENTS ──────────────────────────────────────────────
+  Functional: Browse products, cart, checkout, payment, order tracking
+  Non-functional: 10M DAU, Black Friday 10x traffic, < 200ms API latency
+  Consistency: Inventory must not oversell!
+
+── MICROSERVICES ARCHITECTURE ────────────────────────────────
+
+  [Client App]
+       |
+  [API Gateway]  ← Auth, Rate limiting, Routing
+       |
+  ┌────┴──────────────────────────┐
+  |         |         |           |
+[Product] [Cart]  [Order]   [Payment]
+Service   Service  Service   Service
+  |         |         |           |
+[Product  [Redis  [Order DB  [Payment
+   DB]    Cache]  (Postgres)] Gateway]
+  |                   |
+[Search]          [Inventory
+(Elastic)          Service]
+                       |
+                  [Inventory DB]
+                  (Postgres + Redis)
+
+Event Flow (Kafka):
+  Order Placed → inventory.reserve, payment.process, notification.order
+  Payment Success → order.confirm, inventory.commit
+  Payment Fail → inventory.release (Saga compensating txn)
+
+── INVENTORY OVERSELLING PREVENTION ─────────────────────────
+
+PROBLEM: 100 users ek saath last iPhone buy karna chahte hain (stock=1)
+
+SOLUTION 1: Database Lock (SELECT FOR UPDATE)
+  BEGIN;
+  SELECT quantity FROM inventory WHERE product_id = 'P1' FOR UPDATE;
+  -- quantity = 1? Proceed
+  UPDATE inventory SET quantity = quantity - 1 WHERE product_id = 'P1';
+  COMMIT;
+
+  Problem: Lock contention → slow for high traffic!
+
+SOLUTION 2: Optimistic Locking (version column) ✅
+  SELECT quantity, version FROM inventory WHERE product_id = 'P1';
+  -- Got: quantity=1, version=42
+
+  UPDATE inventory
+  SET quantity = quantity - 1, version = version + 1
+  WHERE product_id = 'P1' AND version = 42; -- Only update if version matches!
+
+  -- 0 rows affected? → Concurrent update happened → Retry!
+
+SOLUTION 3: Redis Atomic Decrement (best for high traffic) ✅
+  // DECR is atomic in Redis
+  Long remaining = redisTemplate.opsForValue().decrement("inventory:P1");
+  if (remaining < 0) {
+      redisTemplate.opsForValue().increment("inventory:P1"); // Rollback
+      throw new OutOfStockException();
+  }
+  // Reserve in Redis → Async sync to DB via Kafka
+
+── FLASH SALE HANDLING (10x traffic) ────────────────────────
+
+  Pre-sale:
+    - Redis mein stock pre-load karo (fast atomic decrement)
+    - CDN pe product pages cache karo (no origin hit for reads)
+    - Pre-warm DB connection pool
+
+  During sale:
+    - Rate limit per user (1 buy/minute)
+    - Queue orders (Kafka) → process async (smooth load)
+    - Circuit breaker: Payment service slow → Queue + retry
+
+  DB protection:
+    - Write-through cache → Redis + async DB sync
+    - Read replicas serve all product read queries
+
+── SAGA PATTERN (Distributed Transaction) ────────────────────
+
+  Order Placement Saga:
+    1. Order Service → Create order (status: PENDING)
+    2. Kafka: order.created event
+    3. Inventory Service → Reserve items (status: RESERVED)
+    4. Kafka: inventory.reserved event
+    5. Payment Service → Charge card
+    6a. SUCCESS → payment.processed → Order.confirm + Inventory.commit
+    6b. FAILURE → payment.failed → Inventory.RELEASE (compensating!)
+                                 → Order.CANCEL
+
+── SCENARIO QUESTIONS ────────────────────────────────────────
+
+Q. "Payment successful hua but order status update nahi hua?"
+A. "Outbox pattern use kiya — DB + Kafka event ek transaction mein.
+   Payment service → DB mein payment record + outbox event save karo.
+   Outbox publisher → Kafka pe publish karo.
+   Idempotency: order_id unique → Duplicate events safe."
+
+Q. "User cart mein item add kiya, phir item out of stock hua?"
+A. "Cart mein 'soft reservation' nahi karte (warna 10 users cart mein daalen → stuck)
+   Cart = wishlist only. Actual reserve = checkout time only.
+   At checkout: availability check → Agar unavailable → 'Item out of stock' show karo."
+
+Q. "DB bottleneck — orders table bahut badi ho gayi?"
+A. "Sharding by user_id or order_id (consistent hashing).
+   Archival: Orders > 2 years → Cold storage (S3 Parquet).
+   CQRS: Write to PostgreSQL, Read from DynamoDB/Cassandra (denormalized)."
+
+================================================================================
+SECTION 7: HLD #5 — CHAT SYSTEM
+================================================================================
+
+Q. "Design WhatsApp / Slack real-time chat"
+
+── REQUIREMENTS ──────────────────────────────────────────────
+  1:1 and group chat (max 100 members)
+  Real-time message delivery
+  Message persistence + history
+  Online/offline status
+  Message delivery receipts (sent/delivered/read)
+  Scale: 50M DAU, 10B messages/day
+
+── ARCHITECTURE ──────────────────────────────────────────────
+
+  [Mobile/Web Client]
+       |
+   WebSocket       (Persistent connection for real-time)
+       |
+  [Chat Service]   (Stateful — each server manages N connections)
+       |
+  [Message Queue]  (Kafka — decouple send from deliver)
+       |
+  [Message Store]  (Cassandra — write-heavy, time-series data)
+       |
+  [Presence Service] (Redis — online/offline status, TTL)
+       |
+  [Push Notification] (When user offline → APNs/FCM)
+
+── WHY WEBSOCKET? ────────────────────────────────────────────
+  HTTP polling: Client asks every N seconds "koi message hai?" → Wasteful
+  Long polling:  Client waits for response → Better but server load
+  WebSocket:     Persistent bidirectional connection → Server PUSHES messages
+                 1 connection = 10s of messages → Efficient!
+
+  // Spring Boot WebSocket:
+  @Configuration
+  @EnableWebSocketMessageBroker
+  public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+      @Override
+      public void configureMessageBroker(MessageBrokerRegistry config) {
+          config.enableSimpleBroker("/topic", "/queue");
+          config.setApplicationDestinationPrefixes("/app");
+      }
+      @Override
+      public void registerStompEndpoints(StompEndpointRegistry registry) {
+          registry.addEndpoint("/ws").withSockJS(); // SockJS fallback
+      }
+  }
+
+── MESSAGE FLOW ──────────────────────────────────────────────
+  Alice sends message to Bob:
+
+  1. Alice → WebSocket → Chat Server A
+  2. Chat Server A → Kafka topic "chat-messages"
+  3. Chat Server A → Cassandra (persist message)
+  4. Message consumer:
+     a. Bob online? → Find Bob's Chat Server B → Deliver via WebSocket
+     b. Bob offline? → Push Notification (FCM/APNs)
+  5. Delivery receipt: Server → Kafka → Alice's server → Alice's client
+
+── DB DESIGN — CASSANDRA ─────────────────────────────────────
+  WHY CASSANDRA? Write-heavy (millions of messages/sec), time-series
+
+  Table: messages (Cassandra)
+    conversation_id  UUID    PARTITION KEY  (same convo = same node!)
+    message_id       UUID    CLUSTERING KEY (ordered by time)
+    sender_id        UUID
+    content          TEXT
+    created_at       TIMESTAMP
+    message_type     TEXT   (TEXT, IMAGE, VIDEO)
+
+  Query pattern: "Get last 50 messages of conversation X"
+  → Single partition scan (fast in Cassandra!)
+
+  Table: conversations (PostgreSQL)
+    id               UUID   PK
+    type             ENUM   (DIRECT, GROUP)
+    created_by       UUID
+    created_at       TIMESTAMP
+
+  Table: conversation_members (PostgreSQL)
+    conversation_id  UUID
+    user_id          UUID
+    joined_at        TIMESTAMP
+
+── PRESENCE (ONLINE/OFFLINE) ─────────────────────────────────
+  Redis:
+    SET "presence:userId:123" "ONLINE" EX 30   (30 second TTL)
+    Client heartbeat every 15 seconds → Refresh TTL
+    TTL expire → User considered offline
+
+── SCENARIO QUESTIONS ────────────────────────────────────────
+
+Q. "Message ordering guarantee kaise karoge?"
+A. "Client-side: Logical clock / sequence number per conversation.
+   Cassandra: message_id = TimeUUID (time-ordered UUID) → automatic ordering.
+   Server assigns message_id → client ka timestamp unreliable (clock skew)."
+
+Q. "Group chat mein 1000 members — message delivery kaise?"
+A. "Fan-out on write: Message aaye → 1000 delivery events create karo → Kafka.
+   Fan-out on read: Message store karo → Each client reads from store.
+   For large groups (>100): Fan-out on read better (write amplification avoid)"
+
+Q. "User 2 phones use karta hai — sync kaise?"
+A. "Device ke liye last_read_message_id store karo.
+   New device login → Server se messages fetch karo (from last_read to latest).
+   Multi-device: WebSocket connection per device (server se dono pe push)"
+
+================================================================================
+SECTION 8: IMPORTANT FOUNDATION QUESTIONS
+================================================================================
+
+Q. "SQL vs NoSQL kab kya choose karte ho?"
+
+SQL (PostgreSQL/MySQL):
+  - Complex queries, JOINs zaruri hain
+  - ACID transactions critical (banking, orders)
+  - Schema well-defined
+  Use: E-commerce orders, User accounts, Healthcare records
+
+NoSQL - Cassandra:
+  - Write-heavy, time-series data
+  - Horizontal scale critical
+  Use: Chat messages, IoT data, Activity logs
+
+NoSQL - MongoDB:
+  - Schema flexible, document model fits
+  - Rapid iteration, schema changes frequent
+  Use: Product catalog, CMS, User profiles
+
+NoSQL - Redis:
+  - In-memory, microsecond latency
+  - Cache, sessions, counters, pub/sub
+  Use: Rate limiting, caching, presence
+
+Q. "Caching strategies — kaunsa kab use karo?"
+
+CACHE-ASIDE (Lazy loading):
+  - Read: Cache miss → DB fetch → Cache store
+  - Write: DB update → Cache invalidate
+  Use: Read-heavy, OK with stale data briefly
+
+WRITE-THROUGH:
+  - Every write → Cache + DB simultaneously
+  - No stale data but write latency higher
+
+WRITE-BACK (Write-behind):
+  - Write → Cache only → Async DB sync
+  - Fast writes but data loss risk (cache crash)
+  Use: Inventory counters (high write, eventual DB sync)
+
+CACHE STAMPEDE prevention:
+  Problem: Cache expire → 1000 requests hit DB simultaneously
+  Solution: Mutex lock — first request gets lock, others wait
+            Or: Probabilistic early expiry (refresh before expire)
+
+================================================================================
+QUICK CHEAT SHEET — HLD INTERVIEW
+================================================================================
+
+SCENARIO           → ANSWER
+-----------------    -------------------------------------------------------
+10x traffic         → Auto-scale + CDN + Cache + Async (Kafka)
+DB bottleneck       → Index + Read replica + Cache + Sharding
+Overselling         → Redis atomic DECR or Optimistic locking
+Duplicate messages  → Idempotency key + DB unique constraint
+Payment failure     → Saga + compensating transaction
+Slow API            → Cache → DB query → N+1 → External calls → GC
+Data loss           → Kafka acks=all + DB replication + Outbox pattern
+High availability   → Multi-AZ + Load balancer + Circuit breaker
+Message ordering    → Partition key + Cassandra TimeUUID
+Cache consistency   → TTL + Event-driven invalidation
+
+ALWAYS MENTION:
+  Kafka → Event-driven, async, reliable
+  Redis → Cache, rate limit, distributed lock, presence
+  Circuit Breaker → Service failure isolation
+  SAGA → Distributed transactions
+  Outbox → DB + event consistency
+  CQRS → Read/write separation for scale
+
+================================================================================
+END — HLD_ANSWERS.txt
+================================================================================
+
+================================================================================
+SECTION 9: INTERVIEW GUIDE — YE HAI KYA + INTERVIEWER SE KYA POOCHHO
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+HLD #1 — URL SHORTENER
+────────────────────────────────────────────────────────────────────────────────
+
+🎯 YE HAI KYA (2 lines mein):
+  URL Shortener ek aise system ka design hai jo long URLs ko chhote codes mein
+  convert karta hai (jaise bit.ly). Ye READ-HEAVY system hai (100:1 read:write ratio)
+  aur isme Base62 encoding + Redis caching ka combination use hota hai.
+
+  Real world: bit.ly, TinyURL, t.co (Twitter links), YouTube short links
+
+🙋 INTERVIEWER SE POOCHHO (Clarifying Questions):
+  1. "Should we support custom aliases? Like user apna naam daal sake short URL mein?"
+  2. "Do we need URL expiry? Agar haan, toh kab expire ho — 30 days? 1 year?"
+  3. "Analytics chahiye? Click count, geographic data, referrer tracking?"
+  4. "Scale kya expect kar rahe ho? DAU? Writes per second?"
+  5. "Should the short URLs be guessable/sequential ya random hone chahiye?"
+     (Security matter karta hai — competitors enumerate kar sakte hain)
+  6. "Authentication chahiye? Koi bhi URL shorten kar sakta hai ya registered users only?"
+
+💣 EXTRA SCENARIO QUESTIONS (Jo aksar pooche jaate hain):
+  Q. "Malicious/spam URLs kaise filter karoge?"
+  A. "Google Safe Browsing API integrate karo — URL submit karo, woh check karta hai.
+     Blacklist Redis mein cache karo (blocked_domains set). Rate limit per user/IP."
+
+  Q. "Short URL pe QR code generate karna ho?"
+  A. "QR code = Base62 URL ko QR image mein convert karo.
+     ZXing library use karo. QR CDN pe cache karo (rarely changes)."
+
+  Q. "Agar Base62 ID predict ho jaaye — security?"
+  A. "Option 1: Random string generate karo (nahi sequential ID).
+     Option 2: Hash(original_url + secret_salt) → first 7 chars
+     Option 3: Separate Key Generation Service — pre-shuffled IDs pool"
+
+  Q. "301 vs 302 kab kaunsa? Tradeoff bolo."
+  A. "301 Permanent: Browser cache karta hai → Less server load → Analytics MISS
+     302 Temporary: Har baar server hit → Track every click → More server load
+     Production: 302 use karo if analytics important (bit.ly yahi karta hai)"
+
+────────────────────────────────────────────────────────────────────────────────
+HLD #2 — RATE LIMITER
+────────────────────────────────────────────────────────────────────────────────
+
+🎯 YE HAI KYA:
+  Rate Limiter API abuse rokta hai — ek user ek minute mein 100 se zyada requests
+  nahi kar sakta. Token Bucket algorithm sabse common hai (AWS, Stripe use karte hain).
+  Distributed system mein Redis centralized store hota hai.
+
+  Real world: Twitter API (300 requests/15 min), GitHub API (5000/hour), OTP limit
+
+🙋 INTERVIEWER SE POOCHHO:
+  1. "Rate limit per user hai ya per IP ya per API key?"
+  2. "Window type kya hoga? Fixed window ya sliding window?"
+  3. "Limit exceed hone pe kya karna hai — hard block ya soft throttle?"
+  4. "Different APIs ki alag limits? /search pe 10/min, /login pe 5/min?"
+  5. "Rate limit info response mein return karein? (X-RateLimit-Remaining header)"
+  6. "Distributed hai system ya single server?"
+
+💣 EXTRA SCENARIO QUESTIONS:
+  Q. "Retry-After header kya hota hai aur kaise calculate karte ho?"
+  A. "HTTP 429 ke saath Retry-After header bhejna standard practice hai.
+     Token bucket: tokens refill hone mein kitna time lagega calculate karo.
+     Response: Retry-After: 45 (seconds mein)"
+
+  Q. "Agar user VPN switch kare toh IP-based limit bypass ho sakti hai?"
+  A. "Defense in depth:
+     Layer 1: IP-based (L4 load balancer / CloudFlare)
+     Layer 2: User-ID based (requires auth)
+     Layer 3: Device fingerprinting (browser + OS + screen = unique ID)
+     Real system: Sab layers together use karo"
+
+  Q. "Rate limiter self pe DDoS aaye — Redis bottleneck?"
+  A. "Redis Cluster: Sharded by user_id → Distribute load
+     Local in-memory fallback: Redis down → JVM mein ConcurrentHashMap (limited protection)
+     Circuit breaker on Redis calls"
+
+  Q. "Whitelist chahiye — kuch IPs pe rate limit nahi?"
+  A. "Redis SET mein whitelist IPs/userIds store karo.
+     Filter mein pehle whitelist check karo → Skip rate limiting
+     Admin API se manage karo (dynamic update)"
+
+────────────────────────────────────────────────────────────────────────────────
+HLD #3 — NOTIFICATION SYSTEM
+────────────────────────────────────────────────────────────────────────────────
+
+🎯 YE HAI KYA:
+  Notification System alag-alag channels (Email/SMS/Push) pe users ko messages bhejta hai.
+  Kafka use hota hai async delivery ke liye — sender service ka notification bhejne se
+  koi connection nahi hota. Ye tera project se directly match karta hai (healthcare alerts!)
+
+  Real world: Amazon order updates, OTP SMS, app push notifications, healthcare alerts
+
+🙋 INTERVIEWER SE POOCHHO:
+  1. "Channels kaunse support karne hain? Email, SMS, Push, WhatsApp, In-app?"
+  2. "Priority levels hain? OTP notification = high priority vs marketing = low priority?"
+  3. "Quiet hours support karna hai? User ne 10PM-8AM band kiya ho notifications?"
+  4. "Real-time delivery chahiye ya eventual consistency okay hai?"
+  5. "Template management chahiye? Dynamic content with variables?"
+  6. "Analytics chahiye — open rate, click rate, delivery rate?"
+
+💣 EXTRA SCENARIO QUESTIONS:
+  Q. "Ek user ko 1000 notifications ek saath aayein — spam?"
+  A. "Notification batching/digest: Last 10 notifications → 1 email summary
+     Frequency capping: User ko max 5 notifications/day (preference)
+     Notification center: App mein sab store karo, push only important ones"
+
+  Q. "User unsubscribe kare — comply karna mandatory kyun?"
+  A. "GDPR aur CAN-SPAM laws: Unsubscribe request honor karna legally required
+     user_preferences table mein immediately update
+     Audit log rakho compliance ke liye
+     Healthcare mein HIPAA bhi — patient ka consent mandatory"
+
+  Q. "Push token expire ho jaaye — kaise pata chalega?"
+  A. "APNs/FCM delivery failure response deta hai — token invalid/expired
+     Feedback service: Failed delivery → token DB se remove karo
+     Next app open pe fresh token register karega"
+
+  Q. "Notification ordering guarantee chahiye?"
+  A. "Kafka partition key = user_id → Same user ke saare notifications same partition
+     Same partition → Ordering guaranteed
+     But: Email vs SMS alag workers → Cross-channel ordering guarantee nahi hogi"
+
+────────────────────────────────────────────────────────────────────────────────
+HLD #4 — E-COMMERCE SYSTEM
+────────────────────────────────────────────────────────────────────────────────
+
+🎯 YE HAI KYA:
+  E-commerce system ka HLD multiple microservices ko cover karta hai —
+  Product, Cart, Order, Payment, Inventory. Sabse tricky part hai inventory
+  overselling rokna aur payment failure pe Saga compensation.
+  Rakuten interview mein YE SABSE ZYADA RELEVANT HAI (woh e-commerce company hai!)
+
+  Real world: Amazon, Flipkart, Rakuten, Meesho
+
+🙋 INTERVIEWER SE POOCHHO:
+  1. "Scale kya expect karo? DAU, peak traffic (Black Friday 10x)?"
+  2. "Consistency requirement: Inventory exact real-time chahiye ya eventual okay?"
+  3. "Payment gateway in-house hai ya third-party (Razorpay/Stripe)?"
+  4. "International shipping/multi-currency support chahiye?"
+  5. "Search functionality scope mein hai? (ElasticSearch relevant ho jaayega)"
+  6. "Return/refund flow scope mein hai?"
+
+💣 EXTRA SCENARIO QUESTIONS:
+  Q. "Flash sale: 1 lakh users ek saath 'Buy Now' dabate hain. Stock = 100. Kya hoga?"
+  A. "Without protection: 1 lakh DB writes → Crash!
+     Solution:
+     Step 1: Redis mein stock pre-load karo (DECR atomic)
+     Step 2: DECR negative? → Out of stock, reject immediately (no DB hit!)
+     Step 3: Successful DECR → Async DB update via Kafka
+     Step 4: Queue excess requests → 'Notify me when available' feature"
+
+  Q. "Payment gateway timeout — order confirm karna hai ya nahi?"
+  A. "Idempotency key bhejo payment gateway ko.
+     Timeout pe retry karo same idempotency key se.
+     Gateway internally deduplicates → No double charge.
+     Status unknown pe: Polling ya webhook use karo for final status
+     Saga compensation: Only on definitive FAILURE, not timeout"
+
+  Q. "Product catalog — 10 crore products. Search kaise fast karoge?"
+  A. "ElasticSearch: Full-text search, filters, facets (category/brand/price range)
+     DB → Kafka → ElasticSearch sync (CDC with Debezium)
+     Product images: S3 + CloudFront CDN
+     Autocomplete: Redis sorted set (prefix → ranked suggestions)"
+
+  Q. "User ka cart DB mein store karo ya client side?"
+  A. "Guest users: Browser localStorage (no server cost)
+     Logged in: Redis (fast, TTL = 30 days) + async DB persist
+     Redis key: 'cart:userId:123' → JSON
+     Session merge: Guest login hone pe → cart merge karo"
+
+────────────────────────────────────────────────────────────────────────────────
+HLD #5 — CHAT SYSTEM
+────────────────────────────────────────────────────────────────────────────────
+
+🎯 YE HAI KYA:
+  Real-time chat system mein WebSocket use hota hai persistent bidirectional
+  connection ke liye. Messages Cassandra mein store hote hain (write-heavy,
+  time-series). Presence (online/offline) Redis mein TTL se track hoti hai.
+
+  Real world: WhatsApp, Slack, Discord, Google Chat
+
+🙋 INTERVIEWER SE POOCHHO:
+  1. "1:1 chat only ya group chat bhi? Group mein max kitne members?"
+  2. "Message history kitna store karna hai? Forever ya last 30 days?"
+  3. "Media support chahiye? Images, videos, files?"
+  4. "End-to-end encryption required hai? (WhatsApp jaise)"
+  5. "Read receipts chahiye? (Blue ticks)"
+  6. "Message reactions? Message edit/delete?"
+
+💣 EXTRA SCENARIO QUESTIONS:
+  Q. "End-to-end encryption kaise implement karoge?"
+  A. "Asymmetric key: Each user ka public/private key pair.
+     Sender: Encrypt message with receiver's public key.
+     Server: Encrypted blob store karta hai — plaintext nahi dekh sakta.
+     Key exchange: Diffie-Hellman key exchange protocol
+     WhatsApp: Signal Protocol use karta hai (open source)"
+
+  Q. "User ke 10,000 unread messages hain. App open karna pe load?"
+  A. "Pagination: Last 50 messages load karo first.
+     Infinite scroll: User upar scroll kare → Next 50 load
+     Last read pointer: last_read_message_id store karo per device
+     Push notification: Unread count badge only, not all messages"
+
+  Q. "Message delete karo — 'everyone' ke liye?"
+  A. "Soft delete: is_deleted = true in Cassandra (update)
+     All clients: WebSocket pe 'message_deleted' event push
+     Receiver already read kiya? Server can't force delete from their device
+     (WhatsApp bhi sirf 'This message was deleted' dikhata hai)"
+
+  Q. "Group chat mein 1 member ne block kiya doosre ko — kaise handle?"
+  A. "Block relationship store karo: blocked_users table (blocker_id, blocked_id)
+     Message routing: Blocked user ka message group mein deliver karo
+     But: Blocked recipient ko dikhao 'X sent a message' without content? OR
+     Fully hide — depends on product decision
+     1:1 chat: Hard block — no message delivery"
+
+================================================================================
+INTERVIEW TIPS — HLD MEIN CONFIDENT REHNA
+================================================================================
+
+1. HAMESHA REQUIREMENTS SE SHURU KARO:
+   "Before I start, let me clarify a few things..."
+   Ye dikhata hai ki tu methodical hai aur assumptions nahi banata.
+
+2. TRADE-OFFS BOLNA ZAROORI HAI:
+   "We could use X but it has Y drawback, so I prefer Z because..."
+   Ye senior engineer ki soch dikhata hai.
+
+3. TERA PROJECT CONNECT KARO:
+   "In my healthcare project at EPAM, we used Kafka exactly for this reason..."
+   Real experience = credibility + confidence.
+
+4. DRAWING KARO:
+   Components boxes mein draw karo, arrows se flow dikhao.
+   Interviewer ko visual chahiye hota hai, not just talking.
+
+5. AGAR ANSWER PATA NAHI:
+   "That's a great question. I think the approach would be... but I'd need to
+   look deeper into [specific aspect]. One option could be..."
+   Honesty + thought process = better than fake answer.
+
+================================================================================
+END — INTERVIEW GUIDE ADDED TO HLD_ANSWERS.txt
+================================================================================

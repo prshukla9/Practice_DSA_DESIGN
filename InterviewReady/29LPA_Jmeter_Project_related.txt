@@ -1,0 +1,88 @@
+Software Developer | Nov 2025 - Present
+EPAM | Bengaluru
+Designing and developing scalable healthcare microservices for patient and doctor workflows, integrating FHIR-based interoperable data exchange and AI-driven capabilities for intelligent query handling and decision support.
+● Designed and developed Spring Boot-based microservices for patient management and doctor availability in a distributed architecture
+● Implemented FHIR-based interoperable data exchange to enable secure and standardized sharing of patient health records across systems
+● Developed HIPAA-compliant patient consent management workflows for secure access to sensitive healthcare data
+● Designed and implemented Kafka-based event-driven architecture for real-time updates and notifications
+● Built AI-powered assistant using OpenAI APIs to handle patient and doctor queries with natural language interaction
+● Implemented semantic search using pgvector and designed context-aware prompt pipelines to improve response accuracy and relevance
+● Optimized high-traffic APIs, reducing latency by 200ms and improving response time by 30%
+
+
+
+Software Developer | Apr 2024 – Oct 2025
+Blue Yonder | Bengaluru
+● Developed and deployed RESTful microservices using Spring Boot, ensuring modularity, scalability, and ease of maintenance across multiple components.
+● Implemented Kafka-based asynchronous communication between services to handle high-volume event-driven data processing and ensure real-time data consistency.
+● Enhanced API functionality to improve system performance and ensure seamless integration with client-facing applications. Resolved P1 production issues, improving system reliability and, and ensuring a smooth user experience.
+● Conducted JMeter and PSR load testing, optimizing server performance by identifying and resolving bottlenecks.
+● Collaborated on the materialization process, significantly improving data processing speed and efficiency.
+● Designed event-driven architecture using Kafka.
+● Handled async processing and data consistency.
+
+
+--------------------------------------------------------------------------------
+NOTE — JMeter test flows:
+  EPAM: consent check, FHIR document list/fetch, AI query, document share
+  BY:   order create, inventory snapshot read, materialization under load
+  ❌ No appointment booking / doctor availability / slot tests
+--------------------------------------------------------------------------------
+
+
+🧠 SECTION 1: Real Project Usage (6 YOE — Deep Expected)
+Apache JMeter tumne kis use case ke liye use kiya?
+Kaunsa API flow test kiya tha? (FHIR document access / AI query / consent check / BY order flow)
+Tumhara load testing objective kya tha?
+Real user traffic ko kaise simulate kiya?
+Kitne concurrent users simulate kiye aur kyun?
+EPAM vs Blue Yonder — alag load test strategy?
+
+
+⚙️ SECTION 2: Test Design (MOST IMPORTANT)
+FHIR document access flow ko JMeter me kaise design kiya?
+  (login → consent check → document list → document fetch)
+AI query flow ko JMeter me kaise design kiya?
+Consent check API load test — kaise design kiya? (high frequency API)
+Multiple users same document fetch kare → kaise simulate kiya?
+Document share idempotency test — same Idempotency-Key → kaise verify kiya?
+CSV parameterization kaise use kiya (patientIds, documentIds, tokens, search queries)?
+Authentication flow (JWT token-based) kaise handle kiya?
+Think time kaise add kiya realistic behaviour ke liye?
+Non-GUI mode kyun use kiya production-like test ke liye?
+
+
+🔥 SECTION 3: Kafka + Async Testing (Your Strong Area 💥)
+Kafka-based system ko kaise test kiya JMeter se?
+Async indexing latency measure kaise kiya? (document fetch → pgvector searchable)
+Consumer lag post-load test kaise validate kiya?
+Sync API vs async pipeline — alag metrics kaise track kiye?
+
+
+⚡ SECTION 4: Metrics & Analysis (6 YOE)
+Response Time vs Latency vs Throughput — difference?
+Percentiles (p90, p95, p99) kyun important hain?
+Bottleneck identification kaise kiya? (JMeter + CloudWatch correlation)
+Before/after JMeter results — complete breakdown
+200ms latency reduction — exactly kahan se aaya?
+Blue Yonder JMeter test design
+Order API P1 (15s response) — JMeter se kaise detect kiya?
+PSR vs JMeter — difference? Tumne dono kyun use kiye?
+
+
+🏗️ SECTION 5: Production Debugging with JMeter
+High response time — complete debug workflow
+CPU vs DB vs network vs external FHIR bottleneck kaise differentiate karte ho?
+Logs aur JMeter results ko kaise correlate kiya? (X-Request-Id)
+Slow API ka root cause kaise nikala?
+Production aur test environment me difference kaise handle kiya?
+OpenAI latency vs pgvector vs consent check — kaise isolate kiya?
+
+
+💣 Interviewer Killer Questions (Pakke aayenge)
+
+👉 "Aapka load realistic tha ya synthetic?"
+👉 "Aapne jo 30% improvement bola wo exactly kis change se aaya?"
+👉 "Kafka / async indexing ka performance kaise measure kiya JMeter se?"
+👉 "Consent check har request pe hota hai — uska load test alag kiya?"
+👉 "AI query slow thi — pgvector index se kitna improvement aaya?"

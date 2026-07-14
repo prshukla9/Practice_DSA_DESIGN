@@ -1,0 +1,1810 @@
+==========================================================================================
+  29LPA — REAL PRODUCTION DEPLOYMENT GUIDE
+  Role: Senior DevOps Engineer / Backend Architect
+  Stack: Spring Boot × 8 → Docker → ECR → EKS → RDS → MSK → Jenkins
+  Standard: Industry Production Grade
+==========================================================================================
+
+BIG PICTURE PEHLE SAMJHO — ARCHITECTURE OVERVIEW
+==========================================================================================
+
+COMPLETE PRODUCTION FLOW:
+--------------------------
+
+  Internet
+     ↓
+  [Route 53] — DNS (yourdomain.com → AWS)
+     ↓
+  [AWS ALB — Application Load Balancer]
+  (SSL termination, traffic distribution, health checks)
+     ↓
+  [NGINX Ingress Controller] — K8s ke andar traffic router
+  /api/users → user-service
+  /api/orders → order-service
+     ↓
+  [API Gateway Pod × 2] — Authentication, rate limiting
+     ↓
+  ┌────────────────────────────────────────────────────────────┐
+  │              EKS CLUSTER (Kubernetes)                       │
+  │                                                            │
+  │  [user-service × 2]    [order-service × 2]                │
+  │  [payment-service × 2] [inventory-service × 2]            │
+  │  [product-service × 2] [notification-service × 2]         │
+  │  [shipping-service × 2]                                    │
+  │                                                            │
+  └────────────────────────────────────────────────────────────┘
+     ↓                              ↓
+  [AWS RDS PostgreSQL]      [AWS MSK — Managed Kafka]
+  (Multi-AZ, encrypted)     (3 brokers, replication)
+     ↓
+  [AWS Secrets Manager] — Passwords securely store
+  [AWS CloudWatch]      — Logs + Metrics + Alerts
+  [AWS ECR]             — Docker images registry
+
+SIMPLE INTERVIEW EXPLANATION:
+  "User request aata hai → Route 53 DNS resolve karta hai → AWS Load Balancer pe aata hai
+   jo traffic distribute karta hai → Kubernetes Ingress sahi service ko route karta hai →
+   API Gateway authentication karta hai → Respective microservice request process karta hai →
+   AWS RDS se data read/write hota hai ya MSK Kafka pe event publish hota hai →
+   CloudWatch sab kuch monitor karta hai."
+
+DEV vs PRODUCTION — KEY DIFFERENCES:
+=======================================
+
+  Aspect              DEV Environment           PRODUCTION Environment
+  ─────────────────────────────────────────────────────────────────────────
+  Orchestration       Docker Compose            Kubernetes (EKS)
+  Database            Container PostgreSQL       AWS RDS (Multi-AZ)
+  Messaging           Container Kafka            AWS MSK (Managed)
+  Replicas            1 instance each            2+ instances each
+  Images              Local builds              ECR Registry
+  Config              .env files                K8s Secrets + ConfigMaps
+  Scaling             Manual                    HPA (Auto)
+  Monitoring          docker logs               CloudWatch + Alerts
+  Deployment          docker-compose up         Rolling Update (zero downtime)
+  SSL                 No                        Yes (ACM Certificate)
+  Cost                ~$0 (local)               ~$500-1000/month
+
+WHY DOCKER COMPOSE IS BAD IN PRODUCTION:
+  ❌ Single machine → machine down = entire system down (no HA)
+  ❌ No auto-scaling → traffic spike = system crash
+  ❌ No self-healing → container crash = manual restart
+  ❌ No rolling updates → deployment = downtime
+  ❌ Not battle-tested at scale → Kubernetes solves all these
+
+WHY SINGLE INSTANCE IS BAD:
+  ❌ SPOF (Single Point of Failure) — ek machine down = sab down
+  ❌ Maintenance downtime — update karo = users affected
+  ❌ No horizontal scaling
+  PRODUCTION = Minimum 2 replicas per service, across 2 Availability Zones
+
+
+==========================================================================================
+  STEP 1: PRODUCTION DOCKERFILE — MULTI-STAGE BUILD
+==========================================================================================
+
+SINGLE-STAGE (DEV) vs MULTI-STAGE (PROD):
+-------------------------------------------
+  Single-stage: JDK + Source + Dependencies + JAR = 500MB+ image
+  Multi-stage:  Sirf JRE + JAR = 150MB image
+
+  WHY IMAGE SIZE MATTERS IN PRODUCTION?
+  - ECR storage cost (thousands of images accumulate)
+  - Pull time — deployment slow hoti hai badi images se
+  - Attack surface — kam cheezein = kam vulnerabilities
+  - Network bandwidth — 500MB vs 150MB × 100 deployments per day
+
+PRODUCTION DOCKERFILE:
+-----------------------
+  # ════════════════════════════════════════════════════════════
+  # order-service/Dockerfile
+  # ════════════════════════════════════════════════════════════
+
+  # ── STAGE 1: BUILD STAGE ──────────────────────────────────────
+  # Maven + JDK sirf build ke liye — final image mein nahi aayega
+  FROM maven:3.9-eclipse-temurin-17-alpine AS builder
+
+  # Working directory set karo
+  WORKDIR /build
+
+  # WHY COPY pom.xml PEHLE?
+  # Docker layer caching — agar sirf code change hua (pom.xml nahi)
+  # toh dependencies dobara download nahi hongi → FAST rebuild
+  COPY pom.xml .
+  RUN mvn dependency:go-offline -B    # Saari dependencies download karo
+  # -B = batch mode (no interactive prompts)
+
+  # Ab source code copy karo
+  COPY src ./src
+
+  # JAR build karo
+  RUN mvn clean package -DskipTests -B
+  # Production Dockerfile mein tests Jenkins mein alag stage pe chalenge
+
+  # ── STAGE 2: RUNTIME STAGE ────────────────────────────────────
+  # Sirf JRE — JDK nahi (compiler tools not needed at runtime)
+  # alpine = minimal Linux (musl libc based) — very small
+  FROM eclipse-temurin:17-jre-alpine AS runtime
+
+  # Security: Root user mat use karo!
+  # WHY? Root pe container run karna = security risk (privilege escalation)
+  RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+  WORKDIR /app
+
+  # Stage 1 se sirf JAR copy karo (baaki sab chhod do)
+  COPY --from=builder /build/target/*.jar app.jar
+
+  # File ownership appuser ko do
+  RUN chown appuser:appgroup app.jar
+
+  # Non-root user se run karo
+  USER appuser
+
+  # Port declare karo
+  EXPOSE 8082
+
+  # Health check built-in Docker level pe bhi
+  HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD wget -qO- http://localhost:8082/actuator/health || exit 1
+
+  # JVM Production Tuning:
+  ENTRYPOINT ["java",
+    # Container-aware memory management
+    "-XX:+UseContainerSupport",
+    # Available RAM ka 75% use karo
+    "-XX:MaxRAMPercentage=75.0",
+    # G1 GC — production mein best for microservices
+    "-XX:+UseG1GC",
+    # GC logging (debugging ke liye)
+    "-Xlog:gc*:file=/app/logs/gc.log:time,uptime:filecount=5,filesize=10m",
+    # Out of memory pe heap dump lo
+    "-XX:+HeapDumpOnOutOfMemoryError",
+    "-XX:HeapDumpPath=/app/logs/heapdump.hprof",
+    # Stack traces compact rakho
+    "-XX:+OmitStackTraceInFastThrow",
+    "-jar", "app.jar"]
+
+IMAGE SIZE COMPARISON:
+-----------------------
+  Single-stage (JDK):     ~500MB
+  Multi-stage (JRE):      ~180MB
+  Multi-stage (JRE slim): ~150MB  ← We use this
+
+BUILD COMMAND:
+--------------
+  $ docker build -t order-service:1.0.0 .
+  # Multi-stage automatically handle hota hai — same command
+
+
+==========================================================================================
+  STEP 2: DOCKER IMAGE TAGGING STRATEGY
+==========================================================================================
+
+WHY VERSIONING IS CRITICAL IN PRODUCTION:
+------------------------------------------
+  Scenario bina versioning ke:
+    docker push order-service:latest   ← aaj
+    docker push order-service:latest   ← kal (bug fix)
+    Production down! Rollback karna hai
+    docker pull order-service:latest   ← same image milegi! (purani nahi)
+    DISASTER!
+
+  Versioning ke saath:
+    docker push order-service:1.2.3
+    Bug → docker rollout → order-service:1.2.2 ← pinpoint rollback!
+
+TAGGING STRATEGY (Semantic Versioning + Git):
+----------------------------------------------
+
+  Format: <service>:<major>.<minor>.<patch>-<git-sha>
+
+  Examples:
+    order-service:1.0.0-abc1234
+    order-service:1.0.1-def5678
+    order-service:latest           ← always points to newest stable
+
+  Jenkins mein:
+    VERSION = "1.0.${BUILD_NUMBER}"
+    GIT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+    TAG = "${VERSION}-${GIT_SHA}"
+
+    docker build -t order-service:${TAG} .
+    docker tag order-service:${TAG} order-service:latest
+
+  ECR mein full tag:
+    <account>.dkr.ecr.<region>.amazonaws.com/order-service:1.0.5-abc1234
+
+  Rollback karna ho:
+    kubectl set image deployment/order-service \
+      order-service=<ecr>/order-service:1.0.4-prev1234
+
+IMMUTABLE TAGS (Production Best Practice):
+-------------------------------------------
+  ❌ GALAT: latest tag production mein use karna
+  ✓  SAHI:  Specific version tag production mein
+
+  latest = testing/staging ke liye okay
+  Production = always specific version (1.0.5-abc1234)
+
+
+==========================================================================================
+  STEP 3: AWS ECR — CONTAINER REGISTRY
+==========================================================================================
+
+WHY REGISTRY CHAHIYE?
+----------------------
+  Problem without registry:
+    Jenkins machine pe image build hui.
+    EKS cluster different machines pe hai.
+    Kaise images wahan pahunchegi?
+    Direct copy? → Not scalable, not secure
+
+  Registry = Central store for Docker images.
+  Build once → push to ECR → EKS pull kare anywhere
+
+  WHY ECR (not Docker Hub)?
+  ✓ AWS VPC ke andar hai → Private, no internet exposure
+  ✓ IAM integration → EC2/EKS automatically authenticate
+  ✓ Image scanning built-in → vulnerabilities automatically detect
+  ✓ Lifecycle policies → purani images automatically delete
+  ✓ Low latency → same region mein pull → fast deployments
+
+ECR SETUP:
+-----------
+  # AWS CLI configure karo pehle
+  $ aws configure
+  AWS Access Key ID: <your-key>
+  AWS Secret Access Key: <your-secret>
+  Default region: ap-south-1    # Mumbai region
+
+  # ECR repository banao — har service ke liye
+  $ aws ecr create-repository --repository-name order-service --region ap-south-1
+  $ aws ecr create-repository --repository-name user-service --region ap-south-1
+  $ aws ecr create-repository --repository-name payment-service --region ap-south-1
+  $ aws ecr create-repository --repository-name inventory-service --region ap-south-1
+  $ aws ecr create-repository --repository-name notification-service --region ap-south-1
+  $ aws ecr create-repository --repository-name product-service --region ap-south-1
+  $ aws ecr create-repository --repository-name shipping-service --region ap-south-1
+  $ aws ecr create-repository --repository-name api-gateway --region ap-south-1
+
+  # Output mein milega:
+  # "repositoryUri": "123456789.dkr.ecr.ap-south-1.amazonaws.com/order-service"
+
+  # ECR mein login karo (Docker ko credentials do)
+  $ aws ecr get-login-password --region ap-south-1 | \
+    docker login --username AWS --password-stdin \
+    123456789.dkr.ecr.ap-south-1.amazonaws.com
+
+IMAGE BUILD + PUSH:
+--------------------
+  # Variables
+  ACCOUNT_ID=123456789
+  REGION=ap-south-1
+  ECR_BASE=${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com
+  VERSION=1.0.0
+  GIT_SHA=$(git rev-parse --short HEAD)
+  TAG=${VERSION}-${GIT_SHA}
+
+  # Build
+  $ docker build -t order-service:${TAG} ./order-service/
+
+  # Tag ECR ke liye
+  $ docker tag order-service:${TAG} ${ECR_BASE}/order-service:${TAG}
+  $ docker tag order-service:${TAG} ${ECR_BASE}/order-service:latest
+
+  # Push
+  $ docker push ${ECR_BASE}/order-service:${TAG}
+  $ docker push ${ECR_BASE}/order-service:latest
+
+ECR LIFECYCLE POLICY (Purani images delete karo — cost save):
+--------------------------------------------------------------
+  # ECR Console → Repository → Lifecycle Policy → Edit
+
+  {
+    "rules": [
+      {
+        "rulePriority": 1,
+        "description": "Sirf last 10 versions rakho",
+        "selection": {
+          "tagStatus": "tagged",
+          "tagPrefixList": ["1."],
+          "countType": "imageCountMoreThan",
+          "countNumber": 10
+        },
+        "action": { "type": "expire" }
+      },
+      {
+        "rulePriority": 2,
+        "description": "Untagged images 7 din mein delete karo",
+        "selection": {
+          "tagStatus": "untagged",
+          "countType": "sinceImagePushed",
+          "countUnit": "days",
+          "countNumber": 7
+        },
+        "action": { "type": "expire" }
+      }
+    ]
+  }
+
+
+==========================================================================================
+  STEP 4: KUBERNETES BASICS — Pehle Concepts Clear Karo
+==========================================================================================
+
+KUBERNETES KYA SOLVE KARTA HAI?
+---------------------------------
+  Problems Docker Compose nahi solve kar sakta:
+    1. Machine crash → sab down (no self-healing)
+    2. Traffic spike → manually scale karo (no auto-scaling)
+    3. Deployment = downtime (no rolling updates)
+    4. 8 services × 10 machines = chaos (no orchestration)
+
+  Kubernetes solutions:
+    1. Pod crash → automatically restart → Self-healing ✓
+    2. CPU high → automatically more pods → HPA ✓
+    3. New version → one by one replace → Zero downtime ✓
+    4. Declarative: "2 replicas chahiye" → K8s ensure karta hai ✓
+
+KEY CONCEPTS:
+--------------
+  Pod:
+    - Kubernetes ki basic unit
+    - 1 ya zyada containers (usually 1 main + sidecar)
+    - Ek IP address milta hai
+    - Ephemeral — crash hone pe naya ban jaata hai (same IP nahi)
+    - Directly use mat karo — Deployment use karo
+
+  Deployment:
+    - "Mujhe order-service ke 2 replicas chahiye"
+    - Self-healing: Pod crash → nayi Pod automatically banao
+    - Rolling updates: Slowly replace old pods with new
+    - Rollback: Purani version pe wapas jao
+
+  Service:
+    - Pods ke aage stable network endpoint
+    - Pod IPs change hoti hain → Service IP fixed rehti hai
+    - Types:
+      ClusterIP   → Sirf cluster ke andar accessible (microservices ke beech)
+      NodePort    → Node ke IP pe accessible (testing)
+      LoadBalancer → AWS ALB automatically create karta hai (public access)
+
+  ConfigMap:
+    - Non-sensitive configuration store karo
+    - DB URL, Kafka brokers, API endpoints
+    - Pods restart kiye bina config update
+
+  Secret:
+    - Sensitive data: Passwords, API keys, certificates
+    - Base64 encoded (not encrypted by default → AWS Secrets Manager better)
+
+  Namespace:
+    - Logical isolation: production, staging, development
+    - Resource limits per namespace
+    - We use: namespace = production
+
+  HPA (Horizontal Pod Autoscaler):
+    - CPU 70% → automatically more pods banao
+    - Traffic kam → pods reduce karo
+    - Cost optimize + performance ensure
+
+KUBERNETES ARCHITECTURE:
+--------------------------
+  ┌─────────────────────────────────────────────────────┐
+  │  EKS CLUSTER                                         │
+  │                                                      │
+  │  ┌──────────────┐    ┌──────────────────────────┐   │
+  │  │ Control Plane│    │      Worker Nodes         │   │
+  │  │ (AWS managed)│    │                          │   │
+  │  │              │    │  Node 1 (t3.medium)      │   │
+  │  │ API Server   │    │  ├─ order-service Pod    │   │
+  │  │ etcd         │    │  └─ user-service Pod     │   │
+  │  │ Scheduler    │    │                          │   │
+  │  │ Controller   │    │  Node 2 (t3.medium)      │   │
+  │  └──────────────┘    │  ├─ order-service Pod    │   │
+  │                      │  └─ payment-service Pod  │   │
+  │                      └──────────────────────────┘   │
+  └─────────────────────────────────────────────────────┘
+
+WHY EKS (not self-managed K8s)?
+  ❌ Self-managed: Control plane tumhe maintain karna padega (etcd backups, upgrades...)
+  ✓ EKS: AWS control plane manage karta hai, tum sirf worker nodes → Developer focus
+
+
+==========================================================================================
+  STEP 5: KUBERNETES YAML — COMPLETE FOR ALL SERVICES
+==========================================================================================
+
+FOLDER STRUCTURE:
+------------------
+  k8s/
+  ├── namespace.yaml
+  ├── configmaps/
+  │   └── app-config.yaml
+  ├── secrets/
+  │   └── app-secrets.yaml
+  ├── services/
+  │   ├── order-service/
+  │   │   ├── deployment.yaml
+  │   │   └── service.yaml
+  │   ├── user-service/
+  │   │   ├── deployment.yaml
+  │   │   └── service.yaml
+  │   └── ... (all 8 services)
+  ├── ingress/
+  │   └── ingress.yaml
+  └── hpa/
+      └── hpa.yaml
+
+NAMESPACE:
+-----------
+  # k8s/namespace.yaml
+  apiVersion: v1
+  kind: Namespace
+  metadata:
+    name: production
+    labels:
+      env: production
+
+  # Apply:
+  $ kubectl apply -f k8s/namespace.yaml
+
+CONFIGMAP (Non-sensitive config):
+----------------------------------
+  # k8s/configmaps/app-config.yaml
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: app-config
+    namespace: production
+  data:
+    # DB config (host sirf — credentials Secret mein)
+    DB_HOST: "myapp-db.cluster-xyz.ap-south-1.rds.amazonaws.com"
+    DB_PORT: "5432"
+    DB_NAME: "microservices"
+
+    # Kafka (MSK)
+    KAFKA_BROKERS: "b-1.mykafka.xyz.kafka.ap-south-1.amazonaws.com:9092,b-2.mykafka.xyz.kafka.ap-south-1.amazonaws.com:9092"
+
+    # App config
+    LOG_LEVEL: "INFO"
+    SPRING_PROFILES_ACTIVE: "production"
+
+    # Service URLs (K8s DNS — Step 6 mein explain hoga)
+    USER_SERVICE_URL: "http://user-service.production.svc.cluster.local:8081"
+    ORDER_SERVICE_URL: "http://order-service.production.svc.cluster.local:8082"
+    INVENTORY_SERVICE_URL: "http://inventory-service.production.svc.cluster.local:8084"
+
+SECRETS:
+---------
+  # k8s/secrets/app-secrets.yaml
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    name: app-secrets
+    namespace: production
+  type: Opaque
+  data:
+    # Base64 encode karo: echo -n "devpassword" | base64
+    DB_USERNAME: ZGV2dXNlcg==        # devuser
+    DB_PASSWORD: ZGV2cGFzc3dvcmQ=   # devpassword
+    JWT_SECRET: bXlzdXBlcnNlY3JldA==
+
+  # BETTER OPTION: AWS Secrets Manager → External Secrets Operator
+  # Step 10 mein explain hoga
+
+ORDER-SERVICE DEPLOYMENT:
+---------------------------
+  # k8s/services/order-service/deployment.yaml
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: order-service
+    namespace: production
+    labels:
+      app: order-service
+      version: "1.0.5"
+  spec:
+    replicas: 2    # MINIMUM 2 — ek down bhi ho toh service available
+
+    selector:
+      matchLabels:
+        app: order-service    # Ye label wale Pods manage karo
+
+    # Rolling Update Strategy (Step 12 mein detail)
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 1           # Ek extra pod temporarily banao update ke dauran
+        maxUnavailable: 0     # Zero downtime — koi pod unavailable nahi hoga
+
+    template:
+      metadata:
+        labels:
+          app: order-service
+          version: "1.0.5"
+      spec:
+        # Anti-affinity: Dono replicas alag nodes pe rakho!
+        # WHY? Ek node down → sirf ek pod affected, doosra dusre node pe chalta hai
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchExpressions:
+                      - key: app
+                        operator: In
+                        values: [order-service]
+                  topologyKey: kubernetes.io/hostname
+
+        containers:
+          - name: order-service
+            # ECR image — specific version tag (NEVER :latest in production!)
+            image: 123456789.dkr.ecr.ap-south-1.amazonaws.com/order-service:1.0.5-abc1234
+
+            ports:
+              - containerPort: 8082
+
+            # Environment variables — ConfigMap aur Secret se lo (hardcode NAHI!)
+            env:
+              - name: SPRING_PROFILES_ACTIVE
+                valueFrom:
+                  configMapKeyRef:
+                    name: app-config
+                    key: SPRING_PROFILES_ACTIVE
+
+              - name: SPRING_DATASOURCE_URL
+                value: "jdbc:postgresql://$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
+
+              - name: DB_HOST
+                valueFrom:
+                  configMapKeyRef:
+                    name: app-config
+                    key: DB_HOST
+
+              - name: DB_PORT
+                valueFrom:
+                  configMapKeyRef:
+                    name: app-config
+                    key: DB_PORT
+
+              - name: DB_NAME
+                valueFrom:
+                  configMapKeyRef:
+                    name: app-config
+                    key: DB_NAME
+
+              - name: SPRING_DATASOURCE_USERNAME
+                valueFrom:
+                  secretKeyRef:
+                    name: app-secrets
+                    key: DB_USERNAME    # Secret se lo — plaintext nahi!
+
+              - name: SPRING_DATASOURCE_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: app-secrets
+                    key: DB_PASSWORD
+
+              - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+                valueFrom:
+                  configMapKeyRef:
+                    name: app-config
+                    key: KAFKA_BROKERS
+
+              - name: USER_SERVICE_URL
+                valueFrom:
+                  configMapKeyRef:
+                    name: app-config
+                    key: USER_SERVICE_URL
+
+            # Resource Limits — ZAROORI IN PRODUCTION
+            resources:
+              requests:
+                cpu: "250m"       # 0.25 CPU core (guaranteed milega)
+                memory: "512Mi"   # 512MB RAM (guaranteed)
+              limits:
+                cpu: "500m"       # 0.5 CPU core (maximum)
+                memory: "1Gi"     # 1GB RAM (maximum — exceed kiya → OOMKilled)
+
+            # WHY RESOURCE LIMITS?
+            # Bina limits: Ek pod saari node ki RAM/CPU kha sakta hai → dusre pods crash
+            # Production mein requests aur limits dono zaroori hain
+
+            # LIVENESS PROBE: Pod zinda hai?
+            # Fail hone pe → K8s pod restart karta hai (self-healing!)
+            livenessProbe:
+              httpGet:
+                path: /actuator/health/liveness
+                port: 8082
+              initialDelaySeconds: 60    # Spring Boot start hone ka time do
+              periodSeconds: 30          # Har 30 seconds check karo
+              timeoutSeconds: 10         # 10 seconds mein respond karna chahiye
+              failureThreshold: 3        # 3 baar fail → restart
+
+            # READINESS PROBE: Pod traffic lene ke liye ready hai?
+            # Fail hone pe → Load Balancer traffic divert karta hai (no traffic to unhealthy pod)
+            readinessProbe:
+              httpGet:
+                path: /actuator/health/readiness
+                port: 8082
+              initialDelaySeconds: 45
+              periodSeconds: 15
+              timeoutSeconds: 5
+              failureThreshold: 3
+
+            # Graceful shutdown ke liye
+            lifecycle:
+              preStop:
+                exec:
+                  command: ["/bin/sh", "-c", "sleep 10"]
+                  # 10 seconds wait karo → ongoing requests complete honge phir terminate
+
+        # Termination grace period (graceful shutdown)
+        terminationGracePeriodSeconds: 60
+
+ORDER-SERVICE SERVICE (ClusterIP):
+------------------------------------
+  # k8s/services/order-service/service.yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: order-service        # YE NAAM K8s DNS mein use hoga
+    namespace: production
+  spec:
+    type: ClusterIP            # Sirf cluster ke andar accessible
+    selector:
+      app: order-service       # Is label wale pods ko traffic bhejo
+    ports:
+      - protocol: TCP
+        port: 8082             # Service ka port (other services yahan connect karenge)
+        targetPort: 8082       # Pod ka actual port
+
+  # K8s DNS: order-service.production.svc.cluster.local:8082
+
+API-GATEWAY SERVICE (LoadBalancer — bahar exposed):
+-----------------------------------------------------
+  # k8s/services/api-gateway/service.yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: api-gateway
+    namespace: production
+  spec:
+    type: LoadBalancer    # AWS ALB automatically create hoga
+    selector:
+      app: api-gateway
+    ports:
+      - protocol: TCP
+        port: 80
+        targetPort: 8080
+
+APPLY KARO:
+-----------
+  $ kubectl apply -f k8s/namespace.yaml
+  $ kubectl apply -f k8s/configmaps/
+  $ kubectl apply -f k8s/secrets/
+  $ kubectl apply -f k8s/services/order-service/
+  $ kubectl apply -f k8s/services/user-service/
+  # ...sab services ke liye
+
+  # Ya ek baar mein sab:
+  $ kubectl apply -R -f k8s/    # -R = recursive, sab directories
+
+
+==========================================================================================
+  STEP 6: KUBERNETES MEIN SERVICE COMMUNICATION — DNS
+==========================================================================================
+
+WHY LOCALHOST ABSOLUTELY KAAM NAHI KARTA:
+-------------------------------------------
+  Pod ki apni IP hoti hai.
+  Jab order-service pod "localhost:8081" pe connect karna chahti hai →
+  localhost = khud order-service pod ka loopback → user-service wahan nahi!
+
+  Har pod ek alag "machine" hai kubernetes mein.
+  "localhost" sirf us pod ke liye valid hai.
+
+KUBERNETES DNS (kaise kaam karta hai):
+----------------------------------------
+  K8s mein ek internal DNS server hota hai (CoreDNS).
+  Jab Service banate hain, DNS automatically entry add hoti hai.
+
+  Service naam: order-service
+  Namespace: production
+  Full DNS: order-service.production.svc.cluster.local
+
+  Short DNS (same namespace mein):
+    http://order-service:8082    ← same namespace mein ye kaafi hai!
+
+  Full DNS (different namespace se):
+    http://order-service.production.svc.cluster.local:8082
+
+HOW IT WORKS:
+--------------
+  1. order-service pod → "payment-service:8083" resolve karna chahti hai
+  2. CoreDNS pe query jaati hai
+  3. CoreDNS → payment-service Service ka ClusterIP return karta hai (e.g. 10.100.45.67)
+  4. Traffic us IP pe jaata hai
+  5. K8s iptables → actual pods mein distribute karta hai (load balancing)
+
+  Pod IPs change hoti hain (restart pe) → Service IP stable rehti hai ✓
+
+APPLICATION CONFIG (application-production.yml):
+-------------------------------------------------
+  spring:
+    datasource:
+      url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      username: ${SPRING_DATASOURCE_USERNAME}     # Env var se → Secret se aaya
+      password: ${SPRING_DATASOURCE_PASSWORD}
+    kafka:
+      bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+
+  # Service URLs — K8s DNS names
+  services:
+    user-service:
+      url: http://user-service:8081      # ← K8s DNS!
+    inventory-service:
+      url: http://inventory-service:8084
+    payment-service:
+      url: http://payment-service:8083
+
+  # Feign client configuration
+  feign:
+    client:
+      config:
+        user-service:
+          url: http://user-service:8081
+
+SUMMARY TABLE:
+--------------
+  Environment    user-service URL
+  ─────────────────────────────────────────────────────
+  Local          http://localhost:8081
+  Docker Compose http://user-service:8081   (container name)
+  Kubernetes     http://user-service:8081   (K8s service name, same ns)
+  Cross-namespace http://user-service.production.svc.cluster.local:8081
+
+
+==========================================================================================
+  STEP 7: LOAD BALANCER + INGRESS — Traffic Routing
+==========================================================================================
+
+WHY LOAD BALANCER CHAHIYE PRODUCTION MEIN?
+-------------------------------------------
+  Bina LB: User → Direct Pod IP → Pod crash = user ka request fail
+  With LB:  User → Load Balancer → Healthy pods mein distribute
+            Pod crash → LB detect karta hai → traffic healthy pods ko
+
+  AWS ALB Benefits:
+    ✓ SSL/TLS termination (HTTPS handle karta hai)
+    ✓ Health checks automatic
+    ✓ Multi-AZ distribution
+    ✓ WAF integration (firewall)
+    ✓ Sticky sessions (agar chahiye)
+
+INGRESS vs SERVICE(LoadBalancer):
+-----------------------------------
+  Service(LoadBalancer) per service:
+    8 services × 8 AWS Load Balancers = 8 × $20/month = $160/month!
+    Ye mahanga hai.
+
+  Ingress:
+    Ek ALB → Path-based routing → Sab services
+    /api/users  → user-service
+    /api/orders → order-service
+    $20/month instead of $160!
+
+NGINX INGRESS CONTROLLER INSTALL:
+-----------------------------------
+  # AWS EKS mein NGINX Ingress Controller install karo
+  $ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/aws/deploy.yaml
+
+  # Verify
+  $ kubectl get pods -n ingress-nginx
+  NAME                                       READY   STATUS
+  ingress-nginx-controller-xxx               1/1     Running
+
+INGRESS YAML:
+--------------
+  # k8s/ingress/ingress.yaml
+  apiVersion: networking.k8s.io/v1
+  kind: Ingress
+  metadata:
+    name: microservices-ingress
+    namespace: production
+    annotations:
+      # AWS ALB Ingress Controller annotations
+      kubernetes.io/ingress.class: "nginx"
+
+      # SSL redirect — HTTP → HTTPS force
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+
+      # Rate limiting — 100 req/min per IP
+      nginx.ingress.kubernetes.io/limit-rps: "100"
+
+      # Request timeout
+      nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+
+      # CORS (agar frontend alag domain pe hai)
+      nginx.ingress.kubernetes.io/enable-cors: "true"
+      nginx.ingress.kubernetes.io/cors-allow-origin: "https://yourapp.com"
+  spec:
+    # SSL Certificate (AWS ACM se)
+    tls:
+      - hosts:
+          - api.yourapp.com
+        secretName: tls-secret    # Certificate yahan store hai
+
+    rules:
+      - host: api.yourapp.com
+        http:
+          paths:
+            # API Gateway — main entry point
+            - path: /
+              pathType: Prefix
+              backend:
+                service:
+                  name: api-gateway
+                  port:
+                    number: 8080
+
+            # Direct routing agar gateway bypass karna ho (admin tools)
+            - path: /internal/users
+              pathType: Prefix
+              backend:
+                service:
+                  name: user-service
+                  port:
+                    number: 8081
+
+TRAFFIC FLOW:
+--------------
+  User → DNS (api.yourapp.com) → Route 53
+       → AWS ALB (HTTPS, SSL termination)
+       → NGINX Ingress Controller Pod
+       → api-gateway Service → api-gateway Pods
+       → (Gateway routes to) user-service / order-service / etc.
+       → Response wapas same path se
+
+
+==========================================================================================
+  STEP 8: AWS RDS — DATABASE SETUP
+==========================================================================================
+
+WHY NOT CONTAINER POSTGRESQL IN PRODUCTION?
+--------------------------------------------
+  Container PostgreSQL problems:
+  ❌ Data loss: Pod delete → data gone (PVC bhi risky hai)
+  ❌ No automatic backups
+  ❌ No high availability (ek instance = SPOF)
+  ❌ Performance tuning manually karna padega
+  ❌ Upgrades risky — koi managed process nahi
+  ❌ Connection pooling manually manage karo
+  ❌ Monitoring manually set up karo
+
+  AWS RDS Benefits:
+  ✓ Automated daily backups (35 days retention)
+  ✓ Multi-AZ: Primary + Standby in different AZ → automatic failover ~1-2 min
+  ✓ Read Replicas: Scale read traffic
+  ✓ Performance Insights: Query analysis built-in
+  ✓ Automatic minor version upgrades
+  ✓ Parameter groups: DB tuning without SSH
+  ✓ Encryption at rest by default
+
+RDS SETUP (AWS Console + Terraform):
+--------------------------------------
+  # Terraform (Infrastructure as Code — production mein yahi use karo):
+  # main.tf
+
+  resource "aws_db_subnet_group" "rds_subnet" {
+    name       = "microservices-rds-subnet"
+    subnet_ids = [aws_subnet.private_1.id, aws_subnet.private_2.id]
+    # WHY PRIVATE SUBNETS? DB publicly accessible nahi hona chahiye!
+  }
+
+  resource "aws_db_instance" "postgres" {
+    identifier        = "microservices-db"
+    engine            = "postgres"
+    engine_version    = "15.3"
+    instance_class    = "db.t3.medium"    # 2 vCPU, 4GB RAM — production
+
+    # Storage
+    allocated_storage     = 100    # GB
+    max_allocated_storage = 500    # Auto-scaling — zaroorat pe badhega
+    storage_encrypted     = true   # Encryption at rest — mandatory
+
+    # Credentials (Terraform variables se, hardcode nahi!)
+    username = var.db_username
+    password = var.db_password
+
+    # Multi-AZ — MUST in production
+    multi_az = true
+    # WHY? Primary AZ down → Standby automatically promote → ~1 min downtime
+
+    # Network
+    db_subnet_group_name   = aws_db_subnet_group.rds_subnet.name
+    vpc_security_group_ids = [aws_security_group.rds_sg.id]
+    publicly_accessible    = false   # NEVER true in production
+
+    # Backup
+    backup_retention_period = 7      # 7 din ka backup
+    backup_window           = "03:00-04:00"    # Low traffic time pe
+    maintenance_window      = "sun:04:00-sun-05:00"
+
+    # Deletion protection — accidentally delete nahi hoga
+    deletion_protection = true
+
+    # Performance Insights (query monitoring)
+    performance_insights_enabled = true
+
+    tags = { Environment = "production" }
+  }
+
+  # Read Replica (Read traffic ke liye)
+  resource "aws_db_instance" "postgres_replica" {
+    identifier             = "microservices-db-replica"
+    replicate_source_db    = aws_db_instance.postgres.id
+    instance_class         = "db.t3.medium"
+    publicly_accessible    = false
+    skip_final_snapshot    = true
+
+    # Analytics/reporting queries yahan bhejo → Primary DB free rahegi
+  }
+
+SPRING BOOT CONNECTION:
+------------------------
+  # application-production.yml
+
+  spring:
+    datasource:
+      url: jdbc:postgresql://${DB_HOST}:5432/${DB_NAME}
+      username: ${DB_USERNAME}
+      password: ${DB_PASSWORD}
+
+      # HikariCP Connection Pool (Spring Boot default)
+      hikari:
+        maximum-pool-size: 20       # Max 20 concurrent connections
+        minimum-idle: 5             # Minimum 5 idle connections ready
+        connection-timeout: 30000   # 30 sec wait for connection
+        idle-timeout: 600000        # 10 min idle → connection close
+        max-lifetime: 1800000       # 30 min → connection refresh
+        # WHY CONNECTION POOL?
+        # Har request pe naya DB connection = slow + expensive
+        # Pool = pre-created connections → fast!
+
+CONNECTION POOLING ARCHITECTURE:
+----------------------------------
+  8 services × 20 max connections = 160 max connections to RDS
+  RDS instance max connections: depends on RAM
+  db.t3.medium (4GB) → ~170 max connections → tight!
+
+  SOLUTION: PgBouncer (Connection Pooler sidecar)
+  Services → PgBouncer (connection multiplex) → RDS
+  1000 app connections → 50 actual DB connections
+
+
+==========================================================================================
+  STEP 9: KAFKA SETUP — AWS MSK (Managed Streaming for Kafka)
+==========================================================================================
+
+WHY NOT CONTAINER KAFKA IN PRODUCTION?
+-----------------------------------------
+  ❌ Container Kafka:
+    - Data loss: Container crash = messages lost
+    - No automatic failover
+    - Replication manually configure karo
+    - Monitoring manually set up karo
+    - ZooKeeper bhi manage karo (alag headache)
+
+  ✓ AWS MSK (Managed Kafka):
+    - Fully managed (AWS patches, upgrades karta hai)
+    - Automatic broker failure recovery
+    - 3 brokers across 3 AZs → high availability
+    - CloudWatch metrics built-in
+    - Encryption in-transit + at-rest automatic
+    - Kafka Connect, Schema Registry support
+
+MSK SETUP (Terraform):
+------------------------
+  resource "aws_msk_cluster" "kafka" {
+    cluster_name           = "microservices-kafka"
+    kafka_version          = "3.5.1"
+    number_of_broker_nodes = 3    # 3 brokers = 3 AZs mein → HA
+
+    broker_node_group_info {
+      instance_type   = "kafka.m5.large"    # Production broker size
+      client_subnets  = [
+        aws_subnet.private_1.id,
+        aws_subnet.private_2.id,
+        aws_subnet.private_3.id
+      ]
+      storage_info {
+        ebs_storage_info {
+          volume_size = 200    # 200GB per broker
+        }
+      }
+    }
+
+    encryption_info {
+      encryption_in_transit {
+        client_broker = "TLS"      # Encryption in transit
+      }
+    }
+
+    # CloudWatch metrics enable
+    broker_logs {
+      cloudwatch_logs {
+        enabled   = true
+        log_group = "/aws/msk/microservices"
+      }
+    }
+  }
+
+TOPIC CREATION:
+----------------
+  # MSK mein Kafka topics banao (production settings)
+  $ kafka-topics.sh --create \
+    --bootstrap-server ${MSK_BROKERS} \
+    --topic order-events \
+    --partitions 6 \        # 6 partitions = 6 parallel consumers
+    --replication-factor 3  # 3 copies (3 brokers mein ek ek)
+
+  # WHY 6 PARTITIONS?
+  # Ek partition ek consumer hi padh sakta hai
+  # 6 partitions = 6 consumers parallel → 6× throughput
+
+  # WHY REPLICATION FACTOR 3?
+  # 3 copies → ek broker fail bhi ho toh data safe aur messages available
+
+SPRING KAFKA CONFIG (production):
+-----------------------------------
+  spring:
+    kafka:
+      bootstrap-servers: ${KAFKA_BROKERS}
+      consumer:
+        group-id: ${spring.application.name}
+        auto-offset-reset: earliest    # Start from beginning agar naya consumer
+        enable-auto-commit: false      # Manual commit → no message loss
+        max-poll-records: 100          # Ek baar mein 100 records
+        isolation-level: read_committed # Only committed messages read karo
+      producer:
+        acks: all          # Saare replicas confirm karein (no data loss)
+        retries: 3         # Failure pe retry
+        compression-type: snappy      # Compression → bandwidth save
+
+  # ACKS=ALL kyun?
+  # acks=0: Producer send kare, confirm ka wait nahi → data loss possible
+  # acks=1: Sirf leader confirm kare → leader crash = data loss
+  # acks=all: Saare replicas confirm karein → no data loss (slow lekin safe)
+
+
+==========================================================================================
+  STEP 10: SECRETS MANAGEMENT — AWS SECRETS MANAGER
+==========================================================================================
+
+WHY NOT HARDCODE PASSWORDS?
+-----------------------------
+  ❌ Hardcoded in code:
+    application.yml mein: password: mysecret123
+    Git mein commit ho gaya → ANYONE on internet can read!
+    Real incident: Thousands of AWS accounts compromised from GitHub leaks!
+
+  ❌ K8s Secrets (basic):
+    Base64 encoded → not encrypted!
+    etcd mein stored → anyone with etcd access = all secrets visible
+
+  ✓ AWS Secrets Manager:
+    Encrypted at rest (AES-256)
+    Rotation automatic
+    IAM-based access control
+    Audit trail (CloudTrail mein log)
+    No code changes needed
+
+EXTERNAL SECRETS OPERATOR SETUP:
+----------------------------------
+  # External Secrets Operator K8s se AWS Secrets Manager sync karta hai
+
+  # Install ESO
+  $ helm repo add external-secrets https://charts.external-secrets.io
+  $ helm install external-secrets external-secrets/external-secrets -n external-secrets-system
+
+  # AWS Secrets Manager mein secrets store karo:
+  $ aws secretsmanager create-secret \
+    --name "production/microservices/db" \
+    --secret-string '{"username":"produser","password":"SuperSecret123!"}'
+
+  $ aws secretsmanager create-secret \
+    --name "production/microservices/jwt" \
+    --secret-string '{"secret":"myJWTSuperSecret"}'
+
+  # SecretStore — AWS connection define karo
+  apiVersion: external-secrets.io/v1beta1
+  kind: SecretStore
+  metadata:
+    name: aws-secrets-store
+    namespace: production
+  spec:
+    provider:
+      aws:
+        service: SecretsManager
+        region: ap-south-1
+        auth:
+          jwt:
+            serviceAccountRef:
+              name: external-secrets-sa    # IAM Role attached hai ise
+
+  # ExternalSecret — AWS secret ko K8s secret mein sync karo
+  apiVersion: external-secrets.io/v1beta1
+  kind: ExternalSecret
+  metadata:
+    name: db-credentials
+    namespace: production
+  spec:
+    refreshInterval: 1h        # Har ghante AWS se refresh karo
+    secretStoreRef:
+      name: aws-secrets-store
+      kind: SecretStore
+    target:
+      name: app-secrets         # Ye K8s Secret ban jayega
+    data:
+      - secretKey: DB_USERNAME   # K8s Secret mein key naam
+        remoteRef:
+          key: production/microservices/db    # AWS Secrets Manager path
+          property: username
+
+      - secretKey: DB_PASSWORD
+        remoteRef:
+          key: production/microservices/db
+          property: password
+
+      - secretKey: JWT_SECRET
+        remoteRef:
+          key: production/microservices/jwt
+          property: secret
+
+  # Apply karo
+  $ kubectl apply -f k8s/secrets/external-secret.yaml
+
+  # K8s Secret automatically ban jaayega — Pods ise use kar sakte hain
+
+SECRET ROTATION (DB Password automatic rotate karo):
+-----------------------------------------------------
+  AWS Console → Secrets Manager → your-secret → Rotation → Enable
+  Rotation interval: 30 days
+  Lambda function automatically password change karega RDS mein bhi!
+
+
+==========================================================================================
+  STEP 11: JENKINS CI/CD PIPELINE — PRODUCTION GRADE
+==========================================================================================
+
+PRODUCTION JENKINS PIPELINE:
+------------------------------
+  # Jenkinsfile (production)
+  pipeline {
+    agent {
+      kubernetes {
+        # Jenkins agent khud K8s pod mein chalega
+        yaml '''
+          apiVersion: v1
+          kind: Pod
+          spec:
+            containers:
+              - name: maven
+                image: maven:3.9-eclipse-temurin-17-alpine
+                command: [sleep, infinity]
+              - name: docker
+                image: docker:24-dind
+                securityContext:
+                  privileged: true    # Docker-in-Docker ke liye
+              - name: kubectl
+                image: bitnami/kubectl:latest
+                command: [sleep, infinity]
+        '''
+      }
+    }
+
+    environment {
+      ECR_REGISTRY = "123456789.dkr.ecr.ap-south-1.amazonaws.com"
+      AWS_REGION   = "ap-south-1"
+      K8S_NAMESPACE = "production"
+      VERSION      = "1.0.${BUILD_NUMBER}"
+    }
+
+    stages {
+
+      stage('Checkout') {
+        steps {
+          checkout scm
+          script {
+            env.GIT_SHA = sh(
+              script: 'git rev-parse --short HEAD',
+              returnStdout: true
+            ).trim()
+            env.IMAGE_TAG = "${VERSION}-${GIT_SHA}"
+            echo "Building version: ${IMAGE_TAG}"
+          }
+        }
+      }
+
+      stage('Unit Tests') {
+        steps {
+          container('maven') {
+            sh '''
+              for service in user-service order-service payment-service \
+                             inventory-service product-service; do
+                echo "Testing $service..."
+                cd $service && mvn test -q && cd ..
+              done
+            '''
+          }
+        }
+        post {
+          always {
+            junit '**/target/surefire-reports/*.xml'
+            jacoco(execPattern: '**/target/jacoco.exec')   # Code coverage
+          }
+        }
+      }
+
+      stage('SonarQube Analysis') {
+        # Code quality check — production mein mandatory!
+        steps {
+          container('maven') {
+            withSonarQubeEnv('SonarQube') {
+              sh 'mvn sonar:sonar -Dsonar.projectKey=microservices'
+            }
+          }
+        }
+      }
+
+      stage('Quality Gate') {
+        steps {
+          # SonarQube quality gate fail → pipeline rukti hai
+          timeout(time: 5, unit: 'MINUTES') {
+            waitForQualityGate abortPipeline: true
+          }
+        }
+      }
+
+      stage('Maven Build — All Services') {
+        steps {
+          container('maven') {
+            sh '''
+              for service in api-gateway user-service order-service payment-service \
+                             inventory-service notification-service product-service shipping-service; do
+                echo "Building $service..."
+                cd $service && mvn clean package -DskipTests -q && cd ..
+              done
+            '''
+          }
+        }
+      }
+
+      stage('Docker Build + ECR Push') {
+        steps {
+          container('docker') {
+            withAWS(credentials: 'aws-credentials', region: "${AWS_REGION}") {
+              sh """
+                # ECR Login
+                aws ecr get-login-password --region ${AWS_REGION} | \
+                  docker login --username AWS --password-stdin ${ECR_REGISTRY}
+
+                # Har service ke liye build + push
+                for service in api-gateway user-service order-service payment-service \
+                               inventory-service notification-service product-service shipping-service; do
+                  echo "Docker building \$service:${IMAGE_TAG}..."
+                  docker build -t ${ECR_REGISTRY}/\$service:${IMAGE_TAG} ./\$service/
+                  docker push ${ECR_REGISTRY}/\$service:${IMAGE_TAG}
+                  echo "\$service pushed ✓"
+                done
+              """
+            }
+          }
+        }
+      }
+
+      stage('Security Scan — Trivy') {
+        # Docker image vulnerability scan — production must!
+        steps {
+          container('docker') {
+            sh """
+              # Trivy install
+              wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_Linux-64bit.tar.gz
+              tar xzf trivy_Linux-64bit.tar.gz
+
+              # Order service scan (critical + high vulnerabilities fail karein pipeline)
+              ./trivy image --exit-code 1 --severity CRITICAL \
+                ${ECR_REGISTRY}/order-service:${IMAGE_TAG}
+            """
+          }
+        }
+      }
+
+      stage('Deploy to Production') {
+        steps {
+          container('kubectl') {
+            withKubeConfig([credentialsId: 'eks-kubeconfig']) {
+              sh """
+                # ConfigMap update (agar changed)
+                kubectl apply -f k8s/configmaps/ -n ${K8S_NAMESPACE}
+
+                # Har service ka image update karo (rolling update!)
+                for service in api-gateway user-service order-service payment-service \
+                               inventory-service notification-service product-service shipping-service; do
+                  echo "Deploying \$service:${IMAGE_TAG}..."
+                  kubectl set image deployment/\$service \
+                    \$service=${ECR_REGISTRY}/\$service:${IMAGE_TAG} \
+                    -n ${K8S_NAMESPACE}
+                done
+
+                echo "All deployments triggered"
+              """
+            }
+          }
+        }
+      }
+
+      stage('Deployment Verification') {
+        steps {
+          container('kubectl') {
+            withKubeConfig([credentialsId: 'eks-kubeconfig']) {
+              sh """
+                # Wait for rollouts to complete (max 5 minutes each)
+                for service in user-service order-service payment-service; do
+                  echo "Waiting for \$service rollout..."
+                  kubectl rollout status deployment/\$service \
+                    -n ${K8S_NAMESPACE} --timeout=5m
+                done
+
+                echo "All services deployed successfully!"
+                kubectl get pods -n ${K8S_NAMESPACE}
+              """
+            }
+          }
+        }
+      }
+
+      stage('Smoke Tests') {
+        steps {
+          sh """
+            # Basic health checks ke baad
+            sleep 30
+
+            # API Gateway health check
+            response=\$(curl -s -o /dev/null -w "%{http_code}" \
+                         https://api.yourapp.com/actuator/health)
+            if [ \$response -eq 200 ]; then
+              echo "✅ Production healthy!"
+            else
+              echo "❌ Production unhealthy: \$response"
+              exit 1
+            fi
+          """
+        }
+      }
+    }
+
+    post {
+      success {
+        slackSend(
+          channel: '#deployments',
+          color: 'good',
+          message: "✅ Deployment SUCCESS: v${IMAGE_TAG} deployed to production"
+        )
+      }
+      failure {
+        slackSend(
+          channel: '#deployments',
+          color: 'danger',
+          message: "❌ Deployment FAILED: v${IMAGE_TAG} — Check Jenkins logs"
+        )
+        # Auto-rollback on failure!
+        container('kubectl') {
+          withKubeConfig([credentialsId: 'eks-kubeconfig']) {
+            sh """
+              echo "Rolling back all services..."
+              for service in api-gateway user-service order-service; do
+                kubectl rollout undo deployment/\$service -n ${K8S_NAMESPACE}
+              done
+            """
+          }
+        }
+      }
+    }
+  }
+
+
+==========================================================================================
+  STEP 12: DEPLOYMENT STRATEGY — ZERO DOWNTIME
+==========================================================================================
+
+ROLLING UPDATE (Default — Production Standard):
+-------------------------------------------------
+  Strategy:
+    replicas: 4     (4 pods running)
+    maxSurge: 1     → Temporarily 5 pods ban sakte hain
+    maxUnavailable: 0 → Hamesha 4 pods available
+
+  Flow:
+    Original: [v1.0] [v1.0] [v1.0] [v1.0]  (4 pods)
+
+    Step 1: New pod add karo
+    State:   [v1.0] [v1.0] [v1.0] [v1.0] [v1.1]  (5 pods)
+
+    Step 2: v1.1 ready hone pe ek v1.0 hatao
+    State:   [v1.0] [v1.0] [v1.0] [v1.1]  (4 pods)
+
+    Step 3: Process repeat
+    State:   [v1.0] [v1.0] [v1.1] [v1.1]  (4 pods)
+
+    Final:   [v1.1] [v1.1] [v1.1] [v1.1]  (4 pods)
+
+    ✓ Hamesha 4 pods available → NO DOWNTIME!
+
+COMMANDS:
+----------
+  # Deploy karo
+  $ kubectl set image deployment/order-service \
+      order-service=123456789.dkr.ecr.ap-south-1.amazonaws.com/order-service:1.0.6 \
+      -n production
+
+  # Progress dekho
+  $ kubectl rollout status deployment/order-service -n production
+  Waiting for deployment "order-service" rollout to finish: 1 out of 2 new replicas have been updated...
+  Waiting for deployment "order-service" rollout to finish: 1 old replicas are pending termination...
+  deployment "order-service" successfully rolled out
+
+  # ROLLBACK (kuch galat hua!)
+  $ kubectl rollout undo deployment/order-service -n production
+  # Immediately previous version restore ho jaata hai
+
+  # Specific version pe rollback
+  $ kubectl rollout history deployment/order-service -n production
+  REVISION  CHANGE-CAUSE
+  1         Initial deploy
+  2         v1.0.5-abc1234
+  3         v1.0.6-def5678   ← current
+
+  $ kubectl rollout undo deployment/order-service --to-revision=2 -n production
+
+HORIZONTAL POD AUTOSCALER (HPA):
+----------------------------------
+  # k8s/hpa/hpa.yaml
+  apiVersion: autoscaling/v2
+  kind: HorizontalPodAutoscaler
+  metadata:
+    name: order-service-hpa
+    namespace: production
+  spec:
+    scaleTargetRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: order-service
+    minReplicas: 2     # Minimum 2 — hamesha HA
+    maxReplicas: 10    # Maximum 10 — cost control
+    metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          target:
+            type: Utilization
+            averageUtilization: 70   # CPU 70% → scale out
+
+  # Effect:
+  # Normal:     2 replicas
+  # Sale event: Traffic spike → CPU 70%+ → 4, 6, 8 pods automatically!
+  # Sale over:  Traffic kam → CPU neeche → pods reduce
+
+
+==========================================================================================
+  STEP 13: DEBUGGING IN PRODUCTION
+==========================================================================================
+
+KUBECTL DEBUGGING COMMANDS:
+-----------------------------
+  # Sab pods ka status
+  $ kubectl get pods -n production
+  NAME                            READY   STATUS    RESTARTS   AGE
+  order-service-7d6c4b5f8-abc12   1/1     Running   0          2h
+  order-service-7d6c4b5f8-def34   1/1     Running   2          2h   ← 2 restarts!
+  user-service-6c5d4a3b2-ghi56    0/1     CrashLoopBackOff  5  1h  ← PROBLEM!
+
+  # Specific pod ke logs
+  $ kubectl logs order-service-7d6c4b5f8-abc12 -n production
+  $ kubectl logs order-service-7d6c4b5f8-abc12 -n production --previous  # Crash hone se pehle ke logs
+  $ kubectl logs -f order-service-7d6c4b5f8-abc12 -n production  # Live streaming
+
+  # Deployment describe karo (events + config dekho)
+  $ kubectl describe deployment order-service -n production
+  # → Image kaunsa use ho raha hai
+  # → Resource limits
+  # → Events (recent changes)
+
+  # Pod describe karo (detailed status)
+  $ kubectl describe pod order-service-7d6c4b5f8-abc12 -n production
+  # → Container status
+  # → Environment variables
+  # → Events: "OOMKilled" (memory limit exceeded)
+  #           "ImagePullBackOff" (ECR issue)
+  #           "CrashLoopBackOff" (app crash)
+
+  # Pod ke andar jao (live debugging — production pe careful!)
+  $ kubectl exec -it order-service-7d6c4b5f8-abc12 -n production -- /bin/sh
+  # Andar:
+  $ env | grep DB     # Environment variables check karo
+  $ wget -qO- http://localhost:8082/actuator/health   # Health check manually
+
+  # Resource usage dekho
+  $ kubectl top pods -n production
+  NAME                            CPU     MEMORY
+  order-service-7d6c4b5f8-abc12  250m    512Mi
+  order-service-7d6c4b5f8-def34  480m    980Mi  ← Memory limit near (1Gi)!
+
+COMMON ERRORS + DIAGNOSIS:
+----------------------------
+  ❌ CrashLoopBackOff:
+     $ kubectl logs <pod> --previous
+     Usually: App startup fail (DB connection, config missing)
+     Check: Environment variables sahi hain? RDS reachable?
+
+  ❌ OOMKilled:
+     $ kubectl describe pod <pod> | grep -A5 "Last State"
+     Reason: Memory limit exceed
+     Fix: memory limit badhao ya memory leak fix karo
+
+  ❌ ImagePullBackOff:
+     $ kubectl describe pod <pod> | grep -A3 "Events"
+     Usually: ECR credentials expire, wrong image tag, ECR permissions
+     Fix: Check IAM role, verify image tag exists in ECR
+
+  ❌ Pending (pod schedule nahi ho raha):
+     $ kubectl describe pod <pod> | grep "Events" -A10
+     Usually: Insufficient CPU/Memory on nodes
+     Fix: Node group scale karo ya resource requests kam karo
+
+CLOUDWATCH MONITORING:
+-----------------------
+  # Application logs CloudWatch mein jaayein:
+  # Kubernetes pods ke logs automatically CloudWatch Logs mein (FluentBit se)
+
+  # CloudWatch mein:
+  Log Groups: /eks/microservices/application
+  Log Streams: order-service, user-service, etc.
+
+  # Useful queries (CloudWatch Insights):
+  fields @timestamp, @message
+  | filter @message like /ERROR/
+  | sort @timestamp desc
+  | limit 100
+
+  # Metrics + Alarms:
+  CPU > 80% → SNS → Email/Slack alert
+  Memory > 80% → Alert
+  Error rate > 5% → Alert
+  Response time > 2s → Alert
+
+
+==========================================================================================
+  AWS EKS CLUSTER SETUP
+==========================================================================================
+
+EKS CLUSTER BANAO (eksctl — simplest way):
+--------------------------------------------
+  # eksctl install karo
+  $ curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" | tar xz -C /tmp
+  $ sudo mv /tmp/eksctl /usr/local/bin
+
+  # Cluster create karo
+  $ eksctl create cluster \
+    --name microservices-prod \
+    --region ap-south-1 \
+    --nodegroup-name standard-workers \
+    --node-type t3.medium \
+    --nodes 3 \
+    --nodes-min 2 \
+    --nodes-max 5 \
+    --managed
+
+  # WHY MANAGED NODE GROUP?
+  # AWS automatically OS updates, security patches karta hai nodes pe
+  # Self-managed → tum khud karo → risky aur time-consuming
+
+  # ~15-20 minutes lagenge
+
+  # Kubectl configure karo
+  $ aws eks update-kubeconfig --name microservices-prod --region ap-south-1
+
+  # Verify
+  $ kubectl get nodes
+  NAME                                         STATUS   ROLES   AGE
+  ip-10-0-1-100.ap-south-1.compute.internal   Ready    <none>  2m
+  ip-10-0-2-100.ap-south-1.compute.internal   Ready    <none>  2m
+  ip-10-0-3-100.ap-south-1.compute.internal   Ready    <none>  2m
+
+
+==========================================================================================
+  PRODUCTION COMMON MISTAKES
+==========================================================================================
+
+  MISTAKE 1: :latest tag production mein
+  ❌ image: order-service:latest
+  ✓  image: 123456789.dkr.ecr.../order-service:1.0.5-abc1234
+  Why? Latest → kaunsi version hai? Rollback kaise karein? Reproducibility khatam
+
+  MISTAKE 2: Resource limits nahi lagana
+  ❌ resources: {}
+  ✓  resources: { requests: {cpu: 250m, memory: 512Mi}, limits: {cpu: 500m, memory: 1Gi} }
+  Why? Bina limits: ek pod saari node kha jaaye → dusre pods crash → cascade failure
+
+  MISTAKE 3: Single replica per service
+  ❌ replicas: 1
+  ✓  replicas: 2+ (across AZs)
+  Why? Pod restart = 30-60 second downtime. 2 replicas = zero downtime
+
+  MISTAKE 4: DB credentials code mein
+  ❌ password: SuperSecret123
+  ✓  password: ${DB_PASSWORD}  (Secret se)
+  Why? Git mein commit = internet pe expose = breach
+
+  MISTAKE 5: Pod ke andar DB run karna
+  ❌ postgres:15 container in K8s
+  ✓  AWS RDS
+  Why? Pod delete = data loss (even with PVC — not enterprise grade)
+
+  MISTAKE 6: No health probes
+  ❌ No livenessProbe, no readinessProbe
+  ✓  Both probes with correct paths
+  Why? App deadlock → pod "Running" dikhta hai → traffic aata hai → errors!
+  Readiness: Traffic tabhi do jab actually ready ho
+
+  MISTAKE 7: No graceful shutdown
+  ❌ App abruptly terminate
+  ✓  preStop hook + terminationGracePeriodSeconds: 60
+  Why? In-flight requests fail honge → user errors
+
+  MISTAKE 8: All services same namespace mein without RBAC
+  ❌ sab kuch default namespace
+  ✓  Separate namespaces (production, staging) + RBAC
+  Why? Developer staging mein change kare, production affect nahi hona chahiye
+
+  MISTAKE 9: No resource quotas on namespace
+  ❌ Unlimited resources
+  ✓  ResourceQuota on production namespace
+  Why? Bug → infinite pods → entire cluster crash
+
+  MISTAKE 10: Monitoring baad mein add karo
+  ❌ "Baad mein Prometheus + Grafana lagayenge"
+  ✓  Day 1 se CloudWatch/Prometheus
+  Why? Production issue aaya, logs nahi → blind troubleshooting
+
+
+==========================================================================================
+  HOW TO SCALE — PRODUCTION SCALING STRATEGIES
+==========================================================================================
+
+HORIZONTAL SCALING (Add more pods):
+-------------------------------------
+  Auto: HPA — CPU/Memory based (already done in Step 12)
+  Manual: $ kubectl scale deployment order-service --replicas=6 -n production
+
+VERTICAL SCALING (Bigger pods):
+---------------------------------
+  $ kubectl edit deployment order-service -n production
+  # resources.limits.cpu 500m → 1000m badhao
+
+NODE SCALING (Add more EC2 nodes):
+------------------------------------
+  EKS Cluster Autoscaler:
+  Pod pending (no node resources) → Cluster Autoscaler → New EC2 node add
+  Low utilization → Node remove (cost save)
+
+  $ eksctl scale nodegroup \
+    --cluster=microservices-prod \
+    --nodes=5 \
+    --name=standard-workers
+
+DATABASE SCALING:
+------------------
+  Read scaling: Read Replicas → Route read queries there
+  Write scaling: RDS Instance type upgrade (t3.medium → r5.large)
+  Vertical: Upgrade instance class (manual, brief downtime)
+  Connection scaling: PgBouncer connection pooler
+
+KAFKA SCALING:
+---------------
+  Add more brokers: AWS MSK → Modify cluster → Add broker nodes
+  Partition increase: kafka-topics.sh --alter --partitions 12
+  (Partitions sirf increase ho sakti hain, decrease nahi)
+
+INTERVIEW ANSWER — "System slow ho gaya, kya karoge?":
+-------------------------------------------------------
+  "Pehle metrics check karta hun — CloudWatch mein CPU, Memory, Response time.
+   Agar specific service ka CPU high hai → HPA already scale kar raha hoga.
+   Agar DB slow queries hain → RDS Performance Insights se identify karo → Index add karo.
+   Agar Kafka lag hai → Consumer group lag metrics dekho → consumers scale karo.
+   Agar saari services slow hain → Node level metrics → Node scale karo ya instance upgrade.
+   Long term: Bottleneck identify karo → Address karo → Load test karo."
+
+
+==========================================================================================
+  COMPLETE ARCHITECTURE — INTERVIEW EXPLANATION
+==========================================================================================
+
+SIMPLE VERSION (30 seconds):
+------------------------------
+  "User request aata hai domain pe → Route 53 AWS ALB pe bhejta hai →
+   ALB NGINX Ingress ko → Ingress sahi microservice route karta hai →
+   API Gateway authentication check karta hai → Business service process karta hai →
+   AWS RDS se data → AWS MSK pe events → CloudWatch sab monitor karta hai →
+   Jenkins ne build + deploy ki CI/CD se."
+
+DETAILED VERSION (2 minutes):
+-------------------------------
+  "Humara system EKS pe hai — 8 Spring Boot microservices.
+   Har service ke 2 replicas hain different Availability Zones mein — high availability ke liye.
+
+   Traffic flow:
+   User HTTPS request karta hai → AWS ALB SSL terminate karta hai →
+   NGINX Ingress Controller path-based routing karta hai →
+   API Gateway pod authentication + rate limiting karta hai →
+   Specific service pod request process karta hai.
+
+   Services ek doosre se K8s DNS names se communicate karti hain — localhost nahi.
+   order-service → http://inventory-service:8084 → K8s DNS resolve karta hai.
+
+   Persistence ke liye AWS RDS PostgreSQL hai Multi-AZ mein.
+   Async communication ke liye AWS MSK managed Kafka hai — 3 brokers, 3 AZs.
+
+   Secrets AWS Secrets Manager mein hain — External Secrets Operator K8s mein sync karta hai.
+   ConfigMaps non-sensitive config ke liye.
+
+   CI/CD Jenkins mein hai — GitHub push → webhook → pipeline trigger →
+   Maven build → Docker multi-stage build → ECR push → kubectl rolling update →
+   Zero downtime deployment.
+
+   Monitoring CloudWatch mein — FluentBit logs ship karta hai → Alarms Slack pe alert karte hain."
+
+==========================================================================================
+  QUICK COMMAND REFERENCE
+==========================================================================================
+
+  # Cluster status
+  $ kubectl get all -n production
+
+  # Deploy new version
+  $ kubectl set image deployment/<service> <service>=<ecr>/<service>:<tag> -n production
+
+  # Rollout status
+  $ kubectl rollout status deployment/<service> -n production
+
+  # Rollback
+  $ kubectl rollout undo deployment/<service> -n production
+
+  # Logs
+  $ kubectl logs -f <pod-name> -n production
+
+  # Pod describe
+  $ kubectl describe pod <pod-name> -n production
+
+  # Resource usage
+  $ kubectl top pods -n production
+
+  # Scale manually
+  $ kubectl scale deployment <service> --replicas=4 -n production
+
+  # Exec into pod
+  $ kubectl exec -it <pod-name> -n production -- /bin/sh
+
+  # Config map update
+  $ kubectl apply -f k8s/configmaps/ -n production
+
+  # All events (recent activity)
+  $ kubectl get events -n production --sort-by=.lastTimestamp | tail -20
+
+==========================================================================================
