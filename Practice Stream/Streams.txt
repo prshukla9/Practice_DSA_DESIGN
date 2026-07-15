@@ -1,0 +1,953 @@
+
+BASIC OPERATOR
+
+import java.util.*;
+import java.util.stream.*;
+
+class Main {
+		Convert list to stream
+		Filter even numbers
+		Filter strings starting with 'A'
+		Convert list of strings to uppercase
+		Convert list of integers to squares
+		Count elements > 10
+		Find first element
+		Find any element
+		Check all match condition
+		Check any match condition
+		
+		
+    public static void main(String[] args) {
+        // convert list to stream
+        List<Integer> list = Arrays.asList(3,2,1);
+        Stream<Integer> stream = list.stream();
+        stream.forEach(System.out::println);
+        // filter with even number 
+        list = Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8);
+        List<Integer> even = list.stream().filter(x->x%2==0).collect(Collectors.toList());
+        System.out.println(even);
+        List<String> stringList = Arrays.asList("Amit", "Bhavesh", "Anita", "Chetan");
+        List<String> filterStringList = stringList.stream().filter(s-> s.startsWith("A")).collect(Collectors.toList());
+        System.out.println(filterStringList);
+        List<String> names = Arrays.asList("amit", "bhavesh", "chetan");
+        List<String> upper = names.stream().map(String::toUpperCase).collect(Collectors.toList());
+        System.out.println(upper);
+        // Har String ko lo aur uspar toUpperCase() method call kar do.
+        // same hi hai 
+        // x->x.toUpperCase()
+        
+        // conver list to squares of it
+        List<Integer> nums = Arrays.asList(1, 2, 3, 4, 5);
+         List<Integer> squares = nums.stream().map(x->x*x).collect(Collectors.toList());
+         System.out.println(squares);
+        // count element>10 
+        List<Integer> nums2 = Arrays.asList(1, 2, 3, 4, 5,12);
+        long count = nums2.stream().filter(x-> x>10).count();
+        System.out.println(count);
+        
+        // find first element
+         nums = Arrays.asList(7, 3, 9, 1);
+        Optional<Integer> first = nums.stream().findFirst();
+        System.out.println(first.orElse(-1));
+        // find any element 
+         List<Integer> nums1 = Arrays.asList(7, 3, 9, 1);
+         Optional<Integer> any = nums1.stream().findAny();
+        System.out.println("Any: " + any.orElse(-1));
+        
+        
+        // Any even/ all even match 
+        // boolean rahega 
+        nums = Arrays.asList(2, 4, 6, 8);
+        boolean anyEven = nums.stream().anyMatch(x->x%2==0);
+        boolean allOdd = nums.stream().allMatch(x->x%2!=0);
+        System.out.println("All odd: " + allOdd + "Any Even: " + anyEven);
+        
+    }
+	-----------------------------------------------------------------------------------------------------------------------------
+	--------------------------------------------------MAP/FILTER---------------------------------------------------------------------------
+	-----------------------------------------------------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------------------------------------------------------
+	Extract names from list of objects
+	Filter employees with salary > 50k
+	Convert list of objects to list of IDs
+	Remove null values from list
+	Filter distinct elements
+	Convert string list to length list
+	Get emails of all users
+	Filter based on multiple conditions
+	Map values and collect
+	Filter and sort together
+	
+	
+
+class Main {
+    public static void main(String[] args) {
+        // Extract names from list of objects
+        List<Employee> emps = Arrays.asList(
+            new Employee("Amit", 40000),
+            new Employee("Bhavesh", 60000)
+        );
+        List<String> empNames = emps.stream().map(Employee::getName).collect(Collectors.toList());
+        
+        // List<String> empNames = emps.stream().map(Employee->Employee.name).collect(Collectors.toList());
+        System.out.println(empNames);
+        
+        // Filter employees with salary > 50k
+        // ye jo return mil raha hai Employee object me milega agar, Employee name chahte ho .map lagao jo iss object ko strung me change kare 
+        List<Employee> employeeSalary = emps.stream().filter(Employee->Employee.salary > 5000).collect(Collectors.toList());
+        // map(Employee->Employee.name).
+        System.out.println(employeeSalary);
+        // Filter distinct elements
+        // use in stream() .distinct().collect(Colectors.toList());
+        
+        // remove null values from array
+        // filter not null()
+        // x->x!=null   
+        // .forEach(System.out::println)
+        
+        // Filter based on multiple conditions
+        // salary more than 50k AND NAME STARTS with B
+        employeeSalary = emps.stream().filter(Employee->Employee.salary > 5000 && Employee.name.startsWith("A")).collect(Collectors.toList());
+        System.out.println(employeeSalary);
+        
+        // . Map values and collect--> use filter and map
+        List<Double> list = emps.stream().filter(Employee->Employee.salary%2==0)
+        .map(Employee->Employee.salary* 2).collect(Collectors.toList());
+        System.out.println(list);
+        
+        // Filter and sort together
+        // comparator lagega bhaiya kyunki sorted kis form me hai poore emplyee form me 
+        List<Employee> result = emps.stream()
+        .filter(e -> e.getSalary() > 50000)
+            .sorted(Comparator.comparingDouble(Employee->Employee.salary))
+            .collect(Collectors.toList());
+            result.forEach(e -> System.out.println(e.getName() + " - " + e.getSalary()));
+    }
+}
+
+    
+class Employee {
+    String name; double salary;
+    Employee(String name, double salary) { this.name = name; this.salary = salary; }
+    public String getName() { return name; }
+    public double getSalary() { return salary; }
+}
+
+
+
+	-----------------------------------------------------------------------------------------------------------------------------
+	--------------------------------------------------Sorted---------------------------------------------------------------------------
+	-----------------------------------------------------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------------------------------------------------------
+	
+class Main {
+    public static void main(String[] args) {
+        // sort integer ascending 
+        List<Integer> nums = Arrays.asList(5, 1, 4, 2, 3);
+        List<Integer> sorted = nums.stream().sorted().collect(Collectors.toList());
+        System.out.println(sorted);
+        
+        // sort string by length
+        List<String> words = Arrays.asList("Banana", "Fig", "Apple", "Kiwi");
+        List<String> sorted2 = words.stream().sorted(Comparator.comparingInt(x->x.length())).collect(Collectors.toList());
+        System.out.println(sorted2);
+        
+        // sort integer by descending
+        sorted = nums.stream().sorted(Comparator.reverseOrder()).collect(Collectors.toList());
+        System.out.println(sorted);
+        
+        // //////////////////////////////////////
+        
+          List<Employee> emps = Arrays.asList(
+            new Employee("Chetan", 50000),
+            new Employee("Amit", 40000),
+            new Employee("Bhavesh", 60000)
+        );
+        
+        // sort employee by salary
+        List<Employee> employee = emps.stream().sorted(Comparator.comparingDouble(Employee->Employee.salary)).collect(Collectors.toList());
+        employee.forEach(e->e.getName());
+        
+        // sort objects by field
+        List<Employee> sorted3 = emps.stream()
+                            .sorted(Comparator.comparing(x->x.name))
+                            .collect(Collectors.toList());
+        sorted3.forEach(e->System.out.println(e.getName()));           
+        // bhaiya dekho  jbbhi aap lambda lagaynge 
+        // yaad rakhiyega forEach me lagaye e-> SOP(e.....)
+        
+        //sort by multiple field IMP
+        sorted3 = emps.stream()
+        .sorted(
+            Comparator.comparing(Employee::getName)
+                      .thenComparingDouble(e->e.salary)
+        .reversed())
+        .collect(Collectors.toList());
+
+sorted3.forEach(e ->
+        System.out.println(e.getSalary() + " - " + e.getName()));
+        
+        // sort map by keys
+        Map<String, Integer> map = new HashMap<>();
+        map.put("Banana",3); map.put("Apple", 2);
+        map.entrySet().stream().sorted(Map.Entry.comparingByValue())
+            .forEach(e->System.out.println(e.getValue()));        
+        
+        // sort map by values
+        map.entrySet().stream().sorted(Map.Entry.comparingByValue()).forEach(e->System.out.println(e.getValue()))
+        
+        
+        // custom comparator sorting 
+        // last character se compare kara hai 
+        // a, e, g, i
+        words = Arrays.asList("Banana", "Fig", "Apple", "Kiwi");
+        List<String> sorted4 = words.stream()
+                .sorted((a, b) -> a.charAt(a.length()-1) - b.charAt(b.length()-1))
+                .collect(Collectors.toList());
+        System.out.println(sorted4);
+            
+        
+        
+}
+}
+    
+class Employee {
+    String name; double salary;
+    Employee(String name, double salary) { this.name = name; this.salary = salary; }
+    public String getName() { return name; }
+    public double getSalary() { return salary; }
+}
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+	--------------------------------------------------   COLLECTORS   ---------------------------------------------------------------------------
+	-----------------------------------------------------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------------------------------------------------------
+	[ ] Convert to list
+	[ ] Convert to set
+	[ ] Convert to map
+	[ ] Group by field
+	[ ] Count occurrences using grouping
+	[ ] Join strings
+	[ ] Partition by condition
+	[ ] Collect into custom object
+	[ ] Summarizing statistics
+	[ ] Mapping with collectors
+
+grouping by-----> group me daalta hai key value bana kr key em items gaye value me uske clount chale gaye 
+partition By ----> 2 group me daalta hai boolean ke true and false 
+
+
+
+collect(Collectors.toList())
+and toSet()
+
+Convert to map is good
+Collectors.toMap(e->e.id, e->e.name)
+
+partitionning and grouping 
+
+ public static void main(String[] args) {
+        List<Emp2> emps = Arrays.asList(
+            new Emp2("IT", "Amit"),
+            new Emp2("HR", "Bhavesh"),
+            new Emp2("IT", "Chetan")
+        );
+        
+        // group by field
+        Map<String, List<Emp2>> list = emps.stream().collect(Collectors.groupingBy(e->e.dept));
+        list.forEach((dept, list2)->{ System.out.println(dept);
+        list2.forEach(e->System.out.println(e.name));}
+        );
+        
+        // Count occurence using grouping 
+        Map<String, Long> countOccurences = emps.stream().collect(Collectors.groupingBy(w->w.name, Collectors.counting()));
+        System.out.println(countOccurences);
+        
+        
+        // Partition by condition
+        // Map<Boolean, List<Emp2>> partitioned = emps.stream()
+        Map<Boolean, List<String>> partitioned = emps.stream()
+        
+        .collect(Collectors.partitioningBy(
+                e -> e.getName().startsWith("A"), Collectors.mapping(e->e.name, Collectors.toList())
+        ));
+        System.out.println("Even: " + partitioned.get(true));
+        System.out.println("Odd: " + partitioned.get(false));
+        // Mapping with collectors
+        // group krke nikaalo dept aur phir unko lit me leaao
+        
+        Map<String, List<String>> result = emps.stream()
+        .collect(Collectors.groupingBy(
+                Emp2::getDept,
+                Collectors.mapping(
+                        Emp2::getName,
+                        Collectors.toList()
+                )
+        ));
+        System.out.println(result);
+    }
+}
+    
+class Emp2 {
+    String dept, name;
+    Emp2(String dept, String name) { this.dept = dept; this.name = name; }
+    public String getDept() { return dept; }
+    public String getName() { return name; }
+}
+
+
+
+
+List<Emp2> emps = Arrays.asList(
+            new Emp2("IT", "Amit"),
+            new Emp2("HR", "Bhavesh"),
+            new Emp2("IT", "Chetan")
+        );
+        Map<String, List<String>> result = emps.stream()
+                .collect(Collectors.groupingBy(Emp2::getDept,
+                         Collectors.mapping(Emp2::getName, Collectors.toList())));
+        System.out.println(result);
+
+
+and bhai 
+		Map<String, List<String>> resukt = emps.stream().collect(Collectors.groupingBy(ClassName::getter here), Collectors.mapping(x->x.name, Collectors.toList())
+
+-----------------------------------------------------------------------------------------------------------------------------
+	--------------------------------------------------   COLLECTORS   ---------------------------------------------------------------------------
+	-----------------------------------------------------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------------------------------------------------------
+
+[ ] Find duplicate elements
+[ ] Find first non-repeating element
+[ ] Find second highest number
+[ ] Flatten nested lists (flatMap)
+
+
+import java.util.*;
+import java.util.stream.*;
+
+public class ProgramBonus {
+    public static void main(String[] args) {
+        String str = "swiss";
+
+        Map<Character, Long> freqMap = str.chars()
+                .mapToObj(c -> (char) c)
+                .collect(Collectors.groupingBy(c -> c, LinkedHashMap::new, Collectors.counting()));
+
+        Character result = freqMap.entrySet().stream()
+                .filter(e -> e.getValue() == 1)
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(null);
+
+        System.out.println("First non-repeating char: " + result);
+    }
+}
+
+
+
+1. Find duplicate elements
+HashSet.add() false return karta hai agar element already set mein hai — isi trick se duplicates pakadte hain. seen set track karta hai kya already dekha ja chuka hai.
+javaimport java.util.*;
+import java.util.stream.*;
+
+public class Program1 {
+    public static void main(String[] args) {
+        List<Integer> nums = Arrays.asList(1, 2, 3, 2, 4, 3, 5);
+        Set<Integer> seen = new HashSet<>();
+        List<Integer> duplicates = nums.stream()
+                .filter(x -> !seen.add(x))
+                .collect(Collectors.toList());
+        System.out.println("Duplicates: " + duplicates);
+    }
+}
+2. Find first non-repeating element
+Collections.frequency(list, x) batata hai element list mein kitni baar aaya. Jiski frequency 1 hai wahi non-repeating hai — findFirst() se pehla wala uthao.
+javaimport java.util.*;
+import java.util.stream.*;
+
+public class Program2 {
+    public static void main(String[] args) {
+        List<Integer> nums = Arrays.asList(4, 5, 4, 6, 7, 6, 8);
+        int result = nums.stream()
+                .filter(x -> Collections.frequency(nums, x) == 1)
+                .findFirst()
+                .orElse(-1);
+        System.out.println("First non-repeating: " + result);
+    }
+}
+3. Find second highest number
+Pehle descending sort karo (reverseOrder()), phir skip(1) se sabse bada element skip karo, aur jo bacha usme se findFirst() uthao. Note: duplicates ho to pehle distinct() lagana zaroori hai warna dono top values same nikal aayenge.
+javaimport java.util.*;
+import java.util.stream.*;
+
+public class Program3 {
+    public static void main(String[] args) {
+        List<Integer> nums = Arrays.asList(10, 20, 4, 45, 99, 99, 30);
+        int secondHighest = nums.stream()
+                .distinct()
+                .sorted(Collections.reverseOrder())
+                .skip(1)
+                .findFirst()
+                .orElse(-1);
+        System.out.println("Second Highest: " + secondHighest);
+    }
+}
+4. Flatten nested lists (flatMap)
+map() list ke andar list rakh deta (List<List<Integer>>), lekin flatMap() un sab inner lists ko todke ek single flat stream bana deta hai. Jab bhi "list of lists" ko ek list banana ho, flatMap yaad rakhna.
+javaimport java.util.*;
+import java.util.stream.*;
+
+public class Program4 {
+    public static void main(String[] args) {
+        List<List<Integer>> nestedList = Arrays.asList(
+            Arrays.asList(1, 2, 3),
+            Arrays.asList(4, 5),
+            Arrays.asList(6, 7, 8, 9)
+        );
+        List<Integer> flatList = nestedList.stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
+        System.out.println(flatList);
+    }
+}
+Yaad rakhna: map() = 1 element → 1 element, flatMap() = 1 element (jo khud ek collection hai) → uske sab elements nikaal ke flatten kar do.
+Bolo "next" to baaki GROUPING ya ADVANCED wale bache hue 10 karte hain.grouping  vaale krde aur saath me string me first non repeating letter vaala bhiThought processThought processChalo, GROUPING ke 10 + bonus.
+1. Group employees by department
+groupingBy() ek field ke basis pe Map<Key, List<Object>> banata hai — same dept wale sab ek list mein aa jaate hain.
+javaimport java.util.*;
+import java.util.stream.*;
+
+class Employee {
+    String name, dept; double salary;
+    Employee(String name, String dept, double salary) {
+        this.name = name; this.dept = dept; this.salary = salary;
+    }
+    public String getName() { return name; }
+    public String getDept() { return dept; }
+    public double getSalary() { return salary; }
+}
+
+public class Program1 {
+    public static void main(String[] args) {
+        List<Employee> emps = Arrays.asList(
+            new Employee("Amit", "IT", 40000),
+            new Employee("Bhavesh", "HR", 60000),
+            new Employee("Chetan", "IT", 55000)
+        );
+        Map<String, List<Employee>> grouped = emps.stream()
+                .collect(Collectors.groupingBy(Employee::getDept));
+        grouped.forEach((dept, list) -> {
+            System.out.println(dept + ":");
+            list.forEach(e -> System.out.println("  " + e.getName()));
+        });
+    }
+}
+2. Count employees per department
+groupingBy() + Collectors.counting() — group ke andar sirf ginti chahiye, poori list nahi.
+javaimport java.util.*;
+import java.util.stream.*;
+
+public class Program2 {
+    public static void main(String[] args) {
+        List<Employee> emps = Arrays.asList(
+            new Employee("Amit", "IT", 40000),
+            new Employee("Bhavesh", "HR", 60000),
+            new Employee("Chetan", "IT", 55000)
+        );
+        Map<String, Long> countByDept = emps.stream()
+                .collect(Collectors.groupingBy(Employee::getDept, Collectors.counting()));
+        System.out.println(countByDept);
+    }
+}
+3. Find highest salary per department
+groupingBy() + Collectors.maxBy(Comparator) — har group ke andar max value nikaalne ke liye downstream collector chahiye. Result Optional<Employee> mein aata hai kyunki group empty bhi ho sakta hai (theoretically).
+javaimport java.util.*;
+import java.util.stream.*;
+
+public class Program3 {
+    public static void main(String[] args) {
+        List<Employee> emps = Arrays.asList(
+            new Employee("Amit", "IT", 40000),
+            new Employee("Bhavesh", "HR", 60000),
+            new Employee("Chetan", "IT", 55000)
+        );
+        Map<String, Optional<Employee>> maxByDept = emps.stream()
+                .collect(Collectors.groupingBy(Employee::getDept,
+                         Collectors.maxBy(Comparator.comparingDouble(Employee::getSalary))));
+        maxByDept.forEach((dept, emp) ->
+            System.out.println(dept + " -> " + emp.map(Employee::getName).orElse("N/A")));
+    }
+}
+4. Group strings by length
+Key koi bhi function ho sakta hai — yahan String::length key hai, dept nahi.
+javaimport java.util.*;
+import java.util.stream.*;
+
+public class Program4 {
+    public static void main(String[] args) {
+        List<String> words = Arrays.asList("cat", "dog", "lion", "ant", "goat");
+        Map<Integer, List<String>> grouped = words.stream()
+                .collect(Collectors.groupingBy(String::length));
+        System.out.println(grouped);
+    }
+}
+5. Group numbers by even/odd
+Key ek boolean expression bhi ho sakti hai — technically yeh partitioningBy se bhi ho sakta tha, but groupingBy bhi kaam karta hai.
+javaimport java.util.*;
+import java.util.stream.*;
+
+public class Program5 {
+    public static void main(String[] args) {
+        List<Integer> nums = Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8);
+        Map<String, List<Integer>> grouped = nums.stream()
+                .collect(Collectors.groupingBy(x -> x % 2 == 0 ? "Even" : "Odd"));
+        System.out.println(grouped);
+    }
+}
+6. Nested grouping
+groupingBy() ke andar doosra groupingBy() daal do — pehle dept se group, phir usi group ke andar salary-range se group. Result: Map<String, Map<String, List<Employee>>>.
+javaimport java.util.*;
+import java.util.stream.*;
+
+public class Program6 {
+    public static void main(String[] args) {
+        List<Employee> emps = Arrays.asList(
+            new Employee("Amit", "IT", 40000),
+            new Employee("Bhavesh", "IT", 90000),
+            new Employee("Chetan", "HR", 55000)
+        );
+        Map<String, Map<String, List<Employee>>> nested = emps.stream()
+                .collect(Collectors.groupingBy(Employee::getDept,
+                         Collectors.groupingBy(e -> e.getSalary() > 50000 ? "High" : "Low")));
+        System.out.println(nested);
+    }
+}
+7. Group and sort
+groupingBy() khud sort nahi karta — Map bante hi entries ko entrySet().stream().sorted() se sort karo, ya list andar sort karke daalo.
+javaimport java.util.*;
+import java.util.stream.*;
+
+public class Program7 {
+    public static void main(String[] args) {
+        List<Employee> emps = Arrays.asList(
+            new Employee("Amit", "IT", 40000),
+            new Employee("Bhavesh", "HR", 60000),
+            new Employee("Chetan", "IT", 55000)
+        );
+        Map<String, List<Employee>> grouped = emps.stream()
+                .collect(Collectors.groupingBy(Employee::getDept));
+
+        grouped.forEach((dept, list) -> {
+            List<Employee> sorted = list.stream()
+                    .sorted(Comparator.comparingDouble(Employee::getSalary))
+                    .collect(Collectors.toList());
+            System.out.println(dept + ": ");
+            sorted.forEach(e -> System.out.println("  " + e.getName() + " - " + e.getSalary()));
+        });
+    }
+}
+8. Group and filter
+Filter ko groupingBy() se pehle lagao agar overall list chhaanni hai, ya group karne ke baad lagao agar sirf kuch groups chahiye. Yahan pehle filter kar rahe hain.
+javaimport java.util.*;
+import java.util.stream.*;
+
+public class Program8 {
+    public static void main(String[] args) {
+        List<Employee> emps = Arrays.asList(
+            new Employee("Amit", "IT", 40000),
+            new Employee("Bhavesh", "HR", 60000),
+            new Employee("Chetan", "IT", 55000)
+        );
+        Map<String, List<Employee>> grouped = emps.stream()
+                .filter(e -> e.getSalary() > 45000)
+                .collect(Collectors.groupingBy(Employee::getDept));
+        System.out.println(grouped);
+    }
+}
+9. Group into custom DTO
+Collectors.toMap() ya groupingBy ka result custom object mein bhi convert kar sakte ho — yahan har dept ke liye ek summary DTO bana rahe hain.
+javaimport java.util.*;
+import java.util.stream.*;
+
+class DeptSummary {
+    String dept; long count;
+    DeptSummary(String dept, long count) { this.dept = dept; this.count = count; }
+    public String toString() { return dept + " -> " + count + " employees"; }
+}
+
+public class Program9 {
+    public static void main(String[] args) {
+        List<Employee> emps = Arrays.asList(
+            new Employee("Amit", "IT", 40000),
+            new Employee("Bhavesh", "HR", 60000),
+            new Employee("Chetan", "IT", 55000)
+        );
+        Map<String, Long> countMap = emps.stream()
+                .collect(Collectors.groupingBy(Employee::getDept, Collectors.counting()));
+
+        List<DeptSummary> summaries = countMap.entrySet().stream()
+                .map(e -> new DeptSummary(e.getKey(), e.getValue()))
+                .collect(Collectors.toList());
+        summaries.forEach(System.out::println);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+------------------------------------------------------------from previous more popular way explained------------------------------------------------
+
+
+package com.opentorelocate.practice.streams;
+
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+/*
+* Collectors kya kr skte hai--> Collectors.collectingAndThen(Collectors.maxBy(Comparator.compa))
+* Yaad rakho bhai
+                toList()	List bana deta hai
+                groupingBy()	Map bana deta hai
+                maxBy()	max element deta hai
+                averagingDouble()	average nikaalta hai
+
+ */
+public class StreamsPractice {
+
+// Non repeating and repeating characters HAHHA
+    /*.chars()--> ascii me change krdo string ko
+    .mapToObj(c-> chars(c)) vaapis 98, 97--> ['b','a']
+    ab group banao iss map ka aur maintain karo inka insertion order using linkedHashMap
+    .collect(Collectors.groupingBy((Function.identity(), LinkedHashMap::new ,Collectors.counting()))
+    map ban chuka hai unke numbers ke saath
+    .entrySet.stream() map ko tsream me convert aur netry set kya krta hai [(k,v),(k,v),(k,v)] aise stream me read ho jaayeg a
+    .filter(e->e.getValue()>1) vo values nikaal lo map se .map(Map.Entry::getKey)--> aur vo saare keys dedo entry = (k,value)
+    take key only toh Map.Entry::getKey --> Map.Entry<key, value>
+    .findFirst().orElse(null);
+    .map()-->
+    */
+
+    public static void main(String args[])
+    {
+    String nonRepeating = "abbadacdee";
+    Character nonRepeatingChar =
+            nonRepeating.chars().mapToObj(c -> (char) c)
+                    .collect(Collectors.groupingBy(Function.identity(), LinkedHashMap::new, Collectors.counting()))
+                    .entrySet().stream().filter(value -> value.getValue() < 2).map(Map.Entry::getKey)
+                    .findFirst().orElse(null);
+    System.out.println(nonRepeatingChar);
+
+    String repeating = "abcdesddrr";
+    System.out.println(
+            repeating.chars().mapToObj(c->(char)c)
+                    .collect(Collectors.groupingBy(Function.identity(), LinkedHashMap::new, Collectors.counting()))
+                    .entrySet()
+//                    ab map me entrySet --> [(k,v),(k,v),(k,v),(k,v)] lelo bhai key value strema me
+                    .stream().filter(values->values.getValue()>=2)
+                    .map(Map.Entry::getKey)
+//                    Map.Entry--> enytry = [K, V] toh keys nikaal lo
+                    .findFirst().orElse(null)
+    );
+
+    List<EmployeeStreamClass> employee = Arrays.asList(
+            new EmployeeStreamClass(1, "Aman", "HR", 400000),
+            new EmployeeStreamClass(2, "Rahul", "IT", 700000),
+            new EmployeeStreamClass(3, "Neha", "HR", 450000),
+            new EmployeeStreamClass(4, "Sita", "Finance", 300000),
+            new EmployeeStreamClass(5, "John", "HR", 600000)
+    );
+    List<EmployeeStreamClass> employeeSalaryFilter = findHrDeptAndMoreSalary(employee);
+    employeeSalaryFilter.forEach(System.out::println);
+//    -------------------------------level wise part 1-------------------------------
+        part1(employee);
+        part2(employee);
+//        --------------------------------part 3-----------------------------------------
+        part3(employee);
+}
+
+
+    public static List<EmployeeStreamClass> findHrDeptAndMoreSalary(List<EmployeeStreamClass> employeeStreamClasses){
+
+        return (
+                employeeStreamClasses.stream().filter(value->value.department.equals("HR"))
+                        .filter(employeeSalary-> employeeSalary.salary > 500000)
+//                        or you can write .filter(value->value.department.equals("HR") && value.salary>50000)
+//                        .forEach(System.out::println)
+                        .collect(Collectors.toList())
+                );
+    }
+    public static List<EmployeeStreamClass> findHighestSalary(List<EmployeeStreamClass> employeeStreamClasses){
+
+        return (
+                employeeStreamClasses.stream().filter(value->value.department.equals("HR"))
+                        .filter(employeeSalary-> employeeSalary.salary > 500000)
+//                        or you can write .filter(value->value.department.equals("HR") && value.salary>50000)
+//                        .forEach(System.out::println)
+                        .collect(Collectors.toList())
+                );
+    }
+    public static List<EmployeeStreamClass> findGroupByDepartment(List<EmployeeStreamClass> employeeStreamClasses){
+
+        return (
+                employeeStreamClasses.stream().filter(value->value.department.equals("HR"))
+                        .filter(employeeSalary-> employeeSalary.salary > 500000)
+//                        or you can write .filter(value->value.department.equals("HR") && value.salary>50000)
+//                        .forEach(System.out::println)
+                        .collect(Collectors.toList())
+                );
+    }
+    public static List<EmployeeStreamClass> findAverageSalary(List<EmployeeStreamClass> employeeStreamClasses){
+
+        return (
+                employeeStreamClasses.stream().filter(value->value.department.equals("HR"))
+                        .filter(employeeSalary-> employeeSalary.salary > 500000)
+//                        or you can write .filter(value->value.department.equals("HR") && value.salary>50000)
+//                        .forEach(System.out::println)
+                        .collect(Collectors.toList())
+                );
+    }
+
+    /* Part 1
+    * List of employees me se HR department wale print karo
+        Employees ki salary > 500000 filter karo
+        All employee names list me collect karo
+        Total salary find karo (sum)
+        Average salary find karo
+        Count number of employees
+    * */
+
+    public static void part1(List<EmployeeStreamClass> employeeStreamClasses){
+//            hr department vaale print karo
+        employeeStreamClasses.stream().filter(e->e.department.equals("HR"))
+                .forEach(System.out::println);
+//        salary 50000 filter karo
+        employeeStreamClasses.stream().filter(e->e.salary>50000)
+                .forEach(System.out::println);
+//        All employee names list me collect karo
+        List<String> names = employeeStreamClasses.stream().map(employee->employee.name).collect(Collectors.toList());
+        System.out.println(names);
+//        Total salary (sum)
+//        total salary nikaalne ke liye aggregator aur bhai aggeregator map use hoga mapToINteger ya double
+        System.out.println(
+                employeeStreamClasses.stream().mapToDouble(e->e.salary).sum()
+        );
+//        Average salary
+        System.out.println(
+                employeeStreamClasses.stream().mapToDouble(e->e.salary).average()
+                        .orElse(0.0)
+        );
+//        Count number of employees
+//        bhai krni hai counting
+        System.out.println("Count" +
+                employeeStreamClasses.stream().count()
+        );
+    }
+
+
+    /*
+    * Top 3 highest salary employees
+        Lowest salary employee find karo
+        Employees ko salary ke basis pe sort karo (asc/desc)
+        Employees ko department ke basis pe group karo
+        Har department ka employee count nikaalo
+        Partition karo (salary >= 500k vs < 500k)
+        HR department ka average salary
+* */
+
+    public static void part2(List<EmployeeStreamClass> employeeStreamClasses){
+//        Top 3 highest salary employees
+//        toh bhai yaha pehle compare karo reverse krdo aur limit laga kr 3 nikaal lo
+        System.out.println("top 3 highest salaries List<Employee> list = " +
+                employeeStreamClasses.stream().sorted(Comparator.comparingDouble((EmployeeStreamClass e)->e.salary).reversed()).limit(3)
+                        .collect(Collectors.toList())
+        );
+
+//        Lowest salary employee
+//        Bhai lowest salary batao yaara
+//        stream lagao, min lagao compare krdo comparingInteger
+        System.out.println("Lowest salary of employee Employee lowest = " +
+                employeeStreamClasses.stream().min(Comparator.comparingDouble(e->e.salary))
+                        .orElse(null)
+        );
+
+//        Sort by salary (ASC / DESC)
+//        ab bhai yaha vaapis sorted laga comparator comparingDouble and comparingDouble .reversed
+//        ek hack hai bhai yaha kabhi kabhi ye smjh nahi paata e->e.salary comparing me toh
+//        (Employee____ e) -> e.salary likh do chl jaayega
+
+//        Group by department
+//        Bhai ab department me grouping by krde and map me daal de
+        System.out.println("Ye save hoga Map<String, List<Employee>> = " +
+                employeeStreamClasses.stream().collect(Collectors.groupingBy(e->e.department))
+        );
+
+//        Employee count per department
+//          Bhai bata de ab collectors groupingBy krke department me count laga de employees ke liye
+//        groupingBy(Function.indentity, Collectors.counting())
+//        -->ab kyunki hume function identity pata hai yaha that is department so e->e.department
+
+        System.out.println("Ye save hoga Map<String, Long> = " +
+                employeeStreamClasses.stream().collect(Collectors.groupingBy(e->e.department, Collectors.counting()))
+        );
+
+//        Partition (>=500k vs <500k)
+        System.out.println("Ye save Map<Boolean, List<Employee>> partition =" +
+                employeeStreamClasses.stream().collect(Collectors.partitioningBy(e->e.salary>=50000))
+        );
+//System.out.println(">=500k: " + partition.get(true));
+//System.out.println("<500k: " + partition.get(false));
+//
+//        HR department ka average salary
+        System.out.println("average salary double salary =" +
+                employeeStreamClasses.stream().filter(e->e.department.equals("HR"))
+                        .mapToDouble(e->e.salary).average().orElse(0.0)
+                );
+    }
+    /*
+    * First non-repeating character (string stream)
+        First repeating character
+        Unique elements list (distinct)
+        Duplicate elements find karo
+        Map<Character, count> create karo (frequency map)
+        Most frequent character find karo
+    * */
+
+    /*
+    *   Employees ke saare unique skills nikaalo (flatMap)
+        HR employees ke unique skills
+        Max salary per department
+        Min salary per department
+        Employee with second highest salary
+        Longest string in list
+        Group strings by length
+    * */
+//    HR employees me se top 2 salary + names only
+//    bhai top 2 salaries aur sirf naam
+//    toh limit lagade sorted krke and map laga kr sirf naam nikaal le aur list me daal de
+    public static void part3(List<EmployeeStreamClass> employeeStreamClasses){
+
+        System.out.println("Name from top salaries and department HR List<String> names = " +
+            employeeStreamClasses.stream().filter(e->e.department.equals("HR"))
+                    .sorted(Comparator.comparingDouble((EmployeeStreamClass e)->e.salary).reversed())
+                    .limit(2).map(e->e.name).collect(Collectors.toList())
+        );
+
+
+//    HR employees ke unique skills
+//    suppose skills are in List<String> flat map karo istemaal bhai
+
+//        System.out.println(" HR employees List<String> skills = " +
+//                employeeStreamClasses.stream().filter(e -> e.department.equals("HR"))
+//                        .flatMap(e->e.skills.stream())
+//                        .distinct().toList()
+//        );
+
+//        Max salary per department
+//        ab bhai pehle kkaro group inko departments ko phir then comparing collectors maxBy
+//        Bhai toh kya kara humne pata haina--> collectors use kiya collect krne ke lite group me
+//        phir jb department liya toh Collectors use kiya maxBy comparator lagane ke liye
+//
+                System.out.println(" Max slaries of employee per department Map<String, Double> maxSlary = " +
+                employeeStreamClasses.stream().collect(Collectors.groupingBy(e->e.department
+                        ,Collectors.maxBy(Comparator.comparingDouble(e->e.salary))))
+
+        );
+//        Min salary per department
+        System.out.println(" Min slaries of employee per department Map<String, Double> maxSlary = " +
+                employeeStreamClasses.stream().collect(Collectors.groupingBy(e->e.department,
+                        Collectors.minBy(Comparator.comparingDouble(e->e.salary))))
+        );
+
+//        Employee with second highest salary
+//        second highest mtlb skip krdo bhai ek reverse krke and find()
+        System.out.println(" Second Highest slaries of employee Double salary = " +
+                employeeStreamClasses.stream().sorted(Comparator.comparingDouble((EmployeeStreamClass e)->e.salary)
+                        .reversed()).skip(1).findFirst().orElse(null)
+        );
+
+//        Longest string in list
+        List<String> listOfString = Arrays.asList("Hello", "Black", "Buffalo", "with", "Small", "nails");
+        System.out.println(" String longestString =  = " +
+                listOfString.stream().max(Comparator.comparingInt(elements->elements.length()))
+//                ya iska function likh do (String::lenght)
+        );
+//        Group strings by length
+//        listOfString
+        System.out.println(" Group the Strings Map<Integer, List<String>> maxSlary = " +
+                employeeStreamClasses.stream().collect(Collectors.groupingBy(e->e.department))
+        );
+    }
+
+
+    /*
+    * HR employees me se top 2 salary + names only
+
+        Employees ka Map<Department, Avg Salary>
+        Flatten nested list (flatMap)
+        Convert List → Map (id → employee)
+        Sort employees by salary desc then name asc
+    * */
+
+    public static void part4(List<EmployeeStreamClass> employeeStreamClasses){
+//        HR employees me se top 2 salary + names only
+        System.out.println(" Max 2 salaries names.... List<String> result = " +
+                employeeStreamClasses.stream().sorted(Comparator.comparingDouble((EmployeeStreamClass e)->e.salary).reversed())
+                        .limit(2).map(e->e.name).toList()
+        );
+//        Employees ka Map<Department, Avg Salary>
+        System.out.println(" Employees ka Map<String, Dounle> employees ka map = " +
+                employeeStreamClasses.stream().collect(Collectors.groupingBy(e -> e.department, Collectors.averagingDouble(e->e.salary)))
+        );
+//        Flatten nested list (flatMap)
+//        System.out.println(" list of skills List<String> skills = " +
+//                employeeStreamClasses.stream().flatMap(e->e.skills.stream())
+//                        .collect(Collectors.toList());
+//        );
+//        Convert List → Map (id → employee)
+//        ab bhai yaha map use hoga aur map me vo convert karega key value me--> COllectors.toMap()
+        System.out.println(" Max slaries of employee per department Map<String, Double> maxSlary = " +
+                employeeStreamClasses.stream().collect(Collectors.groupingBy(e -> e.department))
+        );
+
+//        Sort employees by salary desc then name asc
+        System.out.println(" Max slaries of employee per department Map<String, Double> maxSlary = " +
+                employeeStreamClasses.stream().collect(Collectors.groupingBy(e -> e.department))
+        );
+    }
+
+
+
+    //    date -> 18/06/2026  5-7 questions of streams
+
+
+//    date -> 19/06/2026  5-7 questions of streams
+
+
+//    date -> 18/06/2026  5-7 questions of streams
+
+//    date -> 19/06/2026  5-7 questions of streams
+
+//    date -> 20/06/2026  5-7 questions of streams
+
+//    date -> 21/06/2026  5-7 questions of streams
+
+//    date -> 22/06/2026  5-7 questions of streams
+}
